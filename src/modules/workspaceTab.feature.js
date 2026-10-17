@@ -27,13 +27,15 @@ export const workspaceTabFeature = {
         const stateManager = new WorkspaceTabStateManager({
             ...domElements,
             graphqlBodyManager: ctx.get('graphqlBodyManager'),
+            authManager: ctx.get('authManager') ?? null,
         });
 
         const controller = new WorkspaceTabController(
             service,
             tabBar,
             stateManager,
-            responseContainerManager
+            responseContainerManager,
+            { requestPipeline: ctx.get('requestPipeline'), collectionRequests: ctx.get('collectionController') ?? null }
         );
 
         return { previewRepository, responseContainerManager, repository, service, tabBar, stateManager, controller };

@@ -1,5 +1,6 @@
 /* global document */
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
+import { RequestFormReader } from '../../src/modules/requestFormReader.js';
 
 describe('CollectionRequestPersistenceService protocol routing', () => {
     let repository;
@@ -36,9 +37,10 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
 
         service = new CollectionRequestPersistenceService({
             repository,
-            collectionService: { saveRequestBodyModification: jest.fn() },
+            collectionService: { saveBodyState: jest.fn() },
             statusDisplay: { update: jest.fn() },
-            refreshCollections: jest.fn()
+            refreshCollections: jest.fn(),
+            formReader: new RequestFormReader({ authManager: { getAuthConfig: () => ({ type: 'none', config: {} }) } })
         });
 
         document.body.innerHTML = `

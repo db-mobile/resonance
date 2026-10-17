@@ -3,7 +3,6 @@
  * @module services/CollectionService
  */
 
-import { app } from '../appContext.js';
 import {
     flattenRequests,
     topLevelFolders,
@@ -24,10 +23,8 @@ import {
     deriveMethod,
     deriveHttpMethod
 } from '../protocols/protocolRegistry.js';
-import { captureFormBody, getRequestBodyContent } from '../requestBodyHelper.js';
-import { toast } from '../ui/Toast.js';
 import { generateId } from '../utils/ids.js';
-import { normalizeMqttData } from '../mqtt/mqttFields.js';
+import { writeNewEndpointSidecars } from '../collections/endpointSidecars.js';
 
 export class CollectionService {
     /**
@@ -35,7 +32,8 @@ export class CollectionService {
      * @param {SchemaProcessor} schemaProcessor
      * @param {IStatusDisplay} statusDisplay
      */
-    constructor(repository, schemaProcessor, statusDisplay) {
+    constructor(repository, schemaProcessor, statusDisplay, toast = null) {
+        this.toast = toast;
         this.repository = repository;
         this.schemaProcessor = schemaProcessor;
         this.statusDisplay = statusDisplay;
@@ -172,7 +170,7 @@ export class CollectionService {
     async exportCollectionAsOpenApi(collectionId, format) {
         return this._runExport(
             `Collection exported successfully to ${format.toUpperCase()}`,
-            () => window.backendAPI.collections.exportOpenApi(collectionId, format)
+            () => this.repository.exportOpenApi(collectionId, format)
         );
     }
 
@@ -183,7 +181,7 @@ export class CollectionService {
     async exportCollectionAsPostman(collectionId) {
         return this._runExport(
             'Collection exported successfully to Postman',
-            () => window.backendAPI.collections.exportPostman(collectionId)
+            () => this.repository.exportPostman(collectionId)
         );
     }
 
@@ -218,7 +216,7 @@ export class CollectionService {
 
             const createdCollection = await this.repository.add(newCollection);
 
-            toast.success(`Collection "${name}" created`);
+            this.toast?.success(`Collection "${name}" created`);
             return createdCollection;
         });
     }
@@ -279,7 +277,7 @@ export class CollectionService {
             if (requestData.folderId) {
                 const placed = insertRequest(collection, requestData.folderId, newEndpoint);
                 await this.repository.saveOne(placed, { newRequestIds: [newEndpoint.id] });
-                await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
+                await writeNewEndpointSidecars(this.repository, collectionId, newEndpoint.id, descriptor, requestData);
                 this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
                 return newEndpoint;
             }
@@ -309,52 +307,11 @@ export class CollectionService {
 
             await this.repository.saveOne(collection, { newRequestIds: [newEndpoint.id] });
 
-            await this.persistNewEndpointSidecars(collectionId, newEndpoint.id, descriptor, requestData);
+            await writeNewEndpointSidecars(this.repository, collectionId, newEndpoint.id, descriptor, requestData);
 
             this.statusDisplay.update(`Added new request: ${requestData.name}`, null);
             return newEndpoint;
         });
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {Object} descriptor
-     * @param {Object} requestData
-     * @returns {Promise<void>}
-     */
-    async persistNewEndpointSidecars(collectionId, endpointId, descriptor, requestData) {
-        const { createSidecars } = descriptor;
-
-        if (createSidecars.includes('url')) {
-            await this.repository.savePersistedUrl(
-                collectionId,
-                endpointId,
-                requestData.url || requestData.broker || requestData.path || ''
-            );
-        }
-
-        if (createSidecars.includes('grpcData')) {
-            await this.repository.saveGrpcData(collectionId, endpointId, {
-                target: requestData.target || '',
-                service: requestData.service || '',
-                fullMethod: requestData.fullMethod || '',
-                requestJson: requestData.requestJson || '{}'
-            });
-        }
-
-        if (createSidecars.includes('graphqlData')) {
-            await this.repository.saveGraphQLData(collectionId, endpointId, {
-                query: requestData.query || '',
-                variables: requestData.variables || '',
-                operationName: requestData.operationName || null
-            });
-        }
-
-        if (createSidecars.includes('mqttData')) {
-            const { password: _password, ...mqttData } = normalizeMqttData(requestData);
-            await this.repository.saveMqttData(collectionId, endpointId, mqttData);
-        }
     }
 
     /**
@@ -540,10 +497,6 @@ export class CollectionService {
         });
     }
 
-    async saveRequestBodyModification(collectionId, endpointId) {
-        await this.saveModifiedRequestBody(collectionId, endpointId);
-    }
-
     /**
      * @param {Object} requestBody
      * @returns {string}
@@ -572,32 +525,37 @@ export class CollectionService {
         return JSON.stringify({ 'data': 'example' }, null, 2);
     }
 
-    captureRequestBodyState() {
-        const bodyModeSelect = document.getElementById('body-mode-select');
-        const bodyMode = bodyModeSelect?.value || 'json';
-
-        const state = { modifiedBody: null, formBodyData: null, graphqlData: null };
-
-        const formBody = captureFormBody(bodyMode);
-        if (formBody) {
-            state.formBodyData = formBody;
-        } else if (app.graphqlBodyManager && app.graphqlBodyManager.isGraphQLMode()) {
-            state.graphqlData = {
-                mode: 'graphql',
-                query: app.graphqlBodyManager.getGraphQLQuery(),
-                variables: app.graphqlBodyManager.getGraphQLVariables()
-            };
-        } else {
-            const currentBody = getRequestBodyContent().trim();
-            state.modifiedBody = currentBody || null;
-        }
-
-        return state;
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<{collectionId: string, collectionName: string, folderId: string|null, folderName: string, authType: string}>}
+     */
+    async getInheritedAuthInfo(collectionId, endpointId) {
+        const [collection, folder] = await Promise.all([
+            this.repository.getById(collectionId),
+            this.repository.findFolderForEndpoint(collectionId, endpointId)
+        ]);
+        const folderHasAuth = Boolean(folder?.authConfig?.type && folder.authConfig.type !== 'inherit');
+        const authConfig = folderHasAuth
+            ? await this.repository.getFolderAuthConfig(collectionId, folder.id)
+            : await this.repository.getCollectionAuthConfig(collectionId);
+        return {
+            collectionId,
+            collectionName: collection?.name || '',
+            folderId: folderHasAuth ? folder.id : null,
+            folderName: folderHasAuth ? folder.name : '',
+            authType: authConfig?.type || 'none'
+        };
     }
 
-    async saveModifiedRequestBody(collectionId, endpointId) {
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {{modifiedBody: string|null, formBodyData: Object|null, graphqlData: Object|null}} state
+     * @returns {Promise<void>}
+     */
+    async saveBodyState(collectionId, endpointId, state) {
         try {
-            const state = this.captureRequestBodyState();
             await this.repository.saveBodyState(collectionId, endpointId, state);
         } catch {
         }
@@ -606,14 +564,12 @@ export class CollectionService {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Object} formElements
-     * @param {string} listKey
+     * @param {Array<Object>} rows
      * @param {string} repositoryMethod
      * @returns {Promise<void>}
      */
-    async _saveRows(collectionId, endpointId, formElements, listKey, repositoryMethod) {
+    async _saveRows(collectionId, endpointId, rows, repositoryMethod) {
         try {
-            const rows = this.parseKeyValuePairs(formElements[listKey]);
             await this.repository[repositoryMethod](collectionId, endpointId, rows);
         } catch {
         }
@@ -622,70 +578,30 @@ export class CollectionService {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Object} formElements
+     * @param {Array<Object>} rows
      * @returns {Promise<void>}
      */
-    async saveCurrentPathParams(collectionId, endpointId, formElements) {
-        await this._saveRows(collectionId, endpointId, formElements, 'pathParamsList', 'savePersistedPathParams');
+    async savePathParams(collectionId, endpointId, rows) {
+        await this._saveRows(collectionId, endpointId, rows, 'savePersistedPathParams');
     }
 
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Object} formElements
+     * @param {Array<Object>} rows
      * @returns {Promise<void>}
      */
-    async saveCurrentQueryParams(collectionId, endpointId, formElements) {
-        await this._saveRows(collectionId, endpointId, formElements, 'queryParamsList', 'savePersistedQueryParams');
+    async saveQueryParams(collectionId, endpointId, rows) {
+        await this._saveRows(collectionId, endpointId, rows, 'savePersistedQueryParams');
     }
 
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Object} formElements
+     * @param {Array<Object>} rows
      * @returns {Promise<void>}
      */
-    async saveCurrentHeaders(collectionId, endpointId, formElements) {
-        await this._saveRows(collectionId, endpointId, formElements, 'headersList', 'savePersistedHeaders');
-    }
-
-    /**
-     * @param {HTMLElement} container
-     * @returns {Array<Object>}
-     */
-    parseKeyValuePairs(container) {
-        const pairs = [];
-        const rows = container.querySelectorAll('.key-value-row');
-
-        rows.forEach(row => {
-            const keyInput = row.querySelector('.key-input');
-            const valueInput = row.querySelector('.value-input');
-
-            if (keyInput && valueInput && keyInput.value.trim()) {
-                const pair = {
-                    key: keyInput.value.trim(),
-                    value: valueInput.value.trim()
-                };
-
-                const enabledCheckbox = row.querySelector('.row-enabled-checkbox');
-                if (enabledCheckbox) {
-                    pair.enabled = enabledCheckbox.checked;
-                }
-
-                pairs.push(pair);
-            }
-        });
-
-        return pairs;
-    }
-
-    /**
-     * @param {HTMLElement} container
-     * @returns {void}
-     */
-    clearKeyValueList(container) {
-        while (container.firstChild) {
-            container.removeChild(container.firstChild);
-        }
+    async saveHeaders(collectionId, endpointId, rows) {
+        await this._saveRows(collectionId, endpointId, rows, 'savePersistedHeaders');
     }
 }

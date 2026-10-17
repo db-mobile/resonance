@@ -1,11 +1,7 @@
 /* global document */
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
 
-jest.mock('../../src/modules/appContext.js', () => ({
-    app: {
-        captureGrpcState: () => ({ fullMethod: 'pkg.Svc/Method' })
-    }
-}));
+const EMPTY_FORM = { url: null, method: null, pathParams: null, queryParams: null, headers: null, bodyState: null, authConfig: null };
 
 describe('protocol savers skip the sidebar refresh', () => {
     let service;
@@ -23,26 +19,33 @@ describe('protocol savers skip the sidebar refresh', () => {
         };
         service = new CollectionRequestPersistenceService({
             repository,
-            collectionService: { captureRequestBodyState: jest.fn(() => null) },
+            collectionService: { saveBodyState: jest.fn() },
             statusDisplay: { update: jest.fn() },
-            refreshCollections
+            refreshCollections,
+            formReader: {
+                read: jest.fn(() => ({ ...EMPTY_FORM })),
+                hasBody: jest.fn(() => false),
+                readGraphQLData: jest.fn(() => null),
+                readGrpcState: jest.fn(() => ({ fullMethod: 'pkg.Svc/Method' })),
+                readMqttData: jest.fn(() => ({}))
+            }
         });
     });
 
     test('the WebSocket saver never refreshes the tree', async () => {
-        await service.saveWebSocketRequest('c1', 'e1', () => ({}), () => []);
+        await service.saveWebSocketRequest('c1', 'e1');
 
         expect(refreshCollections).not.toHaveBeenCalled();
     });
 
     test('the GraphQL saver never refreshes the tree', async () => {
-        await service.saveGraphQLRequest('c1', 'e1', () => ({}), { getAuthConfig: () => null }, () => []);
+        await service.saveGraphQLRequest('c1', 'e1');
 
         expect(refreshCollections).not.toHaveBeenCalled();
     });
 
     test('the SSE saver never refreshes the tree', async () => {
-        await service.saveSseRequest('c1', 'e1', () => ({}), { getAuthConfig: () => null }, () => []);
+        await service.saveSseRequest('c1', 'e1');
 
         expect(refreshCollections).not.toHaveBeenCalled();
     });
@@ -51,6 +54,7 @@ describe('protocol savers skip the sidebar refresh', () => {
         await service.saveMqttRequest('c1', 'e1');
 
         expect(refreshCollections).not.toHaveBeenCalled();
+        expect(repository.saveMqttData).toHaveBeenCalledWith('c1', 'e1', {});
     });
 
     test('the gRPC saver refreshes only when the path changed', async () => {

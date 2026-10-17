@@ -23,14 +23,14 @@ function isPinned(pinnedRequests, collection, endpoint) {
 export class CollectionRenderer {
     /**
      * @param {string} containerId
-     * @param {Object} [repository=null]
+     * @param {{load: function(): Promise<Object>, save: function(Object): Promise<void>}|null} [expansionStore=null]
      */
-    constructor(containerId, repository = null) {
+    constructor(containerId, expansionStore = null) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
             throw new Error(`Container with id '${containerId}' not found`);
         }
-        this.repository = repository;
+        this.expansionStore = expansionStore;
         this.emptySpaceContextMenuHandler = null;
         this._lastRenderArgs = null;
     }
@@ -622,24 +622,24 @@ export class CollectionRenderer {
 
     /** @returns {Promise<void>} */
     async saveExpansionState() {
-        if (!this.repository) {
+        if (!this.expansionStore) {
             return;
         }
         
         try {
             const currentState = this.getExpansionState();
-            await this.repository.saveCollectionExpansionStates(currentState);
+            await this.expansionStore.save(currentState);
         } catch {}
     }
 
     /** @returns {Promise<void>} */
     async loadAndRestoreExpansionState() {
-        if (!this.repository) {
+        if (!this.expansionStore) {
             return;
         }
 
         try {
-            const savedState = await this.repository.getCollectionExpansionStates();
+            const savedState = await this.expansionStore.load();
             this.restoreExpansionState(savedState);
         } catch {}
     }

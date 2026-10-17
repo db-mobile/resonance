@@ -3,10 +3,7 @@
  * @module ui/WorkspaceTabBar
  */
 
-import { setCurrentEndpoint } from '../state/currentEndpoint.js';
-import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
-import { toast } from './Toast.js';
 import { el } from '../htmlUtils.js';
 import { pushEscapeHandler } from './modalEscape.js';
 
@@ -20,6 +17,8 @@ export class WorkspaceTabBar {
         this.onTabRename = null;
         this.onTabDuplicate = null;
         this.onTabReorder = null;
+        this.onCloseOthers = null;
+        this.onTabSave = null;
         this.dragPreview = null;
     }
 
@@ -442,61 +441,6 @@ export class WorkspaceTabBar {
         input.select();
     }
 
-    /**
-     * @param {Object} tab
-     * @returns {Promise<void>}
-     */
-    async _saveTab(tab) {
-        try {
-            if (tab.endpoint && tab.endpoint.collectionId && tab.endpoint.endpointId) {
-                const { saveAllRequestModifications } = await import('../collectionManager.js');
-                await saveAllRequestModifications(tab.endpoint.collectionId, tab.endpoint.endpointId);
-                if (app.workspaceTabController) {
-                    await app.workspaceTabController.markCurrentTabUnmodified();
-                }
-                toast.success(tab.name ? `Saved "${tab.name}"` : 'Request saved');
-                return;
-            }
-
-            if (!app.workspaceTabController || tab.type === 'runner') {
-                return;
-            }
-
-            const { saveRequestToCollection } = await import('../collectionManager.js');
-            const state = await app.workspaceTabController.stateManager.captureCurrentState();
-            const requestData = {
-                name: tab.name,
-                ...state.request
-            };
-            const result = await saveRequestToCollection(requestData);
-            if (!result) {
-                return;
-            }
-
-            setCurrentEndpoint({
-                collectionId: result.collectionId,
-                endpointId: result.endpointId
-            });
-            await app.workspaceTabController.service.updateTab(tab.id, {
-                name: result.name,
-                endpoint: {
-                    collectionId: result.collectionId,
-                    endpointId: result.endpointId,
-                    protocol: state.request.protocol || 'http'
-                }
-            });
-            await app.workspaceTabController.markCurrentTabUnmodified();
-            const tabs = await app.workspaceTabController.service.getAllTabs();
-            const activeTabId = await app.workspaceTabController.service.getActiveTabId();
-            this.render(tabs, activeTabId);
-
-            toast.success(result.collectionName
-                ? `Saved "${result.name}" to ${result.collectionName}`
-                : `Saved "${result.name}"`);
-        } catch (error) {
-            toast.error(`Save failed: ${error.message || String(error)}`);
-        }
-    }
 
     _showContextMenu(event, tab) {
         this._closeTabContextMenu?.();
@@ -551,7 +495,7 @@ export class WorkspaceTabBar {
             {
                 label: 'Save',
                 iconClass: 'icon-save',
-                action: () => this._saveTab(tab),
+                action: () => this.onTabSave?.(tab),
                 disabled: tab.type === 'runner'
             },
             { divider: true },

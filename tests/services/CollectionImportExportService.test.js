@@ -173,15 +173,15 @@ describe('CollectionImportExportService', () => {
 
             expect(deps.curlImportDialog.show).toHaveBeenCalledWith(expect.any(Array), { targetCollectionId: null });
             expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('c1', {
-                name: 'Create user', method: 'POST', path: '/users', protocol: 'http'
+                name: 'Create user', method: 'POST', path: '/users', protocol: 'http',
+                body: '{"a":1}',
+                headers: [{ key: 'Accept', value: 'application/json' }],
+                queryParams: [
+                    { key: 'page', value: '2' },
+                    { key: 'q', value: '' }
+                ],
+                authConfig: { type: 'bearer', config: { token: 't' } }
             });
-            expect(deps.repository.saveModifiedRequestBody).toHaveBeenCalledWith('c1', 'e1', '{"a":1}');
-            expect(deps.repository.savePersistedHeaders).toHaveBeenCalledWith('c1', 'e1', [{ key: 'Accept', value: 'application/json' }]);
-            expect(deps.repository.savePersistedQueryParams).toHaveBeenCalledWith('c1', 'e1', [
-                { key: 'page', value: '2' },
-                { key: 'q', value: '' }
-            ]);
-            expect(deps.repository.savePersistedAuthConfig).toHaveBeenCalledWith('c1', 'e1', { type: 'bearer', config: { token: 't' } });
             expect(deps.refreshCollections).toHaveBeenCalledWith(false);
             expect(toast.success).toHaveBeenCalledWith('Imported cURL as "Create user"');
         });
@@ -196,11 +196,9 @@ describe('CollectionImportExportService', () => {
             await service.handleImportCurl(null);
 
             expect(deps.collectionService.createCollection).toHaveBeenCalledWith({ name: 'Fresh', storageParentPath: '/tmp/x' });
-            expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('c2', expect.any(Object));
-            expect(deps.repository.saveModifiedRequestBody).not.toHaveBeenCalled();
-            expect(deps.repository.savePersistedHeaders).not.toHaveBeenCalled();
-            expect(deps.repository.savePersistedQueryParams).not.toHaveBeenCalled();
-            expect(deps.repository.savePersistedAuthConfig).not.toHaveBeenCalled();
+            expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('c2', {
+                name: 'Ping', method: 'GET', path: '/ping', protocol: 'http', headers: [], queryParams: []
+            });
         });
 
         test('reports an unknown target collection', async () => {

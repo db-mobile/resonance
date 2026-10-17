@@ -5,9 +5,9 @@ import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 
-const debouncedSavePathParams = debounce(autoSaver('saveCurrentPathParams', 'pathParamsList', pathParamsList), 500);
-const debouncedSaveQueryParams = debounce(autoSaver('saveCurrentQueryParams', 'queryParamsList', queryParamsList), 500);
-const debouncedSaveHeaders = debounce(autoSaver('saveCurrentHeaders', 'headersList', headersList), 500);
+const debouncedSavePathParams = debounce(autoSaver('savePathParams', pathParamsList), 500);
+const debouncedSaveQueryParams = debounce(autoSaver('saveQueryParams', queryParamsList), 500);
+const debouncedSaveHeaders = debounce(autoSaver('saveHeaders', headersList), 500);
 
 let isUpdatingUrlFromQueryParams = false;
 
@@ -421,16 +421,15 @@ export function initKeyValueListeners() {
 }
 
 /**
- * @param {'saveCurrentPathParams'|'saveCurrentQueryParams'|'saveCurrentHeaders'} saveMethod
- * @param {string} listKey
+ * @param {'savePathParams'|'saveQueryParams'|'saveHeaders'} saveMethod
  * @param {HTMLElement|null} list
  * @returns {function(): Promise<void>}
  */
-function autoSaver(saveMethod, listKey, list) {
+function autoSaver(saveMethod, list) {
     return async () => {
         const endpoint = getCurrentEndpoint();
-        if (endpoint && app.collectionService) {
-            await app.collectionService[saveMethod](endpoint.collectionId, endpoint.endpointId, { [listKey]: list });
+        if (endpoint && app.collectionService && list) {
+            await app.collectionService[saveMethod](endpoint.collectionId, endpoint.endpointId, parseKeyValueRows(list));
         }
     };
 }

@@ -14,6 +14,28 @@ const DOC_FORMATS = Object.freeze({
     markdown: { generate: 'generateMarkdown', extension: 'md', mimeType: 'text/markdown' }
 });
 
+/**
+ * @param {{endpoint: Object, auth?: Object|null}} result
+ * @returns {Object}
+ */
+function curlResultToRequestData({ endpoint, auth }) {
+    const requestData = {
+        name: endpoint.name,
+        method: endpoint.method,
+        path: endpoint.path,
+        protocol: 'http',
+        headers: Object.entries(endpoint.headers || {}).map(([key, value]) => ({ key, value })),
+        queryParams: Object.entries(endpoint.parameters?.query || {}).map(([key, param]) => ({ key, value: param.example || '' }))
+    };
+    if (endpoint.requestBody) {
+        requestData.body = endpoint.requestBody.example;
+    }
+    if (auth) {
+        requestData.authConfig = auth;
+    }
+    return requestData;
+}
+
 export class CollectionImportExportService {
     /**
      * @param {Object} options
@@ -219,16 +241,9 @@ export class CollectionImportExportService {
                 return;
             }
 
-            const requestData = {
-                name: result.endpoint.name,
-                method: result.endpoint.method,
-                path: result.endpoint.path,
-                protocol: 'http'
-            };
+            const requestData = curlResultToRequestData(result);
 
             const newEndpoint = await this.collectionService.addRequestToCollection(targetCollection.id, requestData);
-
-            await this._persistCurlSidecars(targetCollection.id, newEndpoint.id, result);
 
             await this.refreshCollections(false);
             toast.success(`Imported cURL as "${result.endpoint.name}"`);
@@ -255,39 +270,6 @@ export class CollectionImportExportService {
         return collections.find(current => current.id === result.collectionId) ?? null;
     }
 
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {Object} result
-     * @returns {Promise<void>}
-     */
-    async _persistCurlSidecars(collectionId, endpointId, result) {
-        const { endpoint, auth } = result;
-
-        if (endpoint.requestBody) {
-            await this.repository.saveModifiedRequestBody(collectionId, endpointId, endpoint.requestBody.example);
-        }
-
-        if (Object.keys(endpoint.headers).length > 0) {
-            const headers = Object.entries(endpoint.headers).map(([key, value]) => ({
-                key,
-                value
-            }));
-            await this.repository.savePersistedHeaders(collectionId, endpointId, headers);
-        }
-
-        if (Object.keys(endpoint.parameters.query).length > 0) {
-            const queryParams = Object.entries(endpoint.parameters.query).map(([key, param]) => ({
-                key,
-                value: param.example || ''
-            }));
-            await this.repository.savePersistedQueryParams(collectionId, endpointId, queryParams);
-        }
-
-        if (auth) {
-            await this.repository.savePersistedAuthConfig(collectionId, endpointId, auth);
-        }
-    }
 
     async openImportedEndpoint(collectionId, endpointId) {
         if (!app.collectionController) {
