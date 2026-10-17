@@ -237,6 +237,16 @@ describe('WorkspaceTabRepository', () => {
     });
 
     describe('updateTab', () => {
+        test('caps binary persistence while preserving response and inspection metadata', async () => {
+            mockBackendAPI.store.get.mockResolvedValue([{ id: 'tab-1' }]);
+            const result = await repository.updateTab('tab-1', {
+                response: { data: null, isBinary: true, isJson: false, bodyBase64: 'A'.repeat(500001) },
+                responseInspection: { view: 'results', json: { draft: '$', applied: '$' } }
+            });
+            expect(result.response).toEqual({ data: null, isBinary: true, isJson: false, bodyBase64: null, truncated: true });
+            expect(result.responseInspection.json.applied).toBe('$');
+        });
+
         test('should update existing tab', async () => {
             const tabs = [{ id: 'tab-1', name: 'Old Name', request: { url: '' } }];
             mockBackendAPI.store.get.mockResolvedValue(tabs);

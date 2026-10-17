@@ -18,6 +18,7 @@
                     <button class="preview-mode-btn" data-mode="preview" aria-label="Preview View" title="Preview View">
                         <span>Preview</span>
                     </button>
+                    <button class="preview-mode-btn" data-mode="results" aria-pressed="false" data-inspection-text="results">Results</button>
                 </div>
                 <button class="copy-btn copy-response-btn" aria-label="Copy Response" title="Copy Response Body">
                     <span class="icon icon-16 icon-copy"></span>
@@ -28,6 +29,35 @@
             </div>
             <div class="response-body-container u-flex" aria-live="polite"></div>
             <div class="response-preview-container u-flex is-hidden"></div>
+            <div class="inspection-panel is-hidden">
+                <div class="inspection-controls">
+                    <form class="inspection-form">
+                        <label class="inspection-query-field">
+                            <span class="inspection-format">JSONPath</span>
+                            <input class="inspection-expression" type="text" autocomplete="off" spellcheck="false" maxlength="4096" aria-label="Query expression">
+                        </label>
+                        <div class="inspection-query-actions">
+                            <button class="inspection-apply" type="submit" data-inspection-text="apply">Apply</button>
+                            <button class="inspection-clear" type="button" data-inspection-text="clear">Clear</button>
+                        </div>
+                    </form>
+                    <details class="inspection-namespace-options is-hidden">
+                        <summary data-inspection-text="namespaces">Namespace overrides</summary>
+                        <p data-inspection-text="namespaceHelp"></p>
+                        <textarea class="inspection-namespaces" rows="3" spellcheck="false" aria-label="Namespace overrides"></textarea>
+                        <p data-inspection-text="bindings"></p>
+                        <pre class="inspection-bindings"></pre>
+                    </details>
+                </div>
+                <div class="inspection-result-toolbar">
+                    <span class="inspection-status" role="status" aria-live="polite"></span>
+                    <div class="inspection-export-actions">
+                        <button class="inspection-copy" type="button" data-inspection-text="copy" disabled>Copy Results</button>
+                        <button class="inspection-save" type="button" data-inspection-text="save" disabled>Save Results</button>
+                    </div>
+                </div>
+                <div class="inspection-editor" role="region" aria-label="Query results"></div>
+            </div>
         </div>
 
         <div class="tab-content" role="tabpanel" data-role="response-headers">

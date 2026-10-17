@@ -70,12 +70,15 @@ export class HistoryService {
         const headerNames = sensitive.headerNames || [];
         const queryNames = sensitive.queryNames || [];
         const cappedRequestBody = truncateBody(requestConfig.body || null, MAX_HISTORY_REQUEST_SIZE);
-        const cappedResponseData = truncateBody(result.data || null, MAX_HISTORY_RESPONSE_SIZE);
+        const cappedResponseData = truncateBody(result.data ?? null, MAX_HISTORY_RESPONSE_SIZE);
         const responseBody = {
             data: cappedResponseData.value,
             ...truncationFields(cappedResponseData),
             headers: this._redactHeaders(result.headers, SENSITIVE_RESPONSE_HEADERS)
         };
+        for (const key of ['isJson', 'isBinary', 'bodyBase64']) {
+            if (Object.hasOwn(result, key)) { responseBody[key] = result[key]; }
+        }
         const responseTiming = {
             ttfb: result.ttfb || null,
             size: result.size || null

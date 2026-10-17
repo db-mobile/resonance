@@ -30,8 +30,9 @@ function capHistoryEntry(entry) {
     const cappedResponse = response
         ? truncateBody(response.data ?? null, MAX_HISTORY_RESPONSE_SIZE)
         : null;
+    const oversizedBinary = response?.bodyBase64?.length > MAX_HISTORY_RESPONSE_SIZE;
 
-    if (!cappedRequest?.truncated && !cappedResponse?.truncated) {
+    if (!cappedRequest?.truncated && !cappedResponse?.truncated && !oversizedBinary) {
         return entry;
     }
 
@@ -53,6 +54,9 @@ function capHistoryEntry(entry) {
             truncated: true,
             originalSize: cappedResponse.originalSize
         };
+    }
+    if (oversizedBinary) {
+        capped.response = { ...(capped.response || response), bodyBase64: null, truncated: true };
     }
 
     return capped;

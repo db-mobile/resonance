@@ -1,5 +1,7 @@
 import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
+import { responseInspectionSource } from './responseInspectionSource.js';
+import { setResponseMeta } from './responseSaver.js';
 import { parseKeyValuePairs, parseKeyValueRows, populateKeyValueList, clearKeyValueList, addKeyValueRow, updateUrlFromQueryParams } from './keyValueManager.js';
 import { displayResponseWithLineNumbersForTab, clearResponseDisplayForTab, clearSchemaValidationBadge, clearGraphQLErrorsBadge } from './responseView.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -335,6 +337,7 @@ export class WorkspaceTabStateManager {
      */
     async _restoreResponseState(tab) {
         activateTab('response', tab.activeResponseTab || 'response-body');
+        app.responseContainerManager?.getOrCreateContainer(tab.id)?.inspection?.restore(tab.responseInspection);
 
         if (tab.response) {
             await this._restoreResponse(tab.response, tab.id);
@@ -381,6 +384,7 @@ export class WorkspaceTabStateManager {
         }
 
         this._applyTabEndpoint(tab, tab.endpoint);
+        await this._restoreResponseState(tab);
     }
 
     /**
@@ -630,7 +634,11 @@ export class WorkspaceTabStateManager {
      * @returns {void}
      */
     _renderResponsePanes(response, tabId, containerElements) {
-        if (response.data) {
+        if (response.isBinary) {
+            displayResponseWithLineNumbersForTab(
+                `[Binary response — ${response.size || 0} bytes]`, null, tabId, 'text'
+            );
+        } else if (Object.hasOwn(response, 'data')) {
             const isStructured = typeof response.data !== 'string';
             const formattedResponse = isStructured
                 ? JSON.stringify(response.data, null, 2)
@@ -641,6 +649,9 @@ export class WorkspaceTabStateManager {
         } else {
             clearResponseDisplayForTab(tabId);
         }
+
+        containerElements?.inspection?.setSource(responseInspectionSource(response));
+        setResponseMeta(tabId, { isBinary: response.isBinary, base64: response.bodyBase64, suggestedName: 'response' });
 
         if (containerElements?.headersEditor) {
             if (response.headers && Object.keys(response.headers).length > 0) {

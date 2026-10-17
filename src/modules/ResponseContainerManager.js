@@ -4,6 +4,7 @@ import { templateLoader } from './templateLoader.js';
 import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { attachSaveResponseHandler } from './responseSaver.js';
 import { PreviewManager } from './PreviewManager.js';
+import { ResponseInspectionController } from './ResponseInspectionController.js';
 
 const PANEL_ROLES = [
     'response-body',
@@ -84,6 +85,7 @@ export class ResponseContainerManager {
     removeContainer(tabId) {
         const container = this.containers.get(tabId);
         if (container) {
+            container.inspection?.destroy();
             if (container.editor && typeof container.editor.destroy === 'function') {
                 container.editor.destroy();
             }
@@ -152,6 +154,7 @@ export class ResponseContainerManager {
             if (this.previewManager) {
                 this.previewManager.updateButtonState(tabId, lang);
             }
+            this.containers.get(tabId)?.inspection?.renderVisibility();
         });
 
         if (languageSelector) {
@@ -170,7 +173,7 @@ export class ResponseContainerManager {
         attachSaveResponseHandler(wrapper.querySelector('.save-response-btn'), tabId);
         attachHeadersCopyHandler(wrapper.querySelector('.copy-headers-btn'), tabId);
 
-        return {
+        const container = {
             wrapper,
             tabId,
             bodyContainer,
@@ -190,5 +193,9 @@ export class ResponseContainerManager {
             previewManager: this.previewManager,
             renderedResponse: null
         };
+        container.inspection = new ResponseInspectionController(container);
+        const preview = this.previewManager.containers.get(tabId);
+        if (preview) { preview.onViewRendered = () => container.inspection.renderVisibility(); }
+        return container;
     }
 }

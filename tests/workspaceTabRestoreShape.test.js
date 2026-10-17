@@ -181,21 +181,21 @@ describe('empty key-value tables get different fallback rows', () => {
     });
 });
 
-describe('response restoration is not uniform', () => {
+describe('response restoration across protocols', () => {
     afterEach(() => {
         document.body.innerHTML = '';
     });
 
-    test('gRPC restores no response and clears none', async () => {
+    test('gRPC clears a response when the tab has none', async () => {
         const { manager } = await loadHarness();
 
         await manager.restoreTabState(tabFor('grpc'));
 
         expect(manager._restoreResponse).not.toHaveBeenCalled();
-        expect(manager._clearResponse).not.toHaveBeenCalled();
+        expect(manager._clearResponse).toHaveBeenCalledWith('tab-1');
     });
 
-    test.each(['sse', 'websocket', 'graphql', 'mqtt', 'http'])(
+    test.each(PROTOCOLS)(
         '%s clears the response when the tab has none',
         async (protocol) => {
             const { manager } = await loadHarness();
@@ -206,7 +206,7 @@ describe('response restoration is not uniform', () => {
         }
     );
 
-    test.each(['sse', 'websocket', 'graphql', 'mqtt', 'http'])(
+    test.each(PROTOCOLS)(
         '%s restores a stored response',
         async (protocol) => {
             const { manager } = await loadHarness();

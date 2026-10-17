@@ -55,6 +55,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **Pre-request and test scripts** — sandboxed JavaScript (Boa Engine) with `request` mutation, `expect()` assertions, `environment` access, and `sendRequest()` for request chaining. A Postman-compatible `pm` API supports common scripts, with synchronous network calls and a limited module API ([supported APIs and limitations](SCRIPTS.md#postman-compatibility-pm))
 - **Collection runner** — HTTP and GraphQL batch execution with ordering, variable chaining, iterations, CSV/JSON data files, stop-on-error, delays, saved configurations, run history, and JSON/JUnit XML report export
 - **Response schema validation** — local validation using JSON Schema drafts 4, 6, 7, 2019-09, and 2020-12, with schema inference, editor checks, and response validation badges. Schemas without `$schema` use draft 2020-12; OpenAPI `nullable` and legacy boolean exclusive bounds are supported. References must resolve within the supplied schema; external schemas are not fetched. Standard formats are checked, including the `url` compatibility alias. Validation applies to successful HTTP JSON responses; runner schema assertions and Postman's `pm.response.to.have.jsonSchema()` are not included
+- **Response inspection** — native JSONPath (RFC 9535) and XPath 1.0 queries in a separate Results view, automatic reapplication, namespace overrides, and result copy/export. Works with completed HTTP/GraphQL responses (including HTTP errors) and unary gRPC JSON
 - **Environments & variables** — `{{ variable }}` templating, dynamic variables (`{{$uuid}}`, `{{$timestamp}}`, random data), quick environment switching, import/export
 
 ### Security
@@ -73,6 +74,45 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **Auto-update** for AppImage and direct downloads; package-manager installs defer to their own update mechanism
 
 See the **[documentation site](https://db-mobile.github.io/resonance/)** for detailed guides on every feature.
+
+## Response inspection
+
+Select **Results** in the response toolbar, enter a query, and press **Apply** or Enter.
+JSONPath is selected for JSON bodies and XPath for XML bodies, independently of syntax
+highlighting. Editing a query creates a draft; Apply runs it. Applied queries run again
+when a new response completes. Each tab keeps separate JSONPath/XPath drafts and applied
+queries. **Clear** removes the current format’s query and returns to the previous Code
+or Preview view. The original response remains available through Code/Preview and the
+original toolbar’s Copy/Save actions.
+
+| Body | Query | Result |
+| --- | --- | --- |
+| JSON | `$.items[*].name` | Names as a JSON array |
+| JSON | `$.items[?@.price < 10]` | Matching items |
+| JSON | `$..id` or `$.items[0:5]` | Recursive IDs or an array slice |
+| XML | `//item/@id` | Attribute values in document order |
+| XML | `count(//item)` | A numeric scalar |
+| XML with `xmlns="urn:shop"` | `//ns:item` | Elements in the default namespace |
+
+JSONPath always returns a pretty-printed array, including a single match or `[]`.
+XPath returns XML fragments for element/document nodes, text for other node kinds,
+and typed scalar results. Root namespace prefixes are detected automatically. The
+default namespace gets the first unused alias `ns`, `ns1`, etc. Expand **Namespace
+overrides** to supply one `prefix=URI` per line; overrides take precedence. Effective
+bindings appear after a successful query. XPath 1.0 has no implicit default namespace.
+
+**Copy Results** and **Save Results** export exactly the displayed text. JSONPath
+exports use `.json`; XPath exports use `.txt` because several fragments may not form
+one XML document. Derived results are recomputed after reopening a tab.
+
+Inspection accepts complete bodies up to **5 MiB** (UTF-8) and expressions up to
+**4,096 characters**. Output contains at most **1,000 complete matches** or **1 MiB**;
+partial results are explicitly labeled. A single oversized match requires a narrower
+query. Expensive expressions and XML nesting beyond 256 levels are rejected by a
+work budget. Binary responses, streaming transcripts, and truncated stored bodies
+require a new complete response. Older saved string bodies without reliable format
+metadata also require resending. Queries run locally in the native background pool;
+DTD/entity declarations and external document access are unsupported.
 
 ## Installation
 

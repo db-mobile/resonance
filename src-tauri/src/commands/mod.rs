@@ -16,6 +16,7 @@ pub mod mqtt;
 pub mod oauth;
 pub mod proxy;
 pub mod proxy_tunnel;
+pub mod response_inspection;
 pub mod schema;
 pub mod scripts;
 pub mod secrets;

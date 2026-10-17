@@ -21,6 +21,7 @@ import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
 import { markTabModified } from './state/tabModified.js';
 import { displayResponseWithLineNumbersForTab } from './responseView.js';
+import { responseInspectionSource } from './responseInspectionSource.js';
 import { generateEffectiveAuthData, getRequestBuilderService, warnUnresolvedVariables } from './requestServices.js';
 import { setRequestInProgress } from './sendControls.js';
 import { getSettings, resolveRequestSettings } from './state/settingsCache.js';
@@ -651,10 +652,11 @@ async function invokeGrpcUnary({ target, fullMethod, requestJson, metadata, prot
             ? app.responseContainerManager?.getOrCreateContainer(requestTabId)
             : app.responseContainerManager?.getActiveElements();
         renderGrpcPanes(containerElements, grpcPanes);
+        containerElements?.inspection?.setSource(responseInspectionSource({ ...result, isJson: true }));
 
         await showStatus(result.success ? 'gRPC OK' : `gRPC error: ${result.statusMessage || 'unknown'}`);
 
-        await persistGrpcResult(requestTabId, result, grpcPanes, Date.now() - startedAt, historyContext);
+        await persistGrpcResult(requestTabId, result, grpcPanes, Date.now() - startedAt, historyContext, containerElements);
     } catch (error) {
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
@@ -685,11 +687,14 @@ async function invokeGrpcUnary({ target, fullMethod, requestJson, metadata, prot
  * @param {Object} historyContext
  * @returns {Promise<void>}
  */
-async function persistGrpcResult(requestTabId, result, grpcPanes, ttfb, historyContext) {
+async function persistGrpcResult(requestTabId, result, grpcPanes, ttfb, historyContext, container) {
     if (app.workspaceTabController && requestTabId) {
+        const manager = app.responseContainerManager;
+        const source = container?.inspection?.source;
         app.workspaceTabController.service.updateTab(requestTabId, {
             response: {
                 data: result.data ?? null,
+                isJson: true,
                 headers: {},
                 status: null,
                 statusText: '',
@@ -698,6 +703,11 @@ async function persistGrpcResult(requestTabId, result, grpcPanes, ttfb, historyC
                 timings: null,
                 cookies: [],
                 grpc: grpcPanes
+            }
+        }).then(updated => {
+            if (container && manager === app.responseContainerManager &&
+                manager?.containers?.get(requestTabId) === container && container.inspection?.source === source) {
+                container.renderedResponse = updated?.response || null;
             }
         }).catch(() => { });
     }

@@ -71,6 +71,30 @@ afterEach(() => {
 });
 
 describe('HTTP responses of every status are treated as responses', () => {
+    test('retains the complete live inspection source across tab restores when storage caps its body', async () => {
+        const data = { value: 'x'.repeat(500100) };
+        const { handleSendRequest, app, updateTab } = await loadApiHandler({
+            status: 500, success: false, data, isJson: true, headers: { 'content-type': 'application/json' }
+        });
+        const inspection = { source: null, setSource: jest.fn(source => { inspection.source = source; }) };
+        const container = { tabId: 'tab-1', inspection, editor: { setContent: jest.fn(), currentLanguage: 'json' } };
+        const savedResponse = { data: '{truncated', truncated: true, isJson: true };
+        updateTab.mockResolvedValue({ response: savedResponse });
+        app.responseContainerManager = { containers: new Map([['tab-1', container]]), getOrCreateContainer: () => container };
+        await handleSendRequest();
+        expect(inspection.source).toEqual({ format: 'json', body: JSON.stringify(data) });
+        expect(container.renderedResponse).toBe(savedResponse);
+        expect(updateTab.mock.calls[0][1].response.isJson).toBe(true);
+        const { WorkspaceTabStateManager } = await import('../../src/modules/WorkspaceTabStateManager.js');
+        const before = inspection.setSource.mock.calls.length;
+        await new WorkspaceTabStateManager({})._restoreResponse(savedResponse, 'tab-1');
+        expect(inspection.setSource).toHaveBeenCalledTimes(before);
+        expect(inspection.source.body.length).toBeGreaterThan(500000);
+        delete app.responseContainerManager;
+        delete app.workspaceTabController;
+        delete app.cookieController;
+    });
+
     test('a 500 is saved to the tab with its body and every Set-Cookie header', async () => {
         const { handleSendRequest, updateTab, handleCookiesFromResponse, app } = await loadApiHandler({
             success: false,

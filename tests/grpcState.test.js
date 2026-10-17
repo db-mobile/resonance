@@ -84,6 +84,26 @@ async function loadGrpcHandlerForSend({ variables = {}, authData = { headers: {}
 }
 
 describe('gRPC send path', () => {
+    it('preserves a complete live unary inspection snapshot when its stored body is capped', async () => {
+        const { module, invokeUnary } = await loadGrpcHandlerForSend();
+        const { app } = await import('../src/modules/appContext.js');
+        const inspection = { source: null, setSource: jest.fn(source => { inspection.source = source; }) };
+        const container = { inspection };
+        const stored = { data: 'capped', isJson: true, truncated: true };
+        app.workspaceTabController = { service: {
+            getActiveTabId: jest.fn().mockResolvedValue('tab-1'), updateTab: jest.fn().mockResolvedValue({ response: stored })
+        } };
+        app.responseContainerManager = { containers: new Map([['tab-1', container]]), getOrCreateContainer: () => container };
+        const data = { value: 'x'.repeat(500100) };
+        invokeUnary.mockResolvedValue({ success: true, data, headers: {}, trailers: {} });
+        module.applyGrpcState({ target: 'localhost:50051', service: 'test.Service', fullMethod: '/test.Service/Get', requestJson: '{}' });
+        await module.handleGrpcSend();
+        expect(inspection.source).toEqual({ format: 'json', body: JSON.stringify(data) });
+        expect(container.renderedResponse).toBe(stored);
+        delete app.workspaceTabController;
+        delete app.responseContainerManager;
+    });
+
     afterEach(() => {
         document.body.innerHTML = '';
         delete window.backendAPI;

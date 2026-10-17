@@ -46,6 +46,7 @@ use commands::{
         oauth2_get_pkce_verifier, oauth2_get_token, oauth2_store_pkce_verifier,
     },
     proxy::{ProxyState, proxy_get, proxy_set, proxy_test},
+    response_inspection::response_inspect,
     schema::{schema_check, schema_validate},
     scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
     secrets::{secret_delete, secret_get, secret_keychain_available, secret_set},
@@ -180,6 +181,7 @@ fn main() {
             // Response schemas
             schema_check,
             schema_validate,
+            response_inspect,
             // WebSocket
             websocket_send,
             websocket_close,

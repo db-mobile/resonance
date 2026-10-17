@@ -1,5 +1,6 @@
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
+import { responseInspectionSource } from './responseInspectionSource.js';
 import { urlInput, methodSelect } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
@@ -693,6 +694,8 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
     displayResponseWithLineNumbersForTab(formattedResponse, contentType, requestTabId, languageHint);
     const responseManager = app.responseContainerManager;
     const responseContainer = responseManager?.containers?.get(requestTabId);
+    responseContainer?.inspection?.setSource(responseInspectionSource(result));
+    const inspectionSource = responseContainer?.inspection?.source;
     const isCurrentResponse = () => inFlightRequestFor(requestTabId) === requestConfig.requestId &&
         app.responseContainerManager === responseManager &&
         (!responseManager?.containers || (responseContainer &&
@@ -726,6 +729,10 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
         app.workspaceTabController.service.updateTab(requestTabId, {
             response: {
                 data: result.data,
+                isJson: result.isJson,
+                isBinary: Boolean(result.isBinary),
+                bodyBase64: result.bodyBase64 || null,
+                truncated: Boolean(result.truncated),
                 headers: result.headers || {},
                 status: result.status,
                 statusText: result.statusText,
@@ -735,6 +742,12 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
                 cookies
             },
             isModified: false
+        }).then(updated => {
+            if (responseContainer && app.responseContainerManager === responseManager &&
+                responseManager.containers.get(requestTabId) === responseContainer &&
+                responseContainer.inspection?.source === inspectionSource) {
+                responseContainer.renderedResponse = updated?.response || null;
+            }
         }).catch(() => { });
         if (app.workspaceTabController.tabBar?.updateTab) {
             app.workspaceTabController.tabBar.updateTab(requestTabId, { isModified: false });

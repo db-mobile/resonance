@@ -56,6 +56,11 @@ serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
 # Validate user-provided schemas locally; no HTTP/file retrieval or extra TLS provider.
 jsonschema = { version = "0.59", default-features = false, features = ["idna"] }
+# Local response queries (no script evaluation or external document retrieval).
+serde_json_path = "0.7"
+sxd-document = "0.3"
+sxd-xpath = "0.4"
+quick-xml = "0.42"
 
 # Mock server
 axum = { version = "0.7", default-features = false, features = ["http1", "json", "query", "tokio"] }

@@ -3,15 +3,17 @@
 
 const statusCalls = { status: jest.fn(), time: jest.fn(), size: jest.fn() };
 let displayResponse;
+let clearResponse;
 
 async function loadHarness() {
     jest.resetModules();
     Object.values(statusCalls).forEach(fn => fn.mockClear());
     displayResponse = jest.fn();
+    clearResponse = jest.fn();
 
     jest.doMock('../src/modules/responseView.js', () => ({
         displayResponseWithLineNumbersForTab: displayResponse,
-        clearResponseDisplayForTab: jest.fn(),
+        clearResponseDisplayForTab: clearResponse,
         clearSchemaValidationBadge: jest.fn(),
         clearGraphQLErrorsBadge: jest.fn()
     }));
@@ -43,6 +45,41 @@ function responseOf(data) {
 }
 
 describe('_restoreResponse', () => {
+    test('restores unary gRPC inspection state and its typed completed source', async () => {
+        const { manager, container } = await loadHarness();
+        container.inspection = { restore: jest.fn(), setSource: jest.fn() };
+        const state = { view: 'results', json: { draft: '$.count', applied: '$.count' } };
+        await manager._restoreGrpc({ id: 'tab-1', request: { grpc: {} }, responseInspection: state,
+            response: { data: { count: 0 }, isJson: true, grpc: { ok: true }, headers: {} } });
+        expect(container.inspection.restore).toHaveBeenCalledWith(state);
+        expect(container.inspection.setSource).toHaveBeenCalledWith({ format: 'json', body: '{"count":0}' });
+    });
+
+    test.each([
+        [false, 'false', 'json'],
+        [0, '0', 'json'],
+        [null, 'null', 'json'],
+        ['', '', undefined]
+    ])('restores the saved JSON scalar %p as a completed response', async (data, displayed, languageHint) => {
+        const { manager } = await loadHarness();
+
+        await manager._restoreResponse({ ...responseOf(data), isJson: true }, 'tab-1');
+
+        expect(displayResponse).toHaveBeenCalledWith(displayed, 'application/json', 'tab-1', languageHint);
+        expect(clearResponse).not.toHaveBeenCalled();
+    });
+
+    test('clears the response pane when the saved response has no body property', async () => {
+        const { manager } = await loadHarness();
+        const response = responseOf(undefined);
+        delete response.data;
+
+        await manager._restoreResponse(response, 'tab-1');
+
+        expect(displayResponse).not.toHaveBeenCalled();
+        expect(clearResponse).toHaveBeenCalledWith('tab-1');
+    });
+
     test('restoring the same response twice renders the panes once', async () => {
         const { manager, container } = await loadHarness();
         const response = responseOf({ a: 1 });

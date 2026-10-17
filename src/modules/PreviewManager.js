@@ -56,6 +56,7 @@ export class PreviewManager {
         this._updateButtonState(tabId, false);
 
         this.previewRepository.setPreviewMode(tabId, false);
+        container.onViewRendered?.();
     }
 
     /** @param {string} tabId */
@@ -79,6 +80,7 @@ export class PreviewManager {
         this._updateButtonState(tabId, true);
 
         this.previewRepository.setPreviewMode(tabId, true);
+        container.onViewRendered?.();
     }
 
     /** @param {string} tabId */
