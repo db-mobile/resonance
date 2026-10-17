@@ -392,40 +392,40 @@ export class RunnerResultsPanel {
             'tpl-runner-result-item'
         );
 
-        const el = fragment.firstElementChild;
-        el.dataset.index = index;
+        const row = fragment.firstElementChild;
+        row.dataset.index = index;
 
-        const methodEl = el.querySelector('[data-role="method"]');
+        const methodEl = row.querySelector('[data-role="method"]');
         if (methodEl) {
             methodEl.textContent = result.method;
             methodEl.dataset.method = result.method;
         }
 
-        const nameEl = el.querySelector('[data-role="name"]');
+        const nameEl = row.querySelector('[data-role="name"]');
         if (nameEl) {
             nameEl.textContent = result.name;
         }
 
-        const statusIcon = el.querySelector('[data-role="status-icon"]');
+        const statusIcon = row.querySelector('[data-role="status-icon"]');
         if (statusIcon) {
             statusIcon.classList.add('is-pending');
         }
 
-        const statusCodeEl = el.querySelector('[data-role="status-code"]');
+        const statusCodeEl = row.querySelector('[data-role="status-code"]');
         if (statusCodeEl) {
             statusCodeEl.style.display = 'none';
         }
 
-        const timeEl = el.querySelector('[data-role="time"]');
+        const timeEl = row.querySelector('[data-role="time"]');
         if (timeEl) {
             timeEl.style.display = 'none';
         }
 
-        el.addEventListener('click', () => {
+        row.addEventListener('click', () => {
             this._selectResultItem(index);
         });
 
-        return el;
+        return row;
     }
 
     /**
@@ -435,14 +435,14 @@ export class RunnerResultsPanel {
     _updateResultItem(index, result) {
         if (!this.dom.resultsList) {return;}
 
-        const el = this.dom.resultsList.querySelector(`[data-index="${index}"]`);
-        if (!el) {return;}
+        const row = this.dom.resultsList.querySelector(`[data-index="${index}"]`);
+        if (!row) {return;}
 
         if (this.data[index]) {
             Object.assign(this.data[index], result);
         }
 
-        const statusIcon = el.querySelector('[data-role="status-icon"]');
+        const statusIcon = row.querySelector('[data-role="status-icon"]');
         const statusClass = STATUS_CLASSES[result.status] || 'is-pending';
 
         if (statusIcon) {
@@ -450,18 +450,18 @@ export class RunnerResultsPanel {
             statusIcon.classList.add(statusClass);
         }
 
-        el.classList.remove(...ALL_STATUS_CLASSES);
-        el.classList.add(statusClass);
-        el.title = result.error || '';
+        row.classList.remove(...ALL_STATUS_CLASSES);
+        row.classList.add(statusClass);
+        row.title = result.error || '';
 
-        const statusCodeEl = el.querySelector('[data-role="status-code"]');
+        const statusCodeEl = row.querySelector('[data-role="status-code"]');
         if (statusCodeEl && result.statusCode != null) {
             statusCodeEl.textContent = result.statusCode;
             statusCodeEl.style.display = '';
             statusCodeEl.dataset.statusClass = getStatusCodeClass(result.statusCode);
         }
 
-        const timeEl = el.querySelector('[data-role="time"]');
+        const timeEl = row.querySelector('[data-role="time"]');
         if (timeEl && result.time != null) {
             timeEl.textContent = `${result.time}ms`;
             timeEl.style.display = '';

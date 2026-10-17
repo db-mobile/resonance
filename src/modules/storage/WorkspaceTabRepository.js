@@ -149,10 +149,8 @@ export class WorkspaceTabRepository {
                 this._queueStoreWrite(this.STORE_KEY, hydrated).catch(() => { });
             }
             return [...hydrated];
-        } catch (error) {
-            const defaultTabs = [this._createDefaultTab()];
-            this._tabsCache = defaultTabs;
-            return [...defaultTabs];
+        } catch {
+            return [this._createDefaultTab()];
         }
     }
 

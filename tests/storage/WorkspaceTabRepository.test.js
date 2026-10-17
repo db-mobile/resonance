@@ -66,6 +66,20 @@ describe('WorkspaceTabRepository', () => {
             expect(result).toHaveLength(1);
             expect(result[0].name).toBe('New Request');
         });
+
+        test('does not cache the default tab after a read failure', async () => {
+            const stored = [{ id: 'tab-1', name: 'Persisted', request: { url: 'http://api.com' } }];
+            mockBackendAPI.store.get
+                .mockRejectedValueOnce(new Error('Storage error'))
+                .mockResolvedValue(stored);
+
+            await repository.getTabs();
+            const added = await repository.addTab({ name: 'New Tab' });
+            await repository._writeChain;
+
+            const written = mockBackendAPI.store.set.mock.calls.at(-1)[1];
+            expect(written.map((tab) => tab.id)).toEqual(['tab-1', added.id]);
+        });
     });
 
     describe('caching', () => {

@@ -146,7 +146,7 @@ export class EnvironmentManager extends BaseModal {
             detailsContainer.innerHTML = '';
 
             const detailsFragment = await templateLoader.clone(
-                './src/templates/environment/environmentManager.html',
+                TEMPLATE_PATH,
                 'tpl-environment-manager-details'
             );
             detailsContainer.appendChild(detailsFragment);
@@ -391,7 +391,7 @@ export class EnvironmentManager extends BaseModal {
         }
 
         return templateLoader
-            .clone('./src/templates/environment/environmentManager.html', 'tpl-environment-manager-variable-row')
+            .clone(TEMPLATE_PATH, 'tpl-environment-manager-variable-row')
             .then((fragment) => {
                 const row = fragment.firstElementChild;
                 container.appendChild(fragment);
