@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Resonance command line — run committed collections and runners headlessly in CI with JUnit reports and meaningful exit codes.">
+
+  <title>Command Line &amp; CI — Resonance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <header id="header">
+    <nav class="container nav-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <span class="logo-text">Resonance</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#screenshots">Screenshots</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="documentation.html" class="nav-cta">Docs</a></li>
+      </ul>
+      <button class="burger" id="burger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc-page">
+      <aside class="doc-sidebar">
+        <div class="doc-sidebar-label">Documentation</div>
+        <ul class="doc-nav-list">
+          <li><a href="documentation.html">Getting Started</a></li>
+          <li><a href="requests.html">Requests &amp; Responses</a></li>
+          <li><a href="graphql.html">GraphQL</a></li>
+          <li><a href="grpc.html">gRPC</a></li>
+          <li><a href="websocket.html">WebSocket</a></li>
+          <li><a href="mqtt.html">MQTT</a></li>
+          <li><a href="sse.html">Server-Sent Events</a></li>
+          <li><a href="cookie-jar.html">Cookie Jar</a></li>
+          <li><a href="mock-server.html">Mock Server</a></li>
+          <li><a href="scripts.html">Using Scripts</a></li>
+          <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="command-line.html" class="active">Command Line &amp; CI</a></li>
+          <li><a href="settings.html">Settings &amp; Network</a></li>
+        </ul>
+      </aside>
+
+      <div class="doc-content-wrap">
+        <div class="doc-page-label">// command line</div>
+        <h2>Command Line &amp; CI</h2>
+        <p class="doc-lead">The <code>resonance</code> command runs the requests, folders and saved runners of a collection without the desktop app. It is a single static binary built on the same execution engine as the app, so scripts, variables, authentication, cookies, proxies and certificates behave exactly as they do in the editor &mdash; in a pipeline, a container, or on a server.</p>
+
+        <h3>What It Is For</h3>
+        <ul class="doc-list">
+          <li>Run the smoke tests you built in the <a href="collection-runner.html">Collection Runner</a> on every push or merge request</li>
+          <li>Run a single request, a folder, or a whole collection from a git checkout, in the order shown in the sidebar</li>
+          <li>Produce JUnit XML that GitHub, GitLab, Jenkins or Azure Pipelines render as test results</li>
+          <li>Fail the pipeline through the exit code when a request or a test fails</li>
+        </ul>
+        <p>Collections saved by Resonance 3 are plain YAML directories, and runner definitions live inside them as <code>runners/&lt;name&gt;.yaml</code>, so everything the command needs is committed next to your code. Secrets are never in those files; they are injected at run time (see <a href="#variables">Variables and secrets</a>).</p>
+
+        <h3 id="install">Installing</h3>
+        <h4>Linux and macOS</h4>
+        <p>One line downloads the archive for your platform, verifies it against the release&rsquo;s <code>SHA256SUMS</code>, and installs the binary into <code>/usr/local/bin</code> when that is writable, otherwise into <code>~/.local/bin</code>:</p>
+        <pre><code>curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh</code></pre>
+        <p>Pin a version or choose the directory:</p>
+        <pre><code>curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh -s -- --version 3.5.0 --dir ~/.local/bin</code></pre>
+        <ul class="doc-list">
+          <li>The script also reads <code>RESONANCE_VERSION</code>, <code>RESONANCE_INSTALL_DIR</code> and <code>RESONANCE_TARGET</code> (to override platform detection, e.g. <code>aarch64-unknown-linux-musl</code>)</li>
+          <li>It never calls <code>sudo</code>; prefix the <code>sh</code> with <code>sudo</code> yourself for a system directory you cannot write to</li>
+          <li>Prefer a manual install? Every <a href="https://github.com/db-mobile/resonance/releases/latest" target="_blank" rel="noopener">release</a> carries <code>resonance-cli_&lt;version&gt;_&lt;target&gt;.tar.gz</code> archives for Linux x86_64 and arm64 (static, no system libraries needed) and macOS (universal), plus <code>SHA256SUMS</code>. Unpack and put <code>resonance</code> on your <code>PATH</code></li>
+        </ul>
+        <h4>Windows</h4>
+        <p>Download <code>resonance-cli_&lt;version&gt;_x86_64-pc-windows-msvc.zip</code> from the release, check it against <code>SHA256SUMS</code>, and put <code>resonance.exe</code> on your <code>PATH</code>. On GitHub Actions the setup action below does this for you.</p>
+        <h4>GitHub Actions</h4>
+        <p>The repository doubles as a setup action for Linux, macOS and Windows runners. Referencing it at a release tag installs that version:</p>
+        <pre><code>- uses: db-mobile/resonance@v3.5.1
+  # with:
+  #   version: 3.5.1        # pick another release explicitly
+- run: resonance --version</code></pre>
+        <p>The action exposes <code>version</code> and <code>path</code> outputs. <code>uses: db-mobile/resonance@main</code> installs the latest release.</p>
+
+        <h3>Running Requests</h3>
+        <pre><code>resonance run collections/petstore                      # every request, in sidebar order
+resonance run collections/petstore pets                 # one folder, recursively
+resonance run collections/petstore pets/create-pet      # one request by file path
+resonance run collections/petstore "Create pet"         # one request by name
+resonance list collections/petstore                     # what the collection offers</code></pre>
+        <p>The first argument is the collection directory, the one holding <code>collection.yaml</code>. Each further argument selects what to run, in the order given:</p>
+        <ul class="doc-list">
+          <li>A request <strong>file path</strong> relative to the collection, with or without <code>.yaml</code> &mdash; stable under git and what <code>resonance list</code> prints</li>
+          <li>A <strong>folder path</strong> &mdash; runs every request below it, in the order shown in the app</li>
+          <li>A request <strong>id</strong> or its display <strong>name</strong> (exact match first, then case-insensitive). A name shared by several requests is an error that lists the candidates; use the file path instead</li>
+        </ul>
+        <p>No selector runs the whole collection. The base URL, default headers, inherited authentication, variables and scripts come from the collection files exactly as in the app.</p>
+
+        <h3>Running a Saved Runner</h3>
+        <pre><code>resonance run collections/petstore --runner smoke</code></pre>
+        <p><code>--runner</code> takes the file stem of <code>runners/&lt;stem&gt;.yaml</code>, the runner&rsquo;s name or its id, and runs its queue with the overrides, iteration count, delay, stop-on-error setting and data file saved in the app. It cannot be combined with request selectors. Flags override the saved values:</p>
+        <ul class="doc-list">
+          <li><code>-n, --iterations N</code> &mdash; run the queue N times (1&ndash;1000)</li>
+          <li><code>-d, --data FILE</code> &mdash; a CSV or JSON data file, one iteration per row; replaces the runner&rsquo;s data file</li>
+          <li><code>--delay MS</code> &mdash; pause between requests</li>
+          <li><code>--bail</code> / <code>--no-bail</code> &mdash; stop at the first failed request or keep going. Plain runs default to <code>--no-bail</code> so CI sees every failure; a runner uses the <strong>Stop on error</strong> setting from its file</li>
+        </ul>
+        <p>The same flags work without <code>--runner</code>, so <code>resonance run collections/petstore users -n 3 --data rows.csv</code> is a data-driven run of one folder.</p>
+
+        <h3 id="variables">Variables and Secrets</h3>
+        <p>Values are layered, later layers winning:</p>
+        <ol class="doc-list">
+          <li>The collection&rsquo;s own variables (<code>variables.yaml</code>, committed)</li>
+          <li><code>--env-file FILE</code> &mdash; an environment exported from the app (<strong>Export</strong> or <strong>Export All</strong> in the environment manager). Add <code>--env NAME</code> when the file holds several environments</li>
+          <li><code>RESONANCE_VAR_&lt;KEY&gt;</code> environment variables &mdash; the key keeps its case, so <code>RESONANCE_VAR_apiToken</code> sets <code>&#123;&#123;apiToken&#125;&#125;</code></li>
+          <li><code>--var KEY=VALUE</code>, repeatable</li>
+        </ol>
+        <p>Secrets are never written to collection files or environment exports; they come from your CI secret store at run time, for example <code>RESONANCE_VAR_apiToken=&hellip;</code> or <code>--var apiToken="$API_TOKEN"</code>. The command warns on standard error when a variable flagged secret still has no value. Values set by scripts (<code>pm.environment.set</code>, <code>pm.variables.set</code>) carry over to the following requests of the run but are not persisted anywhere.</p>
+        <p>A request that still contains unresolved <code>&#123;&#123;names&#125;&#125;</code> is sent as-is, as in the app. Pass <code>--strict-variables</code> to fail such a request before it is sent.</p>
+
+        <h3>Network Options</h3>
+        <ul class="doc-list">
+          <li><code>--timeout MS</code> &mdash; request timeout, default 30000; <code>0</code> disables it</li>
+          <li><code>-k, --insecure</code> &mdash; skip TLS certificate verification</li>
+          <li><code>--http1</code> / <code>--http2</code> &mdash; force an HTTP version</li>
+          <li><code>--no-follow-redirects</code>, <code>--no-cookies</code> &mdash; transport switches</li>
+          <li><code>--proxy URL</code> / <code>--no-proxy</code> &mdash; a manual proxy (<code>http://user:pass@host:port</code>, <code>socks5://&hellip;</code>) or none. By default the <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and <code>NO_PROXY</code> environment variables apply, as most CI runners expect</li>
+          <li><code>--cert FILE --key FILE [--cacert FILE] --cert-host HOST[:PORT]</code> &mdash; a client certificate and an extra CA for one host, the equivalent of the <a href="settings.html#certificates">certificate settings</a> in the app</li>
+        </ul>
+
+        <h3>Output and Reports</h3>
+        <p>While running, one line per request shows the method, path, status and time, with each test underneath:</p>
+        <pre><code>Running 3 requests
+✓ GET /health 200 23ms
+  ✓ status is 200
+✗ POST /pets 500 87ms (2 tests failed)
+  ✗ created
+  ✗ has id
+– GET /pets/1 skipped
+Passed 1  Failed 1  Skipped 1  (3 requests, 1 iteration, 0.11 s)
+Termination: stoppedOnError</code></pre>
+        <ul class="doc-list">
+          <li><code>--junit FILE</code> and <code>--json FILE</code> write the same reports the app exports after a run; directories are created as needed</li>
+          <li><code>-q, --quiet</code> prints only failures and the summary; <code>-v, --verbose</code> adds script console output and the request and response of every step, with credentials in headers and query strings redacted and bodies cut at 64&nbsp;KiB</li>
+          <li>Colours are used on a terminal unless <code>--no-color</code> or <code>NO_COLOR</code> is set; diagnostics go to standard error</li>
+          <li><kbd>Ctrl</kbd>+<kbd>C</kbd> stops the run, still writes the reports, and exits with code 130</li>
+        </ul>
+
+        <h3>Exit Codes</h3>
+        <ul class="doc-list">
+          <li><strong>0</strong> &mdash; every request succeeded and every test passed</li>
+          <li><strong>1</strong> &mdash; a request or a test failed, or the run stopped early (stop-on-error, execution limit, invalid branching target)</li>
+          <li><strong>2</strong> &mdash; usage or configuration problem: not a collection, unknown or ambiguous selector, runner not found, bad flag, unreadable file, or the run could not start</li>
+          <li><strong>130</strong> &mdash; interrupted</li>
+        </ul>
+
+        <h3>Pipeline Examples</h3>
+        <h4>GitHub Actions</h4>
+        <pre><code>jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: db-mobile/resonance@v3.5.1
+      - name: Run smoke tests
+        env:
+          RESONANCE_VAR_apiToken: $&#123;&#123; secrets.API_TOKEN &#125;&#125;
+        run: |
+          resonance run collections/petstore --runner smoke \
+            --var baseUrl=https://staging.example.com \
+            --junit reports/junit.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: api-test-report
+          path: reports/</code></pre>
+        <h4>GitLab CI</h4>
+        <pre><code>api-tests:
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache curl
+    - curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh -s -- --version 3.5.0
+  script:
+    - resonance run collections/petstore --runner smoke --junit reports/junit.xml
+  variables:
+    RESONANCE_VAR_apiToken: $API_TOKEN
+  artifacts:
+    when: always
+    reports:
+      junit: reports/junit.xml</code></pre>
+        <p>The Linux binary is statically linked, so it runs in minimal images such as Alpine without extra packages. Any other CI system works the same way: install with the one-liner, run with <code>--junit</code>, and publish the report.</p>
+
+        <h3>Troubleshooting</h3>
+        <h4>&ldquo;open it in Resonance once to convert it&rdquo;</h4>
+        <ul class="doc-list">
+          <li>The directory still uses the legacy <code>collection.json</code> layout. Open it in the app once; it is converted to the YAML layout the command reads</li>
+        </ul>
+        <h4>&ldquo;ambiguous request&rdquo;</h4>
+        <ul class="doc-list">
+          <li>Several requests share that name. The message lists their file paths; select by path or id instead</li>
+        </ul>
+        <h4>Requests reach the wrong host or fail with a proxy error</h4>
+        <ul class="doc-list">
+          <li>The runner&rsquo;s <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code> environment applies by default. Pass <code>--no-proxy</code> to ignore it, or add internal hosts to <code>NO_PROXY</code></li>
+        </ul>
+        <h4>A test passes in the app but fails in CI</h4>
+        <ul class="doc-list">
+          <li>Compare the variable layers: the app&rsquo;s active environment is not available to the command unless you export it and pass <code>--env-file</code>, and secrets must be supplied again</li>
+          <li>Run with <code>-v</code> to see the exact request that was sent, with credentials redacted</li>
+        </ul>
+
+        <h3>Next Steps</h3>
+        <ul class="doc-list">
+          <li><a href="collection-runner.html">Collection Runner</a> — build and save the runs you execute here</li>
+          <li><a href="scripts.html">Using Scripts</a> — assertions and variable chaining that work identically in the command</li>
+          <li><a href="documentation.html#environments">Environments &amp; Variables</a> — exporting an environment for <code>--env-file</code></li>
+          <li><a href="https://github.com/db-mobile/resonance/blob/main/crates/resonance-cli/README.md" target="_blank" rel="noopener">Command-line reference</a> — the complete option list in the repository</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a href="index.html" class="logo">
+          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <span class="logo-text">Resonance</span>
+        </a>
+        <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <span class="footer-col-label">Project</span>
+          <ul>
+            <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub Repository</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/issues" target="_blank" rel="noopener">Report Issues</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <span class="footer-col-label">Resources</span>
+          <ul>
+            <li><a href="documentation.html">Documentation</a></li>
+            <li><a href="scripts.html">Using Scripts</a></li>
+            <li><a href="https://github.com/db-mobile/resonance/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container">
+        <span>&copy; 2026 Resonance &mdash; MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

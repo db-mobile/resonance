@@ -48,6 +48,7 @@
           <li><a href="mock-server.html">Mock Server</a></li>
           <li><a href="scripts.html">Using Scripts</a></li>
           <li><a href="collection-runner.html" class="active">Collection Runner</a></li>
+          <li><a href="command-line.html">Command Line &amp; CI</a></li>
           <li><a href="settings.html">Settings &amp; Network</a></li>
         </ul>
       </aside>
@@ -64,6 +65,7 @@
           <li>Chain values between steps using test scripts and environment variables</li>
           <li>Stop on first failure or continue through the full queue</li>
           <li>Save runner configurations for repeatable workflows</li>
+          <li>Run the saved configuration in CI with the <a href="command-line.html">command line</a></li>
         </ul>
 
         <h3>Opening Collection Runner</h3>
@@ -87,7 +89,7 @@
           <li><strong>Stop on error</strong> — halt when a request fails or a script throws</li>
           <li><strong>Continue on error</strong> — complete the full queue regardless of failures</li>
           <li><strong>Delay between requests</strong> — add a wait between steps</li>
-          <li><strong>Saved configurations</strong> — reload commonly used flows without rebuilding them</li>
+          <li><strong>Saved configurations</strong> — reload commonly used flows without rebuilding them. Each saved runner is stored as <code>runners/&lt;name&gt;.yaml</code> inside its collection, so it is committed and shared with the collection and can be run headlessly with <code>resonance run &lt;collection&gt; --runner &lt;name&gt;</code></li>
         </ul>
 
         <h3>Variable Chaining</h3>
@@ -152,8 +154,15 @@ environment.set('userId',    String(response.body.user.id));
           <li>Switch to <strong>Continue on error</strong> to get a full picture across all requests</li>
         </ul>
 
+        <h3>Running in CI</h3>
+        <p>Everything the runner needs is in the collection directory, so the same run works without the app. Install the <code>resonance</code> command on the CI runner and point it at the checkout:</p>
+        <pre><code>resonance run collections/petstore --runner smoke \
+  --var baseUrl=https://staging.example.com --junit reports/junit.xml</code></pre>
+        <p>Secrets come from the pipeline&rsquo;s secret store through <code>RESONANCE_VAR_&lt;KEY&gt;</code> variables, the JUnit file is rendered by the CI system as test results, and the exit code fails the job when a request or test fails. See <a href="command-line.html">Command Line &amp; CI</a> for installation, selectors, and all options.</p>
+
         <h3>Next Steps</h3>
         <ul class="doc-list">
+          <li><a href="command-line.html">Command Line &amp; CI</a> — run saved runners headlessly in your pipeline</li>
           <li><a href="documentation.html">Getting Started</a> — request setup and environment basics</li>
           <li><a href="scripts.html">Using Scripts</a> — full API reference for pre-request and test scripts</li>
           <li><a href="mock-server.html">Mock Server</a> — run collection flows against local mock endpoints</li>

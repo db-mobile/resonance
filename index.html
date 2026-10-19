@@ -227,7 +227,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
             </div>
             <h3>Collection Runner</h3>
-            <p>Run a batch of requests in sequence, chaining variables from one response into the next via post-response scripts. Set delays, stop-on-error, and watch progress live — then save the setup to rerun.</p>
+            <p>Run a batch of requests in sequence, chaining variables from one response into the next via post-response scripts. Set delays, stop-on-error, and watch progress live — then save the setup to rerun. Run the same saved runners headlessly in CI with the <a href="command-line.html">command line</a>, JUnit reports and exit codes included.</p>
           </div>
 
           <div class="feature-card reveal">
@@ -413,6 +413,21 @@
 <span class="prompt">$</span> npm run build:tauri</code></pre>
           </div>
           <p class="source-note">Requires <a href="https://tauri.app/start/prerequisites/" target="_blank" rel="noopener">Tauri system dependencies</a>.</p>
+        </div>
+
+        <div class="source-build reveal">
+          <div class="source-label">or install the command line for CI</div>
+          <div class="code-terminal">
+            <div class="terminal-bar">
+              <span class="term-dot dot-red"></span>
+              <span class="term-dot dot-yellow"></span>
+              <span class="term-dot dot-green"></span>
+              <span class="term-title">bash</span>
+            </div>
+            <pre class="code-body"><code><span class="prompt">$</span> curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh
+<span class="prompt">$</span> resonance run collections/petstore --runner smoke --junit reports/junit.xml</code></pre>
+          </div>
+          <p class="source-note">Linux and macOS; static binaries, verified against the release checksums. Windows and GitHub Actions: see the <a href="command-line.html">command-line guide</a>.</p>
         </div>
       </div>
     </section>

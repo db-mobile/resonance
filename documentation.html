@@ -48,6 +48,7 @@
           <li><a href="mock-server.html">Mock Server</a></li>
           <li><a href="scripts.html">Using Scripts</a></li>
           <li><a href="collection-runner.html">Collection Runner</a></li>
+          <li><a href="command-line.html">Command Line &amp; CI</a></li>
           <li><a href="settings.html">Settings &amp; Network</a></li>
         </ul>
       </aside>
@@ -73,6 +74,10 @@
         <h4>Windows</h4>
         <ul class="doc-list">
           <li>Download the <strong>NSIS installer</strong> and run it — no elevated permissions required</li>
+        </ul>
+        <h4>Command line</h4>
+        <ul class="doc-list">
+          <li>For CI and servers there is a separate <code>resonance</code> binary with no desktop dependencies: <code>curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh</code> on Linux and macOS, a <code>.zip</code> for Windows, or a GitHub Action. See <a href="command-line.html">Command Line &amp; CI</a></li>
         </ul>
 
         <h3>Making Your First Request</h3>
@@ -105,7 +110,8 @@
         <h4>Postman Environment</h4>
         <ol class="doc-list">
           <li>Click <strong>Import</strong> and choose <strong>Postman Environment</strong></li>
-          <li>All variables are imported into a new Resonance environment</li>
+          <li>Pick the exported <code>.postman_environment.json</code> file — its variables become a new Resonance environment</li>
+          <li>Variables of type <em>secret</em> are stored in the OS keychain, and disabled variables are skipped. If an environment with the same name exists, the import gets a numeric suffix</li>
         </ol>
 
         <h3>Organising Collections</h3>
@@ -138,7 +144,7 @@
           <li>Click <strong>Set active</strong>, or pick the environment from the selector, to use it</li>
           <li>Use <code>&#123;&#123;variableName&#125;&#125;</code> anywhere in URLs, headers, auth, or request bodies — values are substituted at send time, entirely locally</li>
         </ol>
-        <p>Edits save as you go. <strong>Duplicate</strong>, <strong>Export</strong>, and <strong>Delete</strong> act on the selected environment; <strong>Import</strong> and <strong>Export All</strong> at the bottom of the list move all environments between machines (merge with or replace the existing ones).</p>
+        <p>Edits save as you go. <strong>Duplicate</strong>, <strong>Export</strong>, and <strong>Delete</strong> act on the selected environment; <strong>Import</strong> and <strong>Export All</strong> at the bottom of the list move all environments between machines (merge with or replace the existing ones). <strong>Import</strong> also accepts a file saved with a single environment&rsquo;s <strong>Export</strong>. Secret values are exported empty, so re-enter them after importing.</p>
         <h4>Collection variables</h4>
         <p>Right-click a collection and choose <strong>Manage Variables</strong> for values shared by everyone using the collection, stored in the collection folder. When both define the same name, the active environment wins. In the collection runner, values set by scripts and data-file rows take precedence over both.</p>
         <p>Variables can reference other variables. A request that still contains unresolved <code>&#123;&#123;names&#125;&#125;</code> is sent as-is, with a warning listing them.</p>
@@ -228,6 +234,7 @@
           <li><a href="graphql.html">GraphQL</a> — the Explorer and subscriptions</li>
           <li><a href="settings.html">Settings, Proxy &amp; Certificates</a> — networking, mTLS, secrets, and updates</li>
           <li><a href="collection-runner.html">Collection Runner</a> — run sequences of requests and chain variables between steps</li>
+          <li><a href="command-line.html">Command Line &amp; CI</a> — run collections and runners headlessly in your pipeline</li>
           <li><a href="scripts.html">Using Scripts</a> — full pre-request and test script API reference</li>
           <li><a href="mock-server.html">Mock Server</a> — serve OpenAPI-backed responses locally</li>
           <li><a href="grpc.html">gRPC</a> — reflection, streaming, metadata, and trailers</li>
