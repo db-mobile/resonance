@@ -54,6 +54,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 
 - **Pre-request and test scripts** — sandboxed JavaScript (Boa Engine) with `request` mutation, `expect()` assertions, `environment` access, and `sendRequest()` for request chaining. A Postman-compatible `pm` API supports common scripts, with synchronous network calls and a limited module API ([supported APIs and limitations](SCRIPTS.md#postman-compatibility-pm))
 - **Collection runner** — HTTP and GraphQL execution with script-controlled branching, bounded loops, conditional skips, run-local variable chaining, an execution timeline, iterations, CSV/JSON data files, stop-on-error, delays, runner definitions saved as `runners/<name>.yaml` inside the collection (committable, one collection per runner), run history, and JSON/JUnit XML report export
+- **Command line** — the `resonance` binary runs committed requests, folders and runners headlessly in CI with variables from flags, environment or an exported environment file, JUnit/JSON reports and meaningful exit codes ([details](crates/resonance-cli/README.md))
 - **Response schema validation** — local validation using JSON Schema drafts 4, 6, 7, 2019-09, and 2020-12, with schema inference, editor checks, and response validation badges. Schemas without `$schema` use draft 2020-12; OpenAPI `nullable` and legacy boolean exclusive bounds are supported. References must resolve within the supplied schema; external schemas are not fetched. Standard formats are checked, including the `url` compatibility alias. Validation applies to successful HTTP JSON responses; runner schema assertions and Postman's `pm.response.to.have.jsonSchema()` are not included
 - **Response inspection** — native JSONPath (RFC 9535) and XPath 1.0 queries in a separate Results view, automatic reapplication, namespace overrides, and result copy/export. Works with completed HTTP/GraphQL responses (including HTTP errors) and unary gRPC JSON
 - **Environments & variables** — `{{ variable }}` templating, dynamic variables (`{{$uuid}}`, `{{$timestamp}}`, random data), quick environment switching, import/export
@@ -172,8 +173,28 @@ git clone https://github.com/db-mobile/resonance.git
 cd resonance
 npm install
 npm run dev          # development mode with hot reload
-npm run build:tauri  # production build → src-tauri/target/release/bundle/
+npm run build:tauri  # production build → target/release/bundle/
 ```
+
+## Command line
+
+Collections saved by Resonance are plain YAML files, and the `resonance`
+command runs them without the desktop app, for example in CI:
+
+```bash
+resonance run collections/petstore                      # every request, tree order
+resonance run collections/petstore pets "Create pet"    # a folder and a request
+resonance run collections/petstore --runner smoke \
+  --var baseUrl=https://staging.example.com --junit reports/junit.xml
+resonance list collections/petstore
+```
+
+Variables come from `--var`, `RESONANCE_VAR_<KEY>` environment variables or an
+environment export of the app (`--env-file`), so secrets never live in the
+repository. Exit code 0 means every test passed, 1 means a failure, 2 a usage
+problem. Static Linux, macOS and Windows binaries ship with every
+[release](https://github.com/db-mobile/resonance/releases/latest); see the
+[command-line guide](crates/resonance-cli/README.md) for all options.
 
 ## Screenshots
 

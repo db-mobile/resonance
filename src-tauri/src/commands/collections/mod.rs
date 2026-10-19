@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -9,20 +9,12 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
-use super::fs_secure::{restrict_dir, restrict_file};
-
-mod cache;
-mod git;
-mod ipc;
-mod layout;
-mod legacy;
-mod link;
-mod model;
-mod read;
-mod runners;
-mod secrets;
-mod startup;
-mod write;
+use legacy::{list_collection_endpoints, read_json_file};
+use resonance_collections::fs_secure::{restrict_dir, restrict_file};
+pub use resonance_collections::ipc::{Collection, EndpointData};
+use resonance_collections::{
+    cache, git, ipc, layout, legacy, link, model, read, runners, secrets, write,
+};
 
 use cache::{CollectionCache, read_collection_dir_cached};
 
@@ -31,8 +23,8 @@ use read::Layout;
 
 pub(crate) use layout::{desired_endpoint_file_name, find_endpoint_data_file};
 use layout::{find_available_dir, slugify};
+pub(crate) use resonance_collections::startup::{absorb_store_scripts, convert_v1_dir};
 use secrets::redact_auth_secrets;
-pub(crate) use startup::{absorb_store_scripts, convert_v1_dir};
 
 /// The process-wide parsed-collection cache.
 ///
@@ -50,73 +42,6 @@ use super::store_files::MAIN_STORE as STORE_FILE;
 pub(crate) const COLLECTIONS_DIR: &str = "collections";
 const COLLECTION_INDEX_KEY: &str = "collectionIndex";
 const LAST_COLLECTION_DIR_KEY: &str = "lastCollectionDirectory";
-
-/// Collection metadata stored in collection.json
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Collection {
-    pub id: String,
-    pub name: String,
-    #[serde(default)]
-    pub base_url: String,
-    #[serde(default)]
-    pub endpoints: Vec<Value>,
-    #[serde(default)]
-    pub folders: Vec<Value>,
-    #[serde(default)]
-    pub default_headers: Value,
-    /// Collection-level auth config ({type, config}) inherited by endpoints
-    /// whose auth type is "inherit". Secret fields are redacted before write.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub auth_config: Option<Value>,
-    #[serde(rename = "_openApiSpec")]
-    #[serde(default)]
-    pub open_api_spec: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub storage_path: Option<String>,
-    #[serde(skip_serializing, default)]
-    pub storage_parent_path: Option<String>,
-    /// True for a collection opened in place from a directory the app does not
-    /// own. Emitted for the renderer, ignored on the way in: linkage is store
-    /// state, never something the frontend can assert.
-    #[serde(default, skip_deserializing)]
-    pub linked: bool,
-    /// Branch of the Git working tree the collection directory sits in, when
-    /// it sits in one. Derived on every read, like `linked`: never accepted
-    /// from the frontend and never written to disk.
-    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
-    pub git_branch: Option<String>,
-}
-
-/// Request data stored per-endpoint
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct EndpointData {
-    #[serde(default)]
-    pub modified_body: Option<String>,
-    #[serde(default)]
-    pub path_params: Vec<Value>,
-    #[serde(default)]
-    pub query_params: Vec<Value>,
-    #[serde(default)]
-    pub headers: Vec<Value>,
-    #[serde(default)]
-    pub auth_config: Option<Value>,
-    #[serde(default)]
-    pub url: Option<String>,
-    #[serde(default)]
-    pub scripts: Option<Value>,
-    #[serde(default)]
-    pub graphql_data: Option<Value>,
-    #[serde(default)]
-    pub form_body_data: Option<Value>,
-    #[serde(default)]
-    pub grpc_data: Option<Value>,
-    #[serde(default)]
-    pub mqtt_data: Option<Value>,
-    #[serde(default)]
-    pub response_schema: Option<Value>,
-}
 
 fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
@@ -263,11 +188,6 @@ pub(crate) fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<
     Ok(())
 }
 
-fn read_json_file<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Result<T, String> {
-    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))
-}
-
 fn is_collection_dir(path: &Path) -> bool {
     Layout::detect(path).is_some()
 }
@@ -296,50 +216,6 @@ fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
     // get, and open alike.
     collection.git_branch = git::branch_for_dir(path);
     Ok(collection)
-}
-
-fn extract_endpoint_name(endpoint: &Value) -> Option<String> {
-    endpoint
-        .get("name")
-        .and_then(|value| value.as_str())
-        .filter(|value| !value.trim().is_empty())
-        .map(|value| value.to_string())
-        .or_else(|| {
-            endpoint
-                .get("path")
-                .and_then(|value| value.as_str())
-                .filter(|value| !value.trim().is_empty())
-                .map(|value| value.to_string())
-        })
-}
-
-fn list_collection_endpoints(collection: &Collection) -> Vec<(String, String)> {
-    let mut seen = HashSet::new();
-    let mut endpoints = Vec::new();
-
-    let mut collect_endpoint = |endpoint: &Value| {
-        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str())
-            && seen.insert(endpoint_id.to_string())
-        {
-            let endpoint_name =
-                extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
-            endpoints.push((endpoint_id.to_string(), endpoint_name));
-        }
-    };
-
-    for endpoint in &collection.endpoints {
-        collect_endpoint(endpoint);
-    }
-
-    for folder in &collection.folders {
-        if let Some(folder_endpoints) = folder.get("endpoints").and_then(|value| value.as_array()) {
-            for endpoint in folder_endpoints {
-                collect_endpoint(endpoint);
-            }
-        }
-    }
-
-    endpoints
 }
 
 fn find_endpoint_name_in_collection(collection: &Collection, endpoint_id: &str) -> Option<String> {
@@ -502,29 +378,7 @@ fn folder_request_ids(folder: &read::FolderNode, out: &mut Vec<String>) {
 fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
     match Layout::detect(dir) {
         Some(Layout::V2) => Ok(Some(read_collection_dir_cached(collection_cache(), dir)?)),
-        Some(Layout::V1) => {
-            let collection: Collection =
-                read_json_file(&CollectionPaths::of(dir).collection_json())?;
-
-            let requests_dir = CollectionPaths::of(dir).requests();
-            let mut data = HashMap::new();
-            for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
-                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
-                {
-                    data.insert(endpoint_id, endpoint_data);
-                }
-            }
-
-            let mut loaded = legacy::v1_to_v2(&collection, &data);
-
-            let variables_file = CollectionPaths::of(dir).variables_json();
-            if variables_file.exists() {
-                loaded.variables = read_json_file(&variables_file).unwrap_or_default();
-            }
-
-            Ok(Some(loaded))
-        }
+        Some(Layout::V1) => Ok(Some(legacy::load_v1_dir(dir)?)),
         None => Ok(None),
     }
 }

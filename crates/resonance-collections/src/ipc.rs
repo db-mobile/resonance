@@ -5,12 +5,79 @@
 //! property of this one response, not of the files: on disk each request
 //! exists exactly once.
 
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
 use super::model::{Body, BodyKind, FORMAT_VERSION, FolderDoc, RequestDoc};
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
-use super::{Collection, EndpointData};
+
+/// Collection metadata stored in collection.json
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub base_url: String,
+    #[serde(default)]
+    pub endpoints: Vec<Value>,
+    #[serde(default)]
+    pub folders: Vec<Value>,
+    #[serde(default)]
+    pub default_headers: Value,
+    /// Collection-level auth config ({type, config}) inherited by endpoints
+    /// whose auth type is "inherit". Secret fields are redacted before write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_config: Option<Value>,
+    #[serde(rename = "_openApiSpec")]
+    #[serde(default)]
+    pub open_api_spec: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage_path: Option<String>,
+    #[serde(skip_serializing, default)]
+    pub storage_parent_path: Option<String>,
+    /// True for a collection opened in place from a directory the app does not
+    /// own. Emitted for the renderer, ignored on the way in: linkage is store
+    /// state, never something the frontend can assert.
+    #[serde(default, skip_deserializing)]
+    pub linked: bool,
+    /// Branch of the Git working tree the collection directory sits in, when
+    /// it sits in one. Derived on every read, like `linked`: never accepted
+    /// from the frontend and never written to disk.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub git_branch: Option<String>,
+}
+
+/// Request data stored per-endpoint
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EndpointData {
+    #[serde(default)]
+    pub modified_body: Option<String>,
+    #[serde(default)]
+    pub path_params: Vec<Value>,
+    #[serde(default)]
+    pub query_params: Vec<Value>,
+    #[serde(default)]
+    pub headers: Vec<Value>,
+    #[serde(default)]
+    pub auth_config: Option<Value>,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub scripts: Option<Value>,
+    #[serde(default)]
+    pub graphql_data: Option<Value>,
+    #[serde(default)]
+    pub form_body_data: Option<Value>,
+    #[serde(default)]
+    pub grpc_data: Option<Value>,
+    #[serde(default)]
+    pub mqtt_data: Option<Value>,
+    #[serde(default)]
+    pub response_schema: Option<Value>,
+}
 
 /// Inserts a key only when the value carries something.
 fn insert_some(map: &mut Map<String, Value>, key: &str, value: Option<Value>) {
@@ -25,7 +92,7 @@ fn insert_some(map: &mut Map<String, Value>, key: &str, value: Option<Value>) {
 /// @param folder_id - Owning folder id, absent for a root-level request
 /// @param folder_path - Full folder path, for a tree UI that can use it
 /// @returns The endpoint as the frontend expects it
-pub(crate) fn request_to_endpoint(
+pub fn request_to_endpoint(
     doc: &RequestDoc,
     folder_id: Option<&str>,
     folder_path: &[String],
@@ -73,7 +140,7 @@ pub(crate) fn request_to_endpoint(
 ///
 /// @param doc - The request document
 /// @returns The endpoint data the frontend reads per request
-pub(crate) fn request_to_endpoint_data(doc: &RequestDoc) -> EndpointData {
+pub fn request_to_endpoint_data(doc: &RequestDoc) -> EndpointData {
     let mut data = EndpointData {
         url: doc.url.clone(),
         auth_config: doc.auth.clone(),
@@ -175,7 +242,7 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 
 /// A folder's id: its own metadata when present, else derived from its name so
 /// expansion state and auth scopes stay stable for a hand-made directory.
-pub(crate) fn folder_id(folder: &FolderNode) -> String {
+pub fn folder_id(folder: &FolderNode) -> String {
     if let Some(meta) = &folder.meta
         && !meta.id.is_empty()
     {
@@ -196,7 +263,7 @@ pub(crate) fn folder_id(folder: &FolderNode) -> String {
 /// @param storage_path - Absolute directory, set for this response only
 /// @param linked - True when this collection was opened in place
 /// @returns The collection as the frontend expects it
-pub(crate) fn to_ipc_collection(
+pub fn to_ipc_collection(
     loaded: &LoadedCollection,
     storage_path: &str,
     linked: bool,
@@ -347,17 +414,14 @@ fn entry_for(
 /// @param existing - What is currently on disk, if anything
 /// @returns The root folder of the tree to write
 #[cfg(test)]
-pub(crate) fn tree_from_ipc(
-    incoming: &Collection,
-    existing: Option<&LoadedCollection>,
-) -> FolderNode {
+pub fn tree_from_ipc(incoming: &Collection, existing: Option<&LoadedCollection>) -> FolderNode {
     tree_from_ipc_guarded(incoming, existing, None).0
 }
 
 /// [`tree_from_ipc`] that only creates requests whose ids are in
 /// `allowed_new` (when given and something is already on disk), returning the
 /// ids it skipped.
-pub(crate) fn tree_from_ipc_guarded(
+pub fn tree_from_ipc_guarded(
     incoming: &Collection,
     existing: Option<&LoadedCollection>,
     allowed_new: Option<&HashSet<String>>,
@@ -530,7 +594,7 @@ fn folder_from_ipc(
 ///
 /// @param doc - The request document to update
 /// @param data - The data the frontend sent
-pub(crate) fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
+pub fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
     doc.url = data.url.clone().filter(|u| !u.is_empty());
     doc.auth = data.auth_config.clone().filter(|a| !a.is_null());
     doc.params.path = data.path_params.clone();
@@ -544,10 +608,7 @@ pub(crate) fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
 }
 
 /// Finds one request in a loaded collection.
-pub(crate) fn find_request<'a>(
-    loaded: &'a LoadedCollection,
-    request_id: &str,
-) -> Option<&'a RequestDoc> {
+pub fn find_request<'a>(loaded: &'a LoadedCollection, request_id: &str) -> Option<&'a RequestDoc> {
     loaded
         .requests()
         .into_iter()
@@ -558,10 +619,10 @@ pub(crate) fn find_request<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::collections::legacy::v1_to_v2;
-    use crate::commands::collections::model::{FORMAT_VERSION, FolderDoc};
-    use crate::commands::collections::read::{RequestEntry, read_collection_dir};
-    use crate::commands::collections::write::write_collection_dir;
+    use crate::legacy::v1_to_v2;
+    use crate::model::{FORMAT_VERSION, FolderDoc};
+    use crate::read::{RequestEntry, read_collection_dir};
+    use crate::write::write_collection_dir;
     use std::collections::HashMap;
     use tempfile::TempDir;
 
@@ -587,7 +648,7 @@ mod tests {
 
     fn loaded(root: FolderNode) -> LoadedCollection {
         LoadedCollection {
-            meta: crate::commands::collections::model::CollectionDoc {
+            meta: crate::model::CollectionDoc {
                 format: FORMAT_VERSION,
                 id: "c1".into(),
                 name: "Petstore".into(),
@@ -801,7 +862,7 @@ mod tests {
 
     mod endpoint_data {
         use super::*;
-        use crate::commands::collections::model::{Body, BodyKind};
+        use crate::model::{Body, BodyKind};
 
         fn data_for(body: Body) -> EndpointData {
             let mut doc = RequestDoc::new("r1".into(), "X".into());
@@ -943,8 +1004,8 @@ mod tests {
 #[cfg(test)]
 mod save_path {
     use super::*;
-    use crate::commands::collections::model::{Body, BodyKind, FORMAT_VERSION};
-    use crate::commands::collections::read::RequestEntry;
+    use crate::model::{Body, BodyKind, FORMAT_VERSION};
+    use crate::read::RequestEntry;
 
     fn existing_with_state() -> LoadedCollection {
         let mut doc = RequestDoc::new("r1".into(), "Create Pet".into());
@@ -957,7 +1018,7 @@ mod save_path {
         doc.scripts.test = Some("expect(1).toBe(1);".into());
 
         LoadedCollection {
-            meta: crate::commands::collections::model::CollectionDoc {
+            meta: crate::model::CollectionDoc {
                 format: FORMAT_VERSION,
                 id: "c1".into(),
                 name: "P".into(),
@@ -1182,7 +1243,7 @@ mod save_path {
     fn moving_a_request_out_of_a_folder_keeps_its_state() {
         let mut existing = existing_with_state();
         existing.root.folders.push(FolderNode {
-            meta: Some(crate::commands::collections::model::FolderDoc {
+            meta: Some(crate::model::FolderDoc {
                 format: FORMAT_VERSION,
                 id: "f1".into(),
                 name: "pets".into(),
@@ -1209,7 +1270,7 @@ mod save_path {
     fn folder_auth_and_directory_survive_a_rename() {
         let mut existing = existing_with_state();
         existing.root.folders.push(FolderNode {
-            meta: Some(crate::commands::collections::model::FolderDoc {
+            meta: Some(crate::model::FolderDoc {
                 format: FORMAT_VERSION,
                 id: "f1".into(),
                 name: "pets".into(),
@@ -1325,7 +1386,7 @@ mod save_path {
             let mut existing = existing_three();
             let moved = existing.root.requests.split_off(1);
             existing.root.folders.push(FolderNode {
-                meta: Some(crate::commands::collections::model::FolderDoc {
+                meta: Some(crate::model::FolderDoc {
                     format: FORMAT_VERSION,
                     id: "f1".into(),
                     name: "pets".into(),

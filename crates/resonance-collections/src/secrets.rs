@@ -4,7 +4,7 @@ use serde_json::Value;
 
 /// Secret credential fields per auth type. Kept in sync with the frontend list in
 /// `src/modules/auth/authSecrets.js`.
-pub(crate) fn secret_auth_fields(auth_type: &str) -> &'static [&'static str] {
+pub fn secret_auth_fields(auth_type: &str) -> &'static [&'static str] {
     match auth_type {
         "bearer" => &["token"],
         "basic" => &["password"],
@@ -19,7 +19,7 @@ pub(crate) fn secret_auth_fields(auth_type: &str) -> &'static [&'static str] {
 
 /// A `{{ ... }}` reference resolves from a variable at request time and carries no
 /// secret itself, so it is safe to leave on disk.
-pub(crate) fn is_template_ref(value: &str) -> bool {
+pub fn is_template_ref(value: &str) -> bool {
     match value.find("{{") {
         Some(start) => value[start..].contains("}}"),
         None => false,
@@ -30,7 +30,7 @@ pub(crate) fn is_template_ref(value: &str) -> bool {
 /// git-friendly collection files even if the frontend fails to redact them. Template
 /// references and empty values are preserved. The real values are kept in the
 /// frontend SecretStore and rehydrated on read.
-pub(crate) fn redact_auth_secrets(auth_config: &mut Value) {
+pub fn redact_auth_secrets(auth_config: &mut Value) {
     let auth_type = match auth_config.get("type").and_then(|t| t.as_str()) {
         Some(t) => t.to_string(),
         None => return,

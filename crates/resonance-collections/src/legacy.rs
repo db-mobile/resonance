@@ -9,14 +9,98 @@
 //! touching no filesystem and needing no AppHandle, which is what keeps its
 //! tests cheap.
 
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
 
 use super::model::{
     Body, BodyKind, CollectionDoc, FORMAT_VERSION, FolderDoc, Params, RequestDoc, Scripts, Spec,
 };
 use super::read::{FolderNode, LoadedCollection, RequestEntry};
-use super::{Collection, EndpointData};
+use crate::ipc::{Collection, EndpointData};
+use crate::layout::{COLLECTION_JSON, find_endpoint_data_file};
+
+/// Reads and parses one JSON file.
+pub fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T, String> {
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))
+}
+
+/// A v1 endpoint's display name, falling back to its path.
+pub fn extract_endpoint_name(endpoint: &Value) -> Option<String> {
+    endpoint
+        .get("name")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.to_string())
+        .or_else(|| {
+            endpoint
+                .get("path")
+                .and_then(|value| value.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| value.to_string())
+        })
+}
+
+/// Every endpoint id/name pair a v1 collection lists, each once.
+pub fn list_collection_endpoints(collection: &Collection) -> Vec<(String, String)> {
+    let mut seen = HashSet::new();
+    let mut endpoints = Vec::new();
+
+    let mut collect_endpoint = |endpoint: &Value| {
+        if let Some(endpoint_id) = endpoint.get("id").and_then(|value| value.as_str())
+            && seen.insert(endpoint_id.to_string())
+        {
+            let endpoint_name =
+                extract_endpoint_name(endpoint).unwrap_or_else(|| endpoint_id.to_string());
+            endpoints.push((endpoint_id.to_string(), endpoint_name));
+        }
+    };
+
+    for endpoint in &collection.endpoints {
+        collect_endpoint(endpoint);
+    }
+
+    for folder in &collection.folders {
+        if let Some(folder_endpoints) = folder.get("endpoints").and_then(|value| value.as_array()) {
+            for endpoint in folder_endpoints {
+                collect_endpoint(endpoint);
+            }
+        }
+    }
+
+    endpoints
+}
+
+/// Reads a v1 collection directory (`collection.json`, `requests/*.json`,
+/// `variables.json`) straight into the v2 model, without touching any cache.
+///
+/// @param dir - A directory whose layout is V1
+/// @returns The collection as a v2 tree, ready to be written
+pub fn load_v1_dir(dir: &Path) -> Result<LoadedCollection, String> {
+    let collection: Collection = read_json_file(&dir.join(COLLECTION_JSON))?;
+
+    let requests_dir = dir.join("requests");
+    let mut data = HashMap::new();
+    for (endpoint_id, _) in list_collection_endpoints(&collection) {
+        if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
+            && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
+        {
+            data.insert(endpoint_id, endpoint_data);
+        }
+    }
+
+    let mut loaded = v1_to_v2(&collection, &data);
+
+    let variables_file = dir.join("variables.json");
+    if variables_file.exists() {
+        loaded.variables = read_json_file(&variables_file).unwrap_or_default();
+    }
+
+    Ok(loaded)
+}
 
 /// Gap between generated `seq` values, matching the writer's step.
 const SEQ_STEP: i64 = 10;
@@ -115,7 +199,7 @@ fn prune_parameter_buckets(parameters: Option<Value>) -> Option<Value> {
 ///
 /// @param data - The endpoint's v1 data file
 /// @returns The v2 body, or None when the request had none
-pub(crate) fn body_from_v1(data: &EndpointData) -> Option<Body> {
+pub fn body_from_v1(data: &EndpointData) -> Option<Body> {
     if let Some(form) = &data.form_body_data {
         let mode = form.get("mode").and_then(|m| m.as_str()).unwrap_or("");
         match mode {
@@ -181,7 +265,7 @@ pub(crate) fn body_from_v1(data: &EndpointData) -> Option<Body> {
 }
 
 /// Converts v1 scripts, which used longer field names.
-pub(crate) fn scripts_from_v1(value: Option<&Value>) -> Scripts {
+pub fn scripts_from_v1(value: Option<&Value>) -> Scripts {
     let scripts = match value {
         Some(scripts) => scripts,
         None => return Scripts::default(),
@@ -205,11 +289,7 @@ pub(crate) fn scripts_from_v1(value: Option<&Value>) -> Scripts {
 /// @param data - The endpoint's data file, if it had one
 /// @param seq - Position in its folder, derived from the v1 array order
 /// @returns The v2 request document
-pub(crate) fn endpoint_to_request(
-    endpoint: &Value,
-    data: Option<&EndpointData>,
-    seq: i64,
-) -> RequestDoc {
+pub fn endpoint_to_request(endpoint: &Value, data: Option<&EndpointData>, seq: i64) -> RequestDoc {
     let id = string_field(endpoint, "id").unwrap_or_default();
     let name = string_field(endpoint, "name")
         .or_else(|| string_field(endpoint, "path"))
@@ -277,10 +357,7 @@ fn foldered_ids(collection: &Collection) -> Vec<String> {
 /// @param collection - The parsed collection.json
 /// @param data - Endpoint data files, keyed by endpoint id
 /// @returns The collection in the v2 model, ready to be written
-pub(crate) fn v1_to_v2(
-    collection: &Collection,
-    data: &HashMap<String, EndpointData>,
-) -> LoadedCollection {
+pub fn v1_to_v2(collection: &Collection, data: &HashMap<String, EndpointData>) -> LoadedCollection {
     let meta = CollectionDoc {
         format: FORMAT_VERSION,
         id: collection.id.clone(),
@@ -922,8 +999,8 @@ mod tests {
 #[cfg(test)]
 mod end_to_end {
     use super::*;
-    use crate::commands::collections::read::read_collection_dir;
-    use crate::commands::collections::write::write_collection_dir;
+    use crate::read::read_collection_dir;
+    use crate::write::write_collection_dir;
     use serde_json::json;
     use std::fs;
     use tempfile::TempDir;

@@ -1,0 +1,43 @@
+{
+  "runnerId": "runner_1",
+  "runnerName": "Smoke <&>",
+  "startTime": 1789466700000,
+  "endTime": 1789466701000,
+  "totalTime": 1000,
+  "totalRequests": 4,
+  "plannedRequests": 4,
+  "sentRequests": 3,
+  "iterations": 1,
+  "passed": 1,
+  "failed": 2,
+  "skipped": 1,
+  "variablesSet": {},
+  "terminationReason": "completed",
+  "error": null,
+  "requests": [
+    {
+      "index": 0, "queuePosition": 0, "iteration": 1, "attempt": 1, "collectionId": "c1", "endpointId": "e1",
+      "name": "List", "method": "GET", "path": "/a", "status": "success", "statusCode": 200,
+      "responseTime": 100, "time": 100, "error": null, "variablesSet": {}, "logs": [{"level": "log", "message": "tok", "timestamp": 1}],
+      "testResults": [{"passed": true, "message": "is 200"}], "sent": true
+    },
+    {
+      "index": 1, "queuePosition": 1, "iteration": 1, "attempt": 1, "collectionId": "c1", "endpointId": "e2",
+      "name": "Create", "method": "POST", "path": "/b", "status": "error", "statusCode": 201,
+      "responseTime": 50, "time": 50, "error": "Test script failed", "variablesSet": {}, "logs": [],
+      "testResults": [{"passed": false, "message": "returns \"id\""}], "sent": true
+    },
+    {
+      "index": 2, "queuePosition": 2, "iteration": 1, "attempt": 2, "collectionId": "c1", "endpointId": "e3",
+      "name": "Boom", "method": "GET", "path": "/c", "status": "error", "statusCode": null,
+      "responseTime": 5, "time": 5, "error": "dns error", "variablesSet": {}, "logs": [],
+      "testResults": [], "sent": true
+    },
+    {
+      "index": 3, "queuePosition": 3, "iteration": 1, "attempt": 1, "collectionId": null, "endpointId": null,
+      "name": "Later", "method": "GET", "path": "/d", "status": "skipped", "statusCode": null,
+      "responseTime": 0, "time": 0, "error": "Skipped due to previous error", "variablesSet": {}, "logs": [],
+      "testResults": [], "sent": false, "execution": {"next": {"kind": "unchanged"}, "skipped": true}
+    }
+  ]
+}

@@ -117,6 +117,9 @@ pub struct RunOptions {
     pub delay_ms: Option<u64>,
     pub stop_on_error: bool,
     pub max_executions_per_iteration: Option<Value>,
+    /// Fail a visit before sending when the prepared request still contains
+    /// `{{...}}` references; the desktop never sets it.
+    pub strict_variables: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

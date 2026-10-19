@@ -48,6 +48,7 @@ struct Session<F: FnMut(ExecutionEvent)> {
     token: Cancellation,
     emit: F,
     runner: bool,
+    strict_variables: bool,
     sent: bool,
 }
 impl<F: FnMut(ExecutionEvent)> Session<F> {
@@ -68,6 +69,7 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
             token,
             emit,
             runner,
+            strict_variables: false,
             sent: false,
         }
     }
@@ -377,13 +379,19 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
             );
         }
         preparation::finalize(&mut prepared, &self.context);
-        if !self.runner {
+        if !self.runner || self.strict_variables {
             let unresolved = crate::variables::unresolved_names(&json!({
                 "url":prepared.request["url"], "headers":prepared.request["headers"],
                 "queryParams":prepared.request["queryParams"], "pathParams":prepared.request["pathParams"],
                 "body":prepared.request["body"], "auth":processor.value(&auth, &self.variables(template, &data))
             }));
             if !unresolved.is_empty() {
+                if self.strict_variables {
+                    return Err(ExecutionError::new(
+                        "unresolvedVariables",
+                        json!(unresolved),
+                    ));
+                }
                 self.event(
                     "warning",
                     json!({"code":"unresolvedVariables", "details":unresolved}),
@@ -536,6 +544,7 @@ pub async fn execute_run<F: FnMut(ExecutionEvent)>(
 ) -> RunResult {
     let start = chrono::Utc::now().timestamp_millis();
     let mut session = Session::new(input.execution_id, input.context, token, emit, true);
+    session.strict_variables = input.options.strict_variables;
     let mut result = json!({"runnerId":input.runner_id,"runnerName":input.runner_name,"startTime":start,"endTime":null,"totalRequests":0,"iterations":1,"passed":0,"failed":0,"skipped":0,"requests":[],"variablesSet":{},"plannedRequests":0,"sentRequests":0,"terminationReason":"completed","error":null});
     let setup = (|| {
         if input.requests.is_empty() {

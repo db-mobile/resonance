@@ -25,7 +25,7 @@ const SHORT_ID_LEN: usize = 7;
 ///
 /// @param start - Directory to start the search from
 /// @returns The Git directory, or None when the path is not in a working tree
-pub(crate) fn find_git_dir(start: &Path) -> Option<PathBuf> {
+pub fn find_git_dir(start: &Path) -> Option<PathBuf> {
     let mut current = Some(start);
 
     while let Some(dir) = current {
@@ -48,7 +48,7 @@ pub(crate) fn find_git_dir(start: &Path) -> Option<PathBuf> {
 ///
 /// @param git_dir - The Git directory, as returned by `find_git_dir`
 /// @returns The branch name or short object id, or None when HEAD is unreadable
-pub(crate) fn read_head_branch(git_dir: &Path) -> Option<String> {
+pub fn read_head_branch(git_dir: &Path) -> Option<String> {
     let head = fs::read_to_string(git_dir.join("HEAD")).ok()?;
     let head = head.trim();
 
@@ -70,7 +70,7 @@ pub(crate) fn read_head_branch(git_dir: &Path) -> Option<String> {
 ///
 /// @param dir - Directory to inspect
 /// @returns The branch name or short object id, or None when there is no repository
-pub(crate) fn branch_for_dir(dir: &Path) -> Option<String> {
+pub fn branch_for_dir(dir: &Path) -> Option<String> {
     find_git_dir(dir).as_deref().and_then(read_head_branch)
 }
 

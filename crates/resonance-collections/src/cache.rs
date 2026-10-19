@@ -26,7 +26,7 @@ const MAX_ENTRIES: usize = 20;
 /// A plain file list is what makes an added or removed request visible: an
 /// mtime check alone would miss both.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct Fingerprint(Vec<(PathBuf, u64, u128)>);
+pub struct Fingerprint(Vec<(PathBuf, u64, u128)>);
 
 /// Fingerprints a collection directory.
 ///
@@ -36,7 +36,7 @@ pub(crate) struct Fingerprint(Vec<(PathBuf, u64, u128)>);
 ///
 /// @param dir - The collection directory
 /// @returns The fingerprint, or an error if the directory cannot be walked
-pub(crate) fn fingerprint(dir: &Path) -> Result<Fingerprint, String> {
+pub fn fingerprint(dir: &Path) -> Result<Fingerprint, String> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files)?;
     files.sort();
@@ -106,7 +106,7 @@ pub struct CollectionCache {
 
 impl CollectionCache {
     /// Returns the cached parse when the directory is unchanged.
-    pub(crate) fn get(&self, dir: &Path, fingerprint: &Fingerprint) -> Option<LoadedCollection> {
+    pub fn get(&self, dir: &Path, fingerprint: &Fingerprint) -> Option<LoadedCollection> {
         let mut entries = self.entries.lock().ok()?;
         let index = entries.iter().position(|entry| entry.dir == dir)?;
 
@@ -122,7 +122,7 @@ impl CollectionCache {
     }
 
     /// Stores a parse against the fingerprint it was read at.
-    pub(crate) fn put(&self, dir: &Path, fingerprint: Fingerprint, collection: LoadedCollection) {
+    pub fn put(&self, dir: &Path, fingerprint: Fingerprint, collection: LoadedCollection) {
         let Ok(mut entries) = self.entries.lock() else {
             return;
         };
@@ -143,7 +143,7 @@ impl CollectionCache {
     }
 
     /// Drops a directory, for a collection that was deleted.
-    pub(crate) fn remove(&self, dir: &Path) {
+    pub fn remove(&self, dir: &Path) {
         if let Ok(mut entries) = self.entries.lock() {
             entries.retain(|entry| entry.dir != dir);
         }
@@ -154,7 +154,7 @@ impl CollectionCache {
     /// Used right after a write: the writer leaves its `LoadedCollection`
     /// mirroring what it put on disk, so a save can leave the cache warm rather
     /// than cold.
-    pub(crate) fn refresh(&self, dir: &Path, collection: &LoadedCollection) {
+    pub fn refresh(&self, dir: &Path, collection: &LoadedCollection) {
         if let Ok(fingerprint) = fingerprint(dir) {
             self.put(dir, fingerprint, collection.clone());
         }
@@ -174,7 +174,7 @@ impl CollectionCache {
 /// @param cache - The parsed-collection cache
 /// @param dir - The collection directory
 /// @returns The collection in memory
-pub(crate) fn read_collection_dir_cached(
+pub fn read_collection_dir_cached(
     cache: &CollectionCache,
     dir: &Path,
 ) -> Result<LoadedCollection, String> {

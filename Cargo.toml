@@ -1,0 +1,85 @@
+[workspace]
+resolver = "3"
+members = [
+    "src-tauri",
+    "crates/resonance-core",
+    "crates/resonance-collections",
+    "crates/resonance-cli",
+]
+# A bare `cargo build`/`cargo test` at the root covers the headless crates only;
+# the desktop package needs the frontend bundle (`npm run build`) first and is
+# selected explicitly with `-p resonance`.
+default-members = [
+    "crates/resonance-core",
+    "crates/resonance-collections",
+    "crates/resonance-cli",
+]
+
+[workspace.package]
+version = "3.4.0"
+edition = "2024"
+license = "MIT"
+authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
+repository = "https://github.com/db-mobile/resonance"
+# Edition 2024 with let-chains.
+rust-version = "1.88"
+
+# Versions and features shared by two or more members live here; a member
+# writes `name.workspace = true`. Desktop-only and core-only crates stay in
+# their own manifests.
+[workspace.dependencies]
+resonance-core = { path = "crates/resonance-core" }
+resonance-collections = { path = "crates/resonance-collections" }
+
+# HTTP client. rustls-no-provider instead of plain rustls: the latter would
+# statically link the aws-lc-rs crypto provider; ring is installed as the
+# process default by the core. Root verification uses the OS trust store via
+# rustls-platform-verifier.
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+bytes = "1"
+http = "1"
+base64 = "0.22"
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+tower = { version = "0.5", features = ["util"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "0.26"
+rustls-pemfile = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+thiserror = "2"
+tracing = "0.1"
+regex = "1"
+url = "2"
+sha2 = "0.10"
+hex = "0.4"
+getrandom = "0.3"
+# Share Boa 0.19's ICU4X 1.5 tables with url/idna. One resolution graph, so the
+# pin is workspace-wide. Remove after Boa moves to ICU4X 2.x.
+idna_adapter = "=1.2.0"
+
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"    # Optimize for binary size
+lto = true         # Link-time optimization
+codegen-units = 1  # Maximize cross-module optimization (slower compile)
+strip = true       # Strip symbols from the binary
+# panic = "abort" intentionally omitted: the Boa script sandbox relies on
+# unwinding worker-thread panics, which abort would escalate to a full crash.
+
+# The CLI trades size for throughput. A named profile rather than a
+# per-package override, because the per-package form would leave the core,
+# Boa and reqwest at opt-level "z" inside the CLI binary.
+[profile.cli]
+inherits = "release"
+opt-level = 3

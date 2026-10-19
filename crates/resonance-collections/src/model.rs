@@ -11,12 +11,12 @@ use serde_json::{Map, Value};
 
 /// The format every v2 document declares in its first key. Bumped only for a
 /// change old readers cannot cope with.
-pub(crate) const FORMAT_VERSION: u32 = 2;
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Reads just the version off a document, so a reader can dispatch before
 /// committing to a full parse.
 #[derive(Debug, Deserialize)]
-pub(crate) struct FormatProbe {
+pub struct FormatProbe {
     #[serde(rename = "resonanceFormat")]
     pub format: Option<u32>,
 }
@@ -28,7 +28,7 @@ pub(crate) struct FormatProbe {
 ///
 /// @param source - Raw YAML document text
 /// @returns The declared format version
-pub(crate) fn probe_format(source: &str) -> Result<u32, String> {
+pub fn probe_format(source: &str) -> Result<u32, String> {
     let probe: FormatProbe = serde_yaml_ng::from_str(source)
         .map_err(|e| format!("Failed to read document version: {}", e))?;
     Ok(probe.format.unwrap_or(FORMAT_VERSION))
@@ -54,7 +54,7 @@ fn default_true() -> bool {
 /// the directory structure is the tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CollectionDoc {
+pub struct CollectionDoc {
     #[serde(rename = "resonanceFormat", default = "default_format")]
     pub format: u32,
     pub id: String,
@@ -80,7 +80,7 @@ pub(crate) struct CollectionDoc {
 /// file is still a folder, named after the directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct FolderDoc {
+pub struct FolderDoc {
     #[serde(rename = "resonanceFormat", default = "default_format")]
     pub format: u32,
     pub id: String,
@@ -97,7 +97,7 @@ pub(crate) struct FolderDoc {
 /// opaque so a key the backend does not know about is not dropped.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Params {
+pub struct Params {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub path: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -115,7 +115,7 @@ impl Params {
 /// Pre-request and test scripts, written as literal block scalars.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Scripts {
+pub struct Scripts {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pre_request: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -132,7 +132,7 @@ impl Scripts {
 /// sits last in a request file, never between two fields a human touches.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Spec {
+pub struct Spec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parameters: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -151,7 +151,7 @@ impl Spec {
 /// `formBodyData`, `graphqlData`) into one value tagged by mode.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum Body {
+pub enum Body {
     Known(BodyKind),
     /// A mode written by a newer build; carried through untouched.
     Other(Value),
@@ -159,7 +159,7 @@ pub(crate) enum Body {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "camelCase")]
-pub(crate) enum BodyKind {
+pub enum BodyKind {
     Json {
         #[serde(default)]
         content: String,
@@ -198,7 +198,7 @@ pub(crate) enum BodyKind {
 /// state the user edits, then reference material.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RequestDoc {
+pub struct RequestDoc {
     #[serde(rename = "resonanceFormat", default = "default_format")]
     pub format: u32,
     pub id: String,
@@ -275,7 +275,7 @@ impl RequestDoc {
 /// path are hints for re-linking after a merge re-ids a request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RunnerDoc {
+pub struct RunnerDoc {
     #[serde(rename = "resonanceFormat", default = "default_format")]
     pub format: u32,
     pub id: String,
@@ -290,7 +290,6 @@ pub(crate) struct RunnerDoc {
     pub extra: Map<String, Value>,
 }
 
-#[cfg(test)]
 impl RunnerDoc {
     /// Builds the minimum viable runner document.
     /// @param id - Stable runner id, referenced by run history and the last-run setting
@@ -314,7 +313,7 @@ impl RunnerDoc {
 /// lists and empty bodies are kept rather than skipped.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RunnerRequest {
+pub struct RunnerRequest {
     /// Accepted from the desktop for validation only; never written.
     #[serde(default, skip_serializing)]
     pub collection_id: Option<String>,
@@ -338,7 +337,7 @@ pub(crate) struct RunnerRequest {
 /// duplicate keys, row order and unknown row fields survive.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RunnerOverrides {
+pub struct RunnerOverrides {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_params: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -365,7 +364,7 @@ impl RunnerOverrides {
 /// true and the execution core to false, so a headless reader must not guess.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RunnerOptions {
+pub struct RunnerOptions {
     #[serde(default = "default_true")]
     pub stop_on_error: bool,
     #[serde(default, skip_serializing_if = "is_zero_u64")]
@@ -398,7 +397,7 @@ impl Default for RunnerOptions {
 /// derived row count must never be committed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RunnerDataFile {
+pub struct RunnerDataFile {
     pub path: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,

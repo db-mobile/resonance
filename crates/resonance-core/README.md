@@ -5,8 +5,8 @@ crate has no Tauri, GUI, storage, or credential-store dependencies. It builds
 without Node or frontend assets:
 
 ```sh
-cargo build --manifest-path crates/resonance-core/Cargo.toml --locked
-cargo test --manifest-path crates/resonance-core/Cargo.toml --locked
+cargo build -p resonance-core --locked
+cargo test -p resonance-core --locked
 ```
 
 `execution::execute_request(RequestInput, Cancellation, on_event)` and
@@ -68,12 +68,13 @@ settle correctly without duplicating persistence. Editor state, history,
 schema validation, report exports, and saved-run bookkeeping stay in the GUI.
 
 The behavioral fixtures in `tests/fixtures/execution` at the repository root are
-shared migration evidence; see their README for provenance. The `core` job in the CI pipeline
-builds/tests this crate and checks its dependency boundary without installing
-frontend or desktop dependencies. `scripts/check-core-resolution.py` verifies
-matching package versions and resolved normal dependency edges against the desktop
-lockfile, which remains the Flathub packaging source. The single idna_adapter pin
-lives in the core manifest.
+shared migration evidence; see their README for provenance. The `workspace` job in
+the CI pipeline builds/tests the headless crates and checks their dependency
+boundary without installing frontend or desktop dependencies. The repository is one
+Cargo workspace with a single root `Cargo.lock`, which is also the Flathub packaging
+source; `scripts/check-version.py` keeps the workspace version in step with
+`package.json` and `tauri.conf.json`. The idna_adapter pin lives in the workspace
+manifest.
 
 CLI commands, committed-file loading, installation/distribution, subscriptions,
 WebSocket, SSE, MQTT, and gRPC are outside this migration.

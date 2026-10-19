@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Smoke &lt;&amp;&gt;" tests="4" failures="2" errors="0" skipped="1" time="1.000" timestamp="2026-09-15T10:05:00.000Z">
+  <testsuite name="GET List · Attempt 1" tests="1" failures="0" errors="0" skipped="0" time="0.100">
+    <testcase name="is 200" classname="Smoke &lt;&amp;&gt;.GET List · Attempt 1" time="0.100"/>
+  </testsuite>
+  <testsuite name="POST Create · Attempt 1" tests="1" failures="1" errors="0" skipped="0" time="0.050">
+    <testcase name="returns &quot;id&quot;" classname="Smoke &lt;&amp;&gt;.POST Create · Attempt 1" time="0.050">
+      <failure type="AssertionFailure" message="returns &quot;id&quot;"/>
+    </testcase>
+  </testsuite>
+  <testsuite name="GET Boom · Attempt 2" tests="1" failures="1" errors="0" skipped="0" time="0.005">
+    <testcase name="Response status" classname="Smoke &lt;&amp;&gt;.GET Boom · Attempt 2" time="0.005">
+      <failure type="AssertionFailure" message="dns error"/>
+    </testcase>
+  </testsuite>
+  <testsuite name="GET Later · Attempt 1" tests="1" failures="0" errors="0" skipped="1" time="0.000">
+    <testcase name="Request" classname="Smoke &lt;&amp;&gt;.GET Later · Attempt 1" time="0.000">
+      <skipped message="Skipped due to previous error"/>
+    </testcase>
+  </testsuite>
+</testsuites>

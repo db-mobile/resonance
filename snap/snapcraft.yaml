@@ -114,7 +114,7 @@ parts:
       rustup default stable
       npm install
       TAURI_SIGNING_PRIVATE_KEY="" npm run tauri build -- --bundles deb -c '{"bundle":{"createUpdaterArtifacts":false}}'
-      dpkg -x src-tauri/target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/
+      dpkg -x target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/
 
       mkdir -p $CRAFT_PART_INSTALL/usr/share/applications
       cp assets/desktop/io.github.db_mobile.resonance.desktop $CRAFT_PART_INSTALL/usr/share/applications/io.github.db_mobile.resonance.desktop

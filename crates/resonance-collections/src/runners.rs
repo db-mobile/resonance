@@ -23,7 +23,7 @@ use super::write::{ensure_dir, relocate, to_yaml, write_if_changed};
 /// One runner, paired with the file it came from so a rename moves that file
 /// rather than orphaning it.
 #[derive(Debug, Clone)]
-pub(crate) struct RunnerEntry {
+pub struct RunnerEntry {
     /// Where this runner was read from; `None` for one never written.
     pub source: Option<PathBuf>,
     pub doc: RunnerDoc,
@@ -37,7 +37,7 @@ impl RunnerEntry {
 
 /// What a read of the directory produced.
 #[derive(Debug, Default)]
-pub(crate) struct ReadRunners {
+pub struct ReadRunners {
     pub entries: Vec<RunnerEntry>,
     /// Ids that were re-minted because a file had none or claimed one already
     /// taken; the caller persists these so the fresh id survives the next read.
@@ -48,12 +48,12 @@ pub(crate) struct ReadRunners {
 const REQUEST_KEYS: &[&str] = &["method", "protocol", "path", "url", "body", "grpc", "mqtt"];
 
 /// The directory holding a collection's runner files.
-pub(crate) fn runners_dir(dir: &Path) -> PathBuf {
+pub fn runners_dir(dir: &Path) -> PathBuf {
     dir.join(RUNNERS_DIR)
 }
 
 /// Mints a runner id that no counter could reproduce on another branch.
-pub(crate) fn new_runner_id() -> String {
+pub fn new_runner_id() -> String {
     format!("runner_{}", uuid::Uuid::new_v4().simple())
 }
 
@@ -64,7 +64,7 @@ pub(crate) fn new_runner_id() -> String {
 ///
 /// @param dir - The collection directory
 /// @returns The runners, ordered by `seq`, name, id
-pub(crate) fn read_runners(dir: &Path) -> Result<ReadRunners, String> {
+pub fn read_runners(dir: &Path) -> Result<ReadRunners, String> {
     let runners = runners_dir(dir);
     if !runners.is_dir() {
         return Ok(ReadRunners::default());
@@ -153,7 +153,7 @@ fn read_runner_file(path: &Path) -> Result<Option<RunnerDoc>, String> {
 /// @param dir - The collection directory
 /// @param entry - The runner, updated in memory; its source is set on return
 /// @returns Ok once the file is in place
-pub(crate) fn write_runner_entry(dir: &Path, entry: &mut RunnerEntry) -> Result<(), String> {
+pub fn write_runner_entry(dir: &Path, entry: &mut RunnerEntry) -> Result<(), String> {
     let runners = runners_dir(dir);
     ensure_dir(&runners)?;
 
@@ -173,7 +173,7 @@ pub(crate) fn write_runner_entry(dir: &Path, entry: &mut RunnerEntry) -> Result<
 /// @param runners - The runners to write
 /// @returns Ok once every file is in place
 #[cfg(test)]
-pub(crate) fn write_runners(dir: &Path, runners: &mut [RunnerEntry]) -> Result<(), String> {
+pub fn write_runners(dir: &Path, runners: &mut [RunnerEntry]) -> Result<(), String> {
     for entry in runners.iter_mut() {
         write_runner_entry(dir, entry)?;
     }
@@ -209,7 +209,7 @@ fn remove_runner_file(dir: &Path, entry: &RunnerEntry) -> Result<(), String> {
 /// @param incoming - The runner as the caller sent it
 /// @param collection_id - The id of the collection that owns `dir`
 /// @returns The runner as written
-pub(crate) fn upsert_runner(
+pub fn upsert_runner(
     dir: &Path,
     runners: &mut Vec<RunnerEntry>,
     mut incoming: RunnerDoc,
@@ -288,7 +288,7 @@ pub(crate) fn upsert_runner(
 /// @param runners - The collection's runners, updated in place
 /// @param runner_id - The runner to remove
 /// @returns True when a runner was removed
-pub(crate) fn delete_runner(
+pub fn delete_runner(
     dir: &Path,
     runners: &mut Vec<RunnerEntry>,
     runner_id: &str,
@@ -310,7 +310,7 @@ pub(crate) fn delete_runner(
 /// @param dir - The collection directory
 /// @param reference - The path as stored in the runner file
 /// @returns The absolute path to read
-pub(crate) fn resolve_data_file(dir: &Path, reference: &str) -> Result<PathBuf, String> {
+pub fn resolve_data_file(dir: &Path, reference: &str) -> Result<PathBuf, String> {
     let referenced = Path::new(reference);
     if referenced.is_absolute() {
         return Ok(referenced.to_path_buf());
@@ -351,7 +351,7 @@ pub(crate) fn resolve_data_file(dir: &Path, reference: &str) -> Result<PathBuf, 
 /// @param dir - The collection directory
 /// @param path - The path as picked or stored
 /// @returns The portable reference
-pub(crate) fn portable_data_path(dir: &Path, path: &str) -> String {
+pub fn portable_data_path(dir: &Path, path: &str) -> String {
     let candidate = Path::new(path);
     if !candidate.is_absolute() {
         return path.to_string();
@@ -373,8 +373,8 @@ pub(crate) fn portable_data_path(dir: &Path, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::collections::layout::COLLECTION_YAML;
-    use crate::commands::collections::model::{RunnerDataFile, RunnerRequest};
+    use crate::layout::COLLECTION_YAML;
+    use crate::model::{RunnerDataFile, RunnerRequest};
     use serde_json::Map;
     use tempfile::TempDir;
 

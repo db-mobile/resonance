@@ -21,7 +21,7 @@ use super::runners::{RunnerEntry, read_runners};
 
 /// Which on-disk format a collection directory uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Layout {
+pub enum Layout {
     /// `collection.json` plus a flat `requests/` directory.
     V1,
     /// `collection.yaml` plus one file per request, folders as directories.
@@ -37,7 +37,7 @@ impl Layout {
     ///
     /// @param dir - Directory to inspect
     /// @returns The layout, or None when this is not a collection directory
-    pub(crate) fn detect(dir: &Path) -> Option<Self> {
+    pub fn detect(dir: &Path) -> Option<Self> {
         if !dir.is_dir() {
             return None;
         }
@@ -54,7 +54,7 @@ impl Layout {
 /// One request, paired with the file it came from so a later write can rename
 /// that file rather than orphaning it.
 #[derive(Debug, Clone)]
-pub(crate) struct RequestEntry {
+pub struct RequestEntry {
     /// Where this request was read from; `None` for one that has never been written.
     pub source: Option<PathBuf>,
     pub doc: RequestDoc,
@@ -68,7 +68,7 @@ impl RequestEntry {
 
 /// A folder and everything under it.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct FolderNode {
+pub struct FolderNode {
     /// `_folder.yaml`, absent for a directory that has none.
     pub meta: Option<FolderDoc>,
     /// Where this folder was read from; `None` for one not yet written.
@@ -79,7 +79,7 @@ pub(crate) struct FolderNode {
 
 /// A whole collection, in memory.
 #[derive(Debug, Clone)]
-pub(crate) struct LoadedCollection {
+pub struct LoadedCollection {
     pub meta: CollectionDoc,
     /// Contents of the sibling spec file, inlined for the frontend.
     pub open_api_spec: Option<Value>,
@@ -117,7 +117,7 @@ fn collect_requests<'a>(node: &'a FolderNode, out: &mut Vec<&'a RequestEntry>) {
 /// @param source - Raw document text
 /// @param path - Path used in the error message
 /// @returns Ok when the version is readable
-pub(super) fn check_version(source: &str, path: &Path) -> Result<(), String> {
+pub fn check_version(source: &str, path: &Path) -> Result<(), String> {
     let format = probe_format(source).map_err(|e| format!("{}: {}", path.display(), e))?;
 
     if format > FORMAT_VERSION {
@@ -220,7 +220,7 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
 /// (neither branch saw the other) and a hand-written file may have none. The
 /// id breaks a remaining tie on name, without which the order would fall back
 /// to `fs::read_dir` and differ between machines for the same commit.
-pub(super) fn sort_key(seq: i64, name: &str, id: &str) -> (i64, String, String) {
+pub fn sort_key(seq: i64, name: &str, id: &str) -> (i64, String, String) {
     (seq, name.to_ascii_lowercase(), id.to_string())
 }
 
@@ -314,7 +314,7 @@ fn read_folder(dir: &Path, at_root: bool) -> Result<FolderNode, String> {
 }
 
 /// A folder's display name: its own metadata when present, else its directory.
-pub(crate) fn folder_display_name(folder: &FolderNode) -> String {
+pub fn folder_display_name(folder: &FolderNode) -> String {
     if let Some(meta) = &folder.meta {
         return meta.name.clone();
     }
@@ -358,7 +358,7 @@ fn dedupe_ids(node: &mut FolderNode, seen: &mut HashSet<String>) -> Vec<(String,
 }
 
 /// Mints a request id that no counter could reproduce on another branch.
-pub(crate) fn new_request_id() -> String {
+pub fn new_request_id() -> String {
     format!("req_{}", uuid::Uuid::new_v4().simple())
 }
 
@@ -366,7 +366,7 @@ pub(crate) fn new_request_id() -> String {
 ///
 /// @param dir - The collection directory
 /// @returns The collection in memory
-pub(crate) fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String> {
+pub fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String> {
     let collection_yaml = dir.join(COLLECTION_YAML);
     if !collection_yaml.exists() {
         return Err(format!("{} has no {}", dir.display(), COLLECTION_YAML));
@@ -797,7 +797,7 @@ mod tests {
         let mut read = read_collection_dir(temp.path()).unwrap();
         assert_eq!(read.requests().len(), 1);
         assert_eq!(read.requests()[0].doc.id, "r1");
-        super::super::write::write_collection_dir(temp.path(), &mut read).unwrap();
+        crate::write::write_collection_dir(temp.path(), &mut read).unwrap();
         assert_eq!(fs::read(environment_path).unwrap(), original);
     }
 

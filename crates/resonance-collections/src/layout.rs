@@ -5,21 +5,21 @@ use std::path::{Path, PathBuf};
 
 /// File names reserved inside a collection directory. A request whose name
 /// slugifies to one of these gets a numeric suffix instead.
-pub(crate) const COLLECTION_YAML: &str = "collection.yaml";
-pub(crate) const VARIABLES_YAML: &str = "variables.yaml";
-pub(crate) const OPENAPI_YAML: &str = "openapi.yaml";
-pub(crate) const FOLDER_YAML: &str = "_folder.yaml";
+pub const COLLECTION_YAML: &str = "collection.yaml";
+pub const VARIABLES_YAML: &str = "variables.yaml";
+pub const OPENAPI_YAML: &str = "openapi.yaml";
+pub const FOLDER_YAML: &str = "_folder.yaml";
 
 /// The v1 marker, kept so a directory written by an older build is still
 /// recognised and can be converted.
-pub(crate) const COLLECTION_JSON: &str = "collection.json";
+pub const COLLECTION_JSON: &str = "collection.json";
 
 const RESERVED_STEMS: &[&str] = &["collection", "variables", "openapi"];
 
 /// Directories the layout owns at the collection root. The reader never
 /// descends into one as a request folder, and the writer never names a root
 /// folder after one. `environments` joins this list when that move lands.
-pub(crate) const RUNNERS_DIR: &str = "runners";
+pub const RUNNERS_DIR: &str = "runners";
 const RESERVED_DIRS: &[&str] = &[RUNNERS_DIR];
 
 /// Longest file stem we derive from a request name, so a long name cannot
@@ -31,7 +31,7 @@ const MAX_STEM_LEN: usize = 60;
 ///
 /// @param name - Directory name, without any path
 /// @returns True when the name is reserved
-pub(crate) fn is_reserved_dir(name: &str) -> bool {
+pub fn is_reserved_dir(name: &str) -> bool {
     RESERVED_DIRS.contains(&name)
 }
 
@@ -42,7 +42,7 @@ pub(crate) fn is_reserved_dir(name: &str) -> bool {
 ///
 /// @param stem - Candidate file stem, without extension
 /// @returns True when the stem is reserved
-pub(crate) fn is_reserved_stem(stem: &str) -> bool {
+pub fn is_reserved_stem(stem: &str) -> bool {
     RESERVED_STEMS.contains(&stem)
 }
 
@@ -50,7 +50,7 @@ pub(crate) fn is_reserved_stem(stem: &str) -> bool {
 ///
 /// @param name - The request's display name
 /// @returns A slug of at most MAX_STEM_LEN characters, never empty
-pub(crate) fn request_stem(name: &str) -> String {
+pub fn request_stem(name: &str) -> String {
     stem_with_fallback(name, "request")
 }
 
@@ -58,7 +58,7 @@ pub(crate) fn request_stem(name: &str) -> String {
 ///
 /// @param name - The runner's display name
 /// @returns A slug of at most MAX_STEM_LEN characters, never empty
-pub(crate) fn runner_stem(name: &str) -> String {
+pub fn runner_stem(name: &str) -> String {
     stem_with_fallback(name, "runner")
 }
 
@@ -89,12 +89,7 @@ fn stem_with_fallback(name: &str, fallback: &str) -> String {
 /// @param ext - File extension, without the dot
 /// @param current - Path the caller already owns, if any
 /// @returns A path that is free, or already the caller's
-pub(crate) fn find_available_path(
-    dir: &Path,
-    stem: &str,
-    ext: &str,
-    current: Option<&Path>,
-) -> PathBuf {
+pub fn find_available_path(dir: &Path, stem: &str, ext: &str, current: Option<&Path>) -> PathBuf {
     let taken = |candidate: &Path| current != Some(candidate) && candidate.exists();
 
     let start = if is_reserved_stem(stem) {
@@ -121,7 +116,7 @@ pub(crate) fn find_available_path(
     }
 }
 
-pub(crate) fn slugify(input: &str) -> String {
+pub fn slugify(input: &str) -> String {
     let mut slug = String::new();
     let mut last_was_dash = false;
 
@@ -144,7 +139,7 @@ pub(crate) fn slugify(input: &str) -> String {
     }
 }
 
-pub(crate) fn sanitize_file_component(input: &str) -> String {
+pub fn sanitize_file_component(input: &str) -> String {
     let mut out = String::new();
     for c in input.chars() {
         let ch = c.to_ascii_lowercase();
@@ -163,11 +158,7 @@ pub(crate) fn sanitize_file_component(input: &str) -> String {
     }
 }
 
-pub(crate) fn find_available_dir(
-    parent: &Path,
-    base_name: &str,
-    current_dir: Option<&Path>,
-) -> PathBuf {
+pub fn find_available_dir(parent: &Path, base_name: &str, current_dir: Option<&Path>) -> PathBuf {
     let mut candidate = parent.join(base_name);
     if current_dir == Some(candidate.as_path()) || !candidate.exists() {
         return candidate;
@@ -195,7 +186,7 @@ pub(crate) fn find_available_dir(
 /// @param current - Directory the caller already owns, if any
 /// @param at_root - Whether parent is the collection root
 /// @returns A directory that is free, or already the caller's
-pub(crate) fn find_available_folder_dir(
+pub fn find_available_folder_dir(
     parent: &Path,
     stem: &str,
     current: Option<&Path>,
@@ -215,7 +206,7 @@ pub(crate) fn find_available_folder_dir(
     }
 }
 
-pub(crate) fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String {
+pub fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String {
     format!(
         "{}--{}.json",
         slugify(endpoint_name),
@@ -223,7 +214,7 @@ pub(crate) fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str)
     )
 }
 
-pub(crate) fn find_endpoint_data_file(
+pub fn find_endpoint_data_file(
     requests_dir: &Path,
     endpoint_id: &str,
 ) -> Result<Option<PathBuf>, String> {

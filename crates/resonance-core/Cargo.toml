@@ -1,44 +1,46 @@
 [package]
 name = "resonance-core"
-version = "3.4.0"
-edition = "2024"
-license = "MIT"
 description = "Frontend-independent HTTP and collection execution for Resonance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
-tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
-futures-util = "0.3"
-bytes = "1"
-http = "1"
-base64 = "0.22"
-hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
-rustls-pemfile = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
-tower = { version = "0.5", features = ["util"] }
-tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-webpki-roots = "0.26"
-uuid = { version = "1", features = ["v4"] }
-chrono = "0.4"
+reqwest.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+bytes.workspace = true
+http.workspace = true
+base64.workspace = true
+hyper-util.workspace = true
+rustls-pemfile.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tower.workspace = true
+tokio-rustls.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
+uuid.workspace = true
+chrono.workspace = true
 encoding_rs = "0.8"
-thiserror = "2"
-tracing = "0.1"
-regex = "1"
-url = "2"
-# Share Boa 0.19's ICU4X 1.5 tables with url/idna. Remove after Boa moves to ICU4X 2.x.
-idna_adapter = "=1.2.0"
+thiserror.workspace = true
+tracing.workspace = true
+regex.workspace = true
+url.workspace = true
+idna_adapter.workspace = true
 md-5 = "0.10"
-sha2 = "0.10"
+sha2.workspace = true
 sha1 = "0.10"
 hmac = "0.12"
-hex = "0.4"
+hex.workspace = true
 ntlmclient = "0.2"
-getrandom = "0.3"
+getrandom.workspace = true
 boa_engine = "0.19"
 
 [dev-dependencies]
-tempfile = "3"
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
+tempfile.workspace = true
+axum.workspace = true

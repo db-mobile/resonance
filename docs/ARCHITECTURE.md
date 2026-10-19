@@ -104,14 +104,38 @@ The core exposes typed results, statuses, termination reasons and context inputs
 User body data, script-visible request objects and templatable auth fields remain
 JSON by design. YAML loading, keychain access and desktop repositories are adapters,
 not core dependencies. Capture fixtures in `tests/fixtures/execution/*capture.json`
-pin the remaining saved/editor mapping rules for a future headless file loader;
-this migration does not implement CLI or committed-file loading.
+pin the saved/editor mapping rules; `resonance-collections` ports them to Rust
+for headless loading and is checked against the same fixtures.
 
-The desktop and core remain separate Cargo packages to preserve the desktop and
-Flathub build paths. `scripts/check-core-resolution.py` enforces matching versions
-and resolved dependency edges in both lockfiles. The `core` job in the CI pipeline runs this
-check and builds/tests the core without frontend or desktop system dependencies.
-Update both lockfiles together; `src-tauri/Cargo.lock` remains the packaging source.
+The repository is one Cargo workspace (root `Cargo.toml`): the desktop package in
+`src-tauri` and the headless crates under `crates/` share a single `Cargo.lock`,
+one version (`workspace.package.version`, checked against `package.json` and
+`tauri.conf.json` by `scripts/check-version.py`) and the release profiles. Every
+member builds into the root `target/` directory; the Flathub manifest in the
+sibling packaging repository vendors crates from the root lockfile. The
+`workspace` job in the CI pipeline builds/tests the headless crates and checks
+their dependency boundary without frontend or desktop system dependencies.
+
+## Command line
+
+`crates/resonance-collections` is the Tauri-free collection reader shared by the
+desktop and the CLI: the v2 YAML model, reader/writer, runner files, secrets
+scopes and git helpers moved there unchanged, plus a loader API (`load_collection`,
+request addressing by path/folder/id/name, `variables.yaml` and environment-export
+parsing) and `capture.rs`, a one-to-one port of the desktop's `captureRunnerEntry`
+that turns loaded requests into core `RequestTemplate`s. `src-tauri` keeps the
+Tauri commands and re-exports the crate's modules.
+
+`crates/resonance-cli` builds the `resonance` binary. `run` loads a collection,
+resolves selectors or a runner, layers variables (collection < `--env-file` <
+`RESONANCE_VAR_*` < `--var`), and always executes through `execute_run`, so plain
+requests, folders and runners share one path for reports, `--bail`, iterations,
+data files and exit codes (0 passed, 1 failed, 2 usage/config, 130 interrupted).
+Console output is an event listener on the core's progress events; `--junit` and
+`--json` reuse `resonance-core::report`, a byte-compatible port of the desktop's
+report writer. The release workflow attaches static Linux (musl), macOS universal
+and Windows archives of the binary, built with the `cli` profile (`opt-level = 3`),
+to every GitHub release.
 
 ## Collection runners
 

@@ -87,7 +87,7 @@ jobs:
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
-        workspaces: './src-tauri -> target'
+        workspaces: '. -> target'
 
     - name: Install Linux dependencies
       if: matrix.os == 'ubuntu-latest'
@@ -111,7 +111,7 @@ jobs:
       uses: actions/upload-artifact@v6
       with:
         name: build-${{ matrix.os }}
-        path: src-tauri/target/release/bundle/
+        path: target/release/bundle/
         retention-days: 7
 
   rust-lint:
@@ -127,12 +127,12 @@ jobs:
         components: clippy, rustfmt
 
     - name: Check formatting
-      run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      run: cargo fmt --all -- --check
 
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
-        workspaces: './src-tauri -> target'
+        workspaces: '. -> target'
 
     - name: Install Linux dependencies
       run: |
@@ -152,7 +152,7 @@ jobs:
       run: npm run build
 
     - name: Run clippy
-      run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      run: cargo clippy -p resonance --locked -- -D warnings
 
   rust-test:
     runs-on: ubuntu-latest
@@ -167,7 +167,7 @@ jobs:
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
-        workspaces: './src-tauri -> target'
+        workspaces: '. -> target'
 
     - name: Install Linux dependencies
       run: |
@@ -187,7 +187,7 @@ jobs:
       run: npm run build
 
     - name: Run Rust tests
-      run: cargo test --manifest-path src-tauri/Cargo.toml
+      run: cargo test -p resonance --locked
 
   security:
     runs-on: ubuntu-latest
@@ -211,17 +211,15 @@ jobs:
     - name: Run dependency check
       run: npx audit-ci --moderate --skip-dev
 
-  core:
+  workspace:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Check shipped dependency resolution and version
-      run: |
-        python3 scripts/test-core-resolution.py
-        python3 scripts/check-core-resolution.py
+    - name: Check version agreement
+      run: python3 scripts/check-version.py
 
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
@@ -231,24 +229,63 @@ jobs:
     - name: Rust cache
       uses: swatinem/rust-cache@v2
       with:
-        workspaces: crates/resonance-core -> target
+        workspaces: '. -> target'
 
-    - name: Check dependency boundary
+    - name: Check dependency boundary of the headless crates
       run: |
-        cargo tree --manifest-path crates/resonance-core/Cargo.toml --locked --prefix none > core-dependencies.txt
-        if grep -Ei '^(tauri|gtk|gdk|webkit|javascriptcore|keyring|oo7|secret-service|security-framework|windows-credentials)([- ]|$)' core-dependencies.txt; then
-          echo 'The execution core must not depend on desktop libraries.'
-          exit 1
-        fi
+        for crate in resonance-core resonance-collections resonance-cli; do
+          cargo tree -p "$crate" --locked --prefix none > "deps-$crate.txt"
+          if grep -Ei '^(tauri|gtk|gdk|webkit|javascriptcore|keyring|oo7|secret-service|security-framework|windows-credentials|openssl-sys)([- ]|$)' "deps-$crate.txt"; then
+            echo "$crate must not depend on desktop libraries."
+            exit 1
+          fi
+        done
 
     - name: Check formatting
-      run: cargo fmt --manifest-path crates/resonance-core/Cargo.toml -- --check
+      run: cargo fmt --all -- --check
 
     - name: Run clippy
-      run: cargo clippy --manifest-path crates/resonance-core/Cargo.toml --locked --all-targets -- -D warnings
+      run: cargo clippy -p resonance-core -p resonance-collections -p resonance-cli --locked --all-targets -- -D warnings
 
     - name: Build without frontend assets or desktop dependencies
-      run: cargo build --manifest-path crates/resonance-core/Cargo.toml --locked
+      run: cargo build -p resonance-core -p resonance-collections -p resonance-cli --locked
 
-    - name: Run core tests
-      run: cargo test --manifest-path crates/resonance-core/Cargo.toml --locked
+    - name: Run tests
+      run: cargo test -p resonance-core -p resonance-collections -p resonance-cli --locked
+
+  cli-static:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-unknown-linux-musl
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: '. -> target'
+        key: cli-x86_64-unknown-linux-musl
+
+    - name: Install musl toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+        echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
+
+    - name: Build static command-line binary
+      run: cargo build -p resonance-cli --profile cli --target x86_64-unknown-linux-musl --locked
+
+    - name: Check the binary is static and runs
+      run: |
+        BIN=target/x86_64-unknown-linux-musl/cli/resonance
+        file "$BIN"
+        if ldd "$BIN" 2>&1 | grep -q '=>'; then
+          echo "The CLI binary must not link shared libraries."
+          exit 1
+        fi
+        "$BIN" --version

@@ -1,11 +1,12 @@
 [package]
 name = "resonance"
-version = "3.4.0"
 description = "A local-first, zero-account API client with excellent user experience"
-authors = ["Dennis Blümer <dennis.bluemer@ducart.de>"]
-license = "MIT"
-repository = "https://github.com/db-mobile/resonance"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
@@ -14,7 +15,8 @@ prost-build = "0.14"
 protoc-bin-vendored = "3"
 
 [dependencies]
-resonance-core = { path = "../crates/resonance-core" }
+resonance-core.workspace = true
+resonance-collections.workspace = true
 # Tauri defaults minus `dynamic-acl` (no runtime capabilities; required for
 # build.removeUnusedCommands). Recheck this list against the defaults on Tauri upgrades.
 tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus"] }
@@ -25,14 +27,11 @@ tauri-plugin-window-state = "2"
 # pull in yanked zip 4.x releases. macOS .app.tar.gz support is unconditional.
 tauri-plugin-updater = { version = "2.13.2", default-features = false, features = ["rustls-tls", "system-proxy"] }
 
-# HTTP client. rustls-no-provider instead of plain rustls: the latter would
-# statically link the aws-lc-rs crypto provider; ring is installed as the
-# process default in main(). Root verification uses the OS trust store via
-# rustls-platform-verifier (0.12's rustls-tls bundled webpki-roots instead).
-reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
-tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
-futures-util = "0.3"
+# HTTP client (versions and features in the workspace manifest).
+reqwest.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
 # MQTT client (async, rustls to match project TLS stack — no OpenSSL).
 # use-rustls-no-provider instead of use-rustls: the latter enables
 # tokio-rustls default features, which statically link the aws-lc-rs crypto
@@ -46,15 +45,15 @@ prost-types = "0.14"
 tonic-prost = "0.14"
 tokio-stream = "0.1"
 prost-reflect = { version = "0.16", features = ["serde"] }
-bytes = "1"
-http = "1"
-base64 = "0.22"
-hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+bytes.workspace = true
+http.workspace = true
+base64.workspace = true
+hyper-util.workspace = true
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
-serde_yaml_ng = "0.10"
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
 # Validate user-provided schemas locally; no HTTP/file retrieval or extra TLS provider.
 jsonschema = { version = "0.59", default-features = false, features = ["idna"] }
 # Local response queries (no script evaluation or external document retrieval).
@@ -64,26 +63,26 @@ sxd-xpath = "0.4"
 quick-xml = "0.42"
 
 # Mock server
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
-tower = { version = "0.5", features = ["util"] }
+axum.workspace = true
+tower.workspace = true
 
 # TLS for connection timing measurement
-tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-webpki-roots = "0.26"
+tokio-rustls.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
 
 # Utilities
-uuid = { version = "1", features = ["v4"] }
-chrono = "0.4"
-thiserror = "2"
-tracing = "0.1"
-regex = "1"
-url = "2"
-sha2 = "0.10"
-hex = "0.4"
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+regex.workspace = true
+url.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 # Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
-getrandom = "0.3"
+getrandom.workspace = true
 
 # Proto file parsing (pure Rust; bundles the well-known types, no protoc needed)
 protox = "0.10"
@@ -118,7 +117,7 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 [dev-dependencies]
 # Temp dirs that clean themselves up even when a test panics, which the
 # hand-rolled temp_dir().join(Uuid) pattern in fs_secure.rs does not.
-tempfile = "3"
+tempfile.workspace = true
 # Mock runtime, so transports that emit events can be driven end to end.
 tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus", "test"] }
 
@@ -126,10 +125,4 @@ tauri = { version = "2.12", default-features = false, features = ["wry", "compre
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
-[profile.release]
-opt-level = "z"    # Optimize for binary size
-lto = true         # Link-time optimization
-codegen-units = 1  # Maximize cross-module optimization (slower compile)
-strip = true       # Strip symbols from the binary
-# panic = "abort" intentionally omitted: the Boa script sandbox relies on
-# unwinding worker-thread panics, which abort would escalate to a full crash.
+# Release profiles live in the workspace manifest at the repository root.

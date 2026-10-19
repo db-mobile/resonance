@@ -6,8 +6,7 @@
 use serde_json::{Map, Value};
 use std::path::Path;
 
-use super::legacy::scripts_from_v1;
-use super::load_existing;
+use super::legacy::{load_v1_dir, scripts_from_v1};
 use super::read::{FolderNode, Layout, read_collection_dir};
 use super::write::write_collection_dir;
 
@@ -15,13 +14,11 @@ use super::write::write_collection_dir;
 ///
 /// @param dir - The collection directory
 /// @returns True when the directory was converted, false when it was not v1
-pub(crate) fn convert_v1_dir(dir: &Path) -> Result<bool, String> {
+pub fn convert_v1_dir(dir: &Path) -> Result<bool, String> {
     if Layout::detect(dir) != Some(Layout::V1) {
         return Ok(false);
     }
-    let Some(mut loaded) = load_existing(dir)? else {
-        return Ok(false);
-    };
+    let mut loaded = load_v1_dir(dir)?;
     write_collection_dir(dir, &mut loaded)?;
     Ok(true)
 }
@@ -37,10 +34,7 @@ pub(crate) fn convert_v1_dir(dir: &Path) -> Result<bool, String> {
 /// @param dir - The collection directory
 /// @param scripts - The `persistedScripts` map; consumed entries are removed
 /// @returns How many requests received scripts
-pub(crate) fn absorb_store_scripts(
-    dir: &Path,
-    scripts: &mut Map<String, Value>,
-) -> Result<u32, String> {
+pub fn absorb_store_scripts(dir: &Path, scripts: &mut Map<String, Value>) -> Result<u32, String> {
     if Layout::detect(dir) != Some(Layout::V2) {
         return Ok(0);
     }
@@ -94,7 +88,7 @@ fn find_request_mut<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::collections::read::read_collection_dir;
+    use crate::read::read_collection_dir;
     use serde_json::json;
     use std::fs;
     use tempfile::TempDir;

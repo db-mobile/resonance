@@ -26,7 +26,7 @@ pub enum TerminationReason {
     InvalidTarget,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistorySensitive {
     pub header_names: Vec<String>,

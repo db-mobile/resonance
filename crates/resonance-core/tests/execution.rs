@@ -71,3 +71,72 @@ async fn network_and_post_script_share_execution_local_state() {
     assert_eq!(result["requests"][1]["apiResponse"]["data"], "/value");
     server.abort();
 }
+
+#[tokio::test]
+async fn strict_variables_fails_the_visit_before_sending_but_lenient_runs_do_not() {
+    for strict in [true, false] {
+        let input: RunInput = serde_json::from_value(json!({
+            "executionId":"strict","runnerName":"Run","runnerId":null,"dataFile":null,"context":{},
+            "options":{"strictVariables":strict},
+            "requests":[{"name":"A","url":"http://127.0.0.1:1/{{missing}}"}]
+        }))
+        .unwrap();
+        let mut warnings = vec![];
+        let result = execute_run(input, Cancellation::default(), |event| {
+            if event.kind == "warning" {
+                warnings.push(event.data);
+            }
+        })
+        .await;
+        let request = &result.requests[0];
+        if strict {
+            assert!(!request.sent, "{result:?}");
+            assert_eq!(
+                request.execution_error.as_ref().unwrap().code,
+                "unresolvedVariables"
+            );
+            assert_eq!(
+                request.execution_error.as_ref().unwrap().details,
+                json!(["missing"])
+            );
+        } else {
+            assert!(request.sent);
+            assert!(
+                warnings.is_empty(),
+                "runner visits never warn: {warnings:?}"
+            );
+            assert!(
+                request
+                    .execution_error
+                    .as_ref()
+                    .is_none_or(|e| e.code != "unresolvedVariables"),
+                "{result:?}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn strict_variables_sees_values_set_by_earlier_scripts() {
+    let input: RunInput = serde_json::from_value(json!({
+        "executionId":"strict-chain","runnerName":"Run","runnerId":null,"dataFile":null,"context":{"environmentId":"e"},
+        "options":{"strictVariables":true,"stopOnError":false},
+        "requests":[
+            {"name":"Seed","url":"http://127.0.0.1:1/seed","preRequestScript":"pm.environment.set('next','value'); pm.execution.skipRequest();"},
+            {"name":"Use","url":"http://127.0.0.1:1/{{next}}"}
+        ]
+    }))
+    .unwrap();
+    let result = execute_run(input, Cancellation::default(), |_| {}).await;
+    assert_eq!(
+        result.requests[0].status,
+        resonance_core::model::RequestStatus::Skipped
+    );
+    let used = &result.requests[1];
+    assert!(used.sent, "{result:?}");
+    assert!(
+        used.execution_error
+            .as_ref()
+            .is_none_or(|e| e.code != "unresolvedVariables")
+    );
+}

@@ -16,19 +16,19 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use super::super::fs_secure::{restrict_dir, restrict_file};
 use super::layout::{
     COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML,
     find_available_folder_dir, find_available_path, is_reserved_dir, request_stem, slugify,
 };
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
+use crate::fs_secure::{restrict_dir, restrict_file};
 
 /// Gap left between consecutive `seq` values, so a request can be inserted
 /// between two others without renumbering either.
 const SEQ_STEP: i64 = 10;
 
 /// Serializes a value to YAML.
-pub(super) fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
+pub fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
     serde_yaml_ng::to_string(value).map_err(|e| format!("Failed to serialize YAML: {}", e))
 }
 
@@ -41,7 +41,7 @@ pub(super) fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
 /// @param path - Destination path
 /// @param contents - Bytes to write
 /// @returns Ok once the file is durably in place
-pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+pub fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
@@ -82,7 +82,7 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
 /// @param path - Destination path
 /// @param contents - Bytes the file should hold
 /// @returns True when the file was written
-pub(crate) fn write_if_changed(path: &Path, contents: &str) -> Result<bool, String> {
+pub fn write_if_changed(path: &Path, contents: &str) -> Result<bool, String> {
     if let Ok(existing) = fs::read_to_string(path)
         && existing == contents
     {
@@ -93,7 +93,7 @@ pub(crate) fn write_if_changed(path: &Path, contents: &str) -> Result<bool, Stri
 }
 
 /// Creates a directory if missing and tightens its permissions either way.
-pub(super) fn ensure_dir(dir: &Path) -> Result<(), String> {
+pub fn ensure_dir(dir: &Path) -> Result<(), String> {
     if !dir.exists() {
         fs::create_dir_all(dir)
             .map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
@@ -141,7 +141,7 @@ fn assign_missing_seq(node: &mut FolderNode) {
 ///
 /// Renaming first and writing after is deliberate: writing the new file before
 /// removing the old would leave two files claiming one request id.
-pub(super) fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
+pub fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
     if current == desired || !current.exists() {
         return Ok(());
     }
@@ -218,7 +218,7 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
 ///
 /// Unconditional and idempotent, so a conversion interrupted before this point
 /// heals itself on the next save rather than leaving both formats forever.
-pub(crate) fn remove_v1_files(dir: &Path) -> Result<(), String> {
+pub fn remove_v1_files(dir: &Path) -> Result<(), String> {
     let collection_json = dir.join(COLLECTION_JSON);
     if collection_json.exists() {
         fs::remove_file(&collection_json)
@@ -250,10 +250,7 @@ pub(crate) fn remove_v1_files(dir: &Path) -> Result<(), String> {
 /// @param dir - The collection directory
 /// @param collection - The collection to persist
 /// @returns Ok once every file is in place
-pub(crate) fn write_collection_dir(
-    dir: &Path,
-    collection: &mut LoadedCollection,
-) -> Result<(), String> {
+pub fn write_collection_dir(dir: &Path, collection: &mut LoadedCollection) -> Result<(), String> {
     ensure_dir(dir)?;
 
     assign_missing_seq(&mut collection.root);
@@ -283,7 +280,7 @@ pub(crate) fn write_collection_dir(
 /// @param entry - The request, already updated in memory
 /// @returns False when the request has no file or no `seq` yet, in which case
 /// the caller must fall back to a whole-tree write that assigns both
-pub(crate) fn write_request_in_place(entry: &RequestEntry) -> Result<bool, String> {
+pub fn write_request_in_place(entry: &RequestEntry) -> Result<bool, String> {
     let Some(path) = entry.source.as_deref() else {
         return Ok(false);
     };
@@ -297,10 +294,8 @@ pub(crate) fn write_request_in_place(entry: &RequestEntry) -> Result<bool, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::collections::model::{
-        CollectionDoc, FORMAT_VERSION, FolderDoc, RequestDoc,
-    };
-    use crate::commands::collections::read::{RequestEntry, read_collection_dir};
+    use crate::model::{CollectionDoc, FORMAT_VERSION, FolderDoc, RequestDoc};
+    use crate::read::{RequestEntry, read_collection_dir};
     use serde_json::Map;
     use tempfile::TempDir;
 

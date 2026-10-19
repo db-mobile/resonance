@@ -16,11 +16,11 @@ use std::path::{Path, PathBuf};
 use super::read::Layout;
 
 /// Store key holding `{collectionId: absolutePath}` for linked collections.
-pub(crate) const LINKED_COLLECTIONS_KEY: &str = "linkedCollections";
+pub const LINKED_COLLECTIONS_KEY: &str = "linkedCollections";
 
 /// What opening a directory should do.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Decision {
+pub enum Decision {
     /// Not known, or known at a path that no longer holds a collection.
     Open,
     /// Already open from exactly this directory; nothing to do.
@@ -44,7 +44,7 @@ pub(crate) enum Decision {
 /// @param index - The `{id: path}` collection index
 /// @param linked - The `{id: path}` linked map
 /// @returns True when this collection was opened in place
-pub(crate) fn is_linked(
+pub fn is_linked(
     id: &str,
     index: &HashMap<String, String>,
     linked: &HashMap<String, String>,
@@ -94,7 +94,7 @@ fn lexical_clean(path: &Path) -> PathBuf {
 /// @param parent - The enclosing directory
 /// @param candidate - The path to test
 /// @returns True when candidate is parent or below it
-pub(crate) fn is_under(parent: &Path, candidate: &Path) -> bool {
+pub fn is_under(parent: &Path, candidate: &Path) -> bool {
     let parent = normalize(parent);
     let candidate = normalize(candidate);
     candidate == parent || candidate.starts_with(&parent)
@@ -102,7 +102,7 @@ pub(crate) fn is_under(parent: &Path, candidate: &Path) -> bool {
 
 /// Where a collection's directory should be for a save.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Placement {
+pub enum Placement {
     /// Use this directory exactly as it is: do not rename it to match the
     /// collection name, do not create it, do not change its permissions.
     InPlace(PathBuf),
@@ -121,7 +121,7 @@ pub(crate) enum Placement {
 /// @param linked - Whether this collection was opened in place
 /// @param existing_dir - The directory it currently occupies, if any
 /// @returns How the directory should be treated
-pub(crate) fn placement(linked: bool, existing_dir: Option<&Path>) -> Placement {
+pub fn placement(linked: bool, existing_dir: Option<&Path>) -> Placement {
     match (linked, existing_dir) {
         (true, Some(dir)) => Placement::InPlace(dir.to_path_buf()),
         _ => Placement::Managed,
@@ -137,7 +137,7 @@ pub(crate) fn placement(linked: bool, existing_dir: Option<&Path>) -> Placement 
 ///
 /// @param root - The directory the user picked
 /// @returns Collection directories, sorted for a stable report
-pub(crate) fn discover_collection_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
+pub fn discover_collection_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
     if !root.is_dir() {
         return Err(format!("{} is not a directory", root.display()));
     }
@@ -179,7 +179,7 @@ pub(crate) fn discover_collection_dirs(root: &Path) -> Result<Vec<PathBuf>, Stri
 /// @param path - The directory being opened
 /// @param index - The `{id: path}` collection index
 /// @returns The decision, including what already claims the identity
-pub(crate) fn classify_open(id: &str, path: &Path, index: &HashMap<String, String>) -> Decision {
+pub fn classify_open(id: &str, path: &Path, index: &HashMap<String, String>) -> Decision {
     if let Some(registered) = index.get(id) {
         let registered_path = PathBuf::from(registered);
 
