@@ -6,11 +6,36 @@
 import { escapeHtml } from './runnerDomUtils.js';
 import { translate, translateCount } from '../../utils/translate.js';
 
+/**
+ * @param {Array<Object>} runners
+ * @param {Array<Object>} collections
+ * @returns {Array<{collectionId: string, name: string, runners: Array<Object>}>}
+ */
+export function groupRunnersByCollection(runners, collections) {
+    const names = new Map((collections || []).map(collection => [collection.id, collection.name || collection.id]));
+    const groups = new Map();
+    for (const runner of runners || []) {
+        const id = runner.collectionId || '';
+        if (!groups.has(id)) {
+            groups.set(id, { collectionId: id, name: names.get(id) ?? id, known: names.has(id), runners: [] });
+        }
+        groups.get(id).runners.push(runner);
+    }
+    const compare = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+    return [...groups.values()]
+        .sort((a, b) => (a.known === b.known ? compare(a.name, b.name) : a.known ? -1 : 1))
+        .map(({ collectionId, name, runners: list }) => ({
+            collectionId,
+            name,
+            runners: [...list].sort((a, b) => compare(a.name || '', b.name || ''))
+        }));
+}
+
 export class RunnerSelectorMenu {
     /**
      * @param {Object} [callbacks]
      * @param {() => Promise<Array>} [callbacks.onLoadRunners]
-     * @param {(runnerId: string) => void} [callbacks.onSelect]
+     * @param {(runnerId: string, collectionId: string) => void} [callbacks.onSelect]
      */
     constructor({ onLoadRunners, onSelect } = {}) {
         this.dom = {};
@@ -59,8 +84,8 @@ export class RunnerSelectorMenu {
         if (!this.dom.dropdown || !this.dom.list) {return;}
 
         if (this._onLoadRunners) {
-            const runners = await this._onLoadRunners();
-            this._renderList(runners || []);
+            const groups = await this._onLoadRunners();
+            this._renderList(groups || []);
         }
 
         this.dom.dropdown.classList.remove('is-hidden');
@@ -70,41 +95,47 @@ export class RunnerSelectorMenu {
         this.dom.dropdown?.classList.add('is-hidden');
     }
 
-    /** @param {Array} runners */
-    _renderList(runners) {
+    /** @param {Array<{collectionId: string, name: string, runners: Array<Object>}>} groups */
+    _renderList(groups) {
         if (!this.dom.list) {return;}
 
-        if (!runners || runners.length === 0) {
+        if (!groups || groups.length === 0) {
             this.dom.list.innerHTML = `<div class="runner-dropdown-empty dropdown-empty">${escapeHtml(translate('runner.no_saved_runners', 'No saved runners yet'))}</div>`;
             return;
         }
 
-        this.dom.list.innerHTML = runners.map(runner => {
-            const requestCount = runner.requests?.length || 0;
-            const isSelected = this.currentRunnerId === runner.id;
-            return `
-                <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${runner.id}">
-                    <span class="runner-dropdown-item-name dropdown-item-label">${escapeHtml(runner.name)}</span>
-                    <span class="dropdown-item-meta">${escapeHtml(translateCount('runner.request_count', requestCount, {
-                        one: '{{count}} request',
-                        other: '{{count}} requests'
-                    }))}</span>
-                </div>
-            `;
+        this.dom.list.innerHTML = groups.map(group => {
+            const items = group.runners.map(runner => {
+                const requestCount = runner.requests?.length || 0;
+                const isSelected = this.currentRunnerId === runner.id;
+                return `
+                    <div class="runner-dropdown-item dropdown-item u-flex u-items-center u-justify-between ${isSelected ? 'is-selected is-active' : ''}" data-runner-id="${escapeHtml(runner.id)}" data-collection-id="${escapeHtml(group.collectionId)}">
+                        <span class="runner-dropdown-item-name dropdown-item-label">${escapeHtml(runner.name)}</span>
+                        <span class="dropdown-item-meta">${escapeHtml(translateCount('runner.request_count', requestCount, {
+                            one: '{{count}} request',
+                            other: '{{count}} requests'
+                        }))}</span>
+                    </div>
+                `;
+            }).join('');
+            return `<div class="runner-dropdown-group-label" data-collection-id="${escapeHtml(group.collectionId)}">${escapeHtml(group.name)}</div>${items}`;
         }).join('');
 
         this.dom.list.querySelectorAll('.runner-dropdown-item').forEach(item => {
             item.addEventListener('click', () => {
-                const { runnerId } = item.dataset;
-                this._select(runnerId);
+                const { runnerId, collectionId } = item.dataset;
+                this._select(runnerId, collectionId);
                 this.close();
             });
         });
     }
 
-    /** @param {string} runnerId */
-    _select(runnerId) {
+    /**
+     * @param {string} runnerId
+     * @param {string} collectionId
+     */
+    _select(runnerId, collectionId) {
         this.currentRunnerId = runnerId;
-        this._onSelect?.(runnerId);
+        this._onSelect?.(runnerId, collectionId);
     }
 }

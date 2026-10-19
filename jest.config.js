@@ -1,4 +1,5 @@
 export default {
+  modulePathIgnorePatterns: ['<rootDir>/target/', '<rootDir>/src-tauri/target/'],
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   testMatch: ['<rootDir>/tests/**/*.test.js'],

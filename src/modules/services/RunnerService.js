@@ -1,25 +1,8 @@
-/**
- * @fileoverview Service for collection runner business logic and execution
- * @module services/RunnerService
- */
-
 import { app } from '../appContext.js';
-import { VariableProcessor } from '../variables/VariableProcessor.js';
 import { ChangeEmitter } from './ChangeEmitter.js';
-import { normalizeFormRows, processFormRows } from '../utils/formDataRows.js';
-import { activeKeyValueRows, appendAuthQueryRows } from '../utils/keyValueRows.js';
-import { buildGraphQLBody } from '../utils/graphqlBody.js';
-import { findRequest } from '../collections/collectionTree.js';
-import { buildEndpointUrl } from '../collections/endpointUrl.js';
-import { deriveRequestSettings } from '../state/settingsCache.js';
-import { responseCookies } from '../cookieParser.js';
-import { methodCarriesBody } from '../utils/bodyMethods.js';
-import { newRequestId } from '../state/inFlightRequests.js';
-import { translate, translateCount } from '../utils/translate.js';
-import { RUNNABLE_PROTOCOLS } from '../utils/runnableRequests.js';
-import { parseDataFile } from '../utils/dataFile.js';
-
-const ABSOLUTE_OR_TEMPLATED_PATH = /^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/|\{\{)/;
+import { translate } from '../utils/translate.js';
+import { CoreExecutionService, adaptResult, executionError } from './CoreExecutionService.js';
+import { loadEndpointRequestConfig } from './endpointRequestConfig.js';
 
 export class RunnerService {
     /**
@@ -36,18 +19,12 @@ export class RunnerService {
         this.backendAPI = backendAPI;
         this.statusDisplay = statusDisplay;
         this.pipeline = pipeline;
-        this.variableProcessor = new VariableProcessor();
-        this.variableRepository = pipeline.variableRepository;
-        this.environmentRepository = pipeline.environmentRepository;
         this.collectionRepository = pipeline.collectionRepository;
-        this.certificateService = pipeline.certificates;
-        this.mockServerService = pipeline.mockServerService;
-        this.requestBuilder = pipeline.requestBuilder;
 
         this.isRunning = false;
         this.shouldStop = false;
         this.currentRunId = null;
-        this._stopWaiters = new Set();
+        this.core = new CoreExecutionService(pipeline, backendAPI);
         this._events = new ChangeEmitter();
     }
 
@@ -56,48 +33,69 @@ export class RunnerService {
         return this._events.listeners;
     }
 
-    /** @returns {Promise<Array<Object>>} */
-    async getAllRunners() {
-        return this.repository.getAll();
+    /**
+     * @param {{fresh?: boolean}} [options]
+     * @returns {Promise<Array<Object>>}
+     */
+    async getAllRunners(options = {}) {
+        return this.repository.getAll(options);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} id
+     * @returns {Promise<Object|undefined>}
+     */
+    async getRunner(collectionId, id) {
+        return this.repository.getById(collectionId, id);
     }
 
     /**
      * @param {string} id
      * @returns {Promise<Object|undefined>}
      */
-    async getRunner(id) {
-        return this.repository.getById(id);
+    async findRunner(id) {
+        return this.repository.findById(id);
     }
 
     /**
+     * @param {string} collectionId
      * @param {Object} runnerData
      * @returns {Promise<Object>}
      */
-    async createRunner(runnerData) {
-        const runner = await this.repository.add(runnerData);
-        this.statusDisplay?.update(translate('runner.created', 'Runner "{{name}}" created', { name: runner.name }), null);
+    async createRunner(collectionId, runnerData) {
+        const runner = await this.repository.add(collectionId, runnerData);
+        this.statusDisplay?.update(
+            translate('runner.created', 'Runner "{{name}}" created', { name: runner.name }),
+            null
+        );
         return runner;
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} id
      * @param {Object} updates
      * @returns {Promise<Object|null>}
      */
-    async updateRunner(id, updates) {
-        const runner = await this.repository.update(id, updates);
+    async updateRunner(collectionId, id, updates) {
+        const runner = await this.repository.update(collectionId, id, updates);
         if (runner) {
-            this.statusDisplay?.update(translate('runner.saved', 'Runner "{{name}}" saved', { name: runner.name }), null);
+            this.statusDisplay?.update(
+                translate('runner.saved', 'Runner "{{name}}" saved', { name: runner.name }),
+                null
+            );
         }
         return runner;
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} id
      * @returns {Promise<boolean>}
      */
-    async deleteRunner(id) {
-        const success = await this.repository.delete(id);
+    async deleteRunner(collectionId, id) {
+        const success = await this.repository.delete(collectionId, id);
         if (success) {
             this.statusDisplay?.update(translate('runner.deleted', 'Runner deleted'), null);
         }
@@ -109,38 +107,27 @@ export class RunnerService {
      * @param {string} endpointId
      * @returns {Promise<Object>}
      */
-    async getEndpointRequestConfig(collectionId, endpointId) {
-        const [pathParams, queryParams, headers, body] = await Promise.all([
-            this.collectionRepository.getPersistedPathParams(collectionId, endpointId),
-            this.collectionRepository.getPersistedQueryParams(collectionId, endpointId),
-            this.collectionRepository.getPersistedHeaders(collectionId, endpointId),
-            this.collectionRepository.getModifiedRequestBody(collectionId, endpointId)
-        ]);
-
-        return {
-            pathParams: pathParams || [],
-            queryParams: queryParams || [],
-            headers: headers || [],
-            body: body || ''
-        };
+    getEndpointRequestConfig(collectionId, endpointId) {
+        return loadEndpointRequestConfig(this.collectionRepository, collectionId, endpointId);
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} runnerId
      * @param {Function} [onProgress]
      * @returns {Promise<Object>}
      */
-    async executeRunner(runnerId, onProgress) {
+    async executeRunner(collectionId, runnerId, onProgress) {
         this._assertIdle();
 
-        const runner = await this.repository.getById(runnerId);
+        const runner = await this.repository.getById(collectionId, runnerId);
         if (!runner) {
             throw new Error(translate('runner.error_not_found', 'Runner not found'));
         }
 
         return this._execute(runner, {
             runnerId,
-            runnerName: runner.name,
+            runnerName: runner.name || translate('runner.untitled', 'Untitled Runner'),
             onProgress,
             onFinish: () => this.repository.updateLastRun(runnerId)
         });
@@ -178,997 +165,109 @@ export class RunnerService {
      * @returns {Promise<Object>}
      */
     async _execute(runner, { runnerId, runnerName, onProgress, onFinish = null }) {
-        if (!runner.requests || runner.requests.length === 0) {
+        if (!runner.requests?.length) {
             throw new Error(translate('runner.error_no_requests', 'Runner has no requests to execute'));
         }
-
+        this._assertIdle();
         this.isRunning = true;
         this.shouldStop = false;
         this.currentRunId = runnerId ?? 'temp';
-
-        const queue = runner.requests;
-        const results = {
+        const execution = this.core.createExecution();
+        this._execution = execution;
+        const startTime = Date.now();
+        let results = {
             runnerId,
             runnerName,
-            startTime: Date.now(),
-            endTime: null,
+            startTime,
+            requests: [],
             totalRequests: 0,
+            plannedRequests: 0,
+            sentRequests: 0,
             iterations: 1,
             passed: 0,
             failed: 0,
             skipped: 0,
-            requests: [],
-            variablesSet: {}
+            variablesSet: {},
+            error: null,
+            terminationReason: 'completed'
         };
-
-        let runtimeVariables = {};
-
+        const historyWrites = [];
+        let historyError;
         try {
-            const dataRows = await this._loadDataRows(runner.options?.dataFile);
-            const iterations = dataRows ? dataRows.length : clampIterations(runner.options?.iterations);
-            const total = queue.length * iterations;
-            results.iterations = iterations;
-            results.totalRequests = total;
-
-            this._notifyListeners('run-started', {
-                runnerId,
-                total,
-                iterations,
-                iterationLabels: dataRows ? dataRows.map(describeDataRow) : null
+            const snapshot = await this.core.captureRun(runner);
+            let plannedRequests = 0;
+            const result = await this.core.execute('run', { ...snapshot, runnerId, runnerName }, execution, (event) => {
+                if (event.kind === 'run-started') {
+                    plannedRequests = event.data.total;
+                }
+                if (event.kind === 'completed') {
+                    return;
+                }
+                if (event.kind === 'request-completed') {
+                    adaptResult(event.data.result);
+                    onProgress?.(event.data.index, plannedRequests, event.data.result);
+                }
+                if (event.kind === 'response') {
+                    historyWrites.push(
+                        this._recordHistory(event.data).catch((error) => {
+                            historyError ||= error;
+                        })
+                    );
+                }
+                if (['run-started', 'request-started', 'request-completed'].includes(event.kind)) {
+                    this._notifyListeners(event.kind, event.data);
+                }
             });
-
-            const runContext = await this._buildRunContext();
-
-            for (let flat = 0; flat < total; flat++) {
-                if (this.shouldStop) {
-                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
-                    break;
-                }
-
-                const iteration = Math.floor(flat / queue.length);
-                this._notifyListeners('request-started', { index: flat });
-
-                const request = queue[flat % queue.length];
-                const requestResult = await this._untilStopped(
-                    this._executeRequest(request, runtimeVariables, flat, runContext, {
-                        index: iteration,
-                        count: iterations,
-                        data: dataRows?.[iteration] ?? null
-                    })
-                );
-
-                if (!requestResult) {
-                    this._markRemainingAsSkipped(queue, results, flat, translate('runner.skip_stopped', 'Execution stopped by user'));
-                    break;
-                }
-
-                requestResult.iteration = iteration + 1;
-                results.requests.push(requestResult);
-
-                if (requestResult.variablesSet) {
-                    runtimeVariables = { ...runtimeVariables, ...requestResult.variablesSet };
-                    Object.assign(results.variablesSet, requestResult.variablesSet);
-                }
-
-                const failed = requestResult.status !== 'success';
-                if (failed) {
-                    results.failed++;
-                } else {
-                    results.passed++;
-                }
-
-                if (onProgress) {
-                    onProgress(flat, total, requestResult);
-                }
-                this._notifyListeners('request-completed', { index: flat, result: requestResult });
-
-                if (failed && runner.options?.stopOnError) {
-                    this._markRemainingAsSkipped(queue, results, flat + 1, translate('runner.skip_previous_error', 'Skipped due to previous error'));
-                    break;
-                }
-
-                if (runner.options?.delayMs > 0 && flat < total - 1) {
-                    await this._delay(runner.options.delayMs);
-                }
-            }
+            results = { ...results, ...result };
+        } catch (error) {
+            results.error = error.code ? executionError(error) : error.message || String(error);
+            results.terminationReason = 'executionError';
         } finally {
-            results.endTime = Date.now();
+            await Promise.all(historyWrites);
+            if (historyError) {
+                results.error = historyError.message;
+                results.terminationReason = 'persistenceError';
+            }
+            results.endTime ||= Date.now();
             results.totalTime = results.endTime - results.startTime;
-
             this.isRunning = false;
             this.shouldStop = false;
             this.currentRunId = null;
-            this._stopWaiters.clear();
-
-            if (onFinish) {
-                await onFinish();
+            this._execution = null;
+            try {
+                await onFinish?.();
+            } catch (error) {
+                results.error = error.message;
+                results.terminationReason = 'persistenceError';
             }
-
             this._notifyListeners('run-completed', results);
         }
-
         return results;
     }
 
     stopExecution() {
-        if (this.isRunning) {
-            this.shouldStop = true;
-            if (this._inFlightRequestId) {
-                Promise.resolve(this.backendAPI.cancelApiRequest?.(this._inFlightRequestId)).catch(() => { });
-            }
-            this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
-            const waiters = [...this._stopWaiters];
-            this._stopWaiters.clear();
-            waiters.forEach(wake => wake());
-        }
-    }
-
-    /**
-     * @param {Promise<Object>} work
-     * @returns {Promise<Object|null>}
-     */
-    _untilStopped(work) {
-        return new Promise((resolve, reject) => {
-            const wake = () => resolve(null);
-            this._stopWaiters.add(wake);
-            work.then(resolve, reject).finally(() => this._stopWaiters.delete(wake));
-        });
-    }
-
-    /**
-     * @param {Array} queue
-     * @param {Object} results
-     * @param {number} startIndex
-     * @param {string} reason
-     */
-    _markRemainingAsSkipped(queue, results, startIndex, reason) {
-        for (let flat = startIndex; flat < results.totalRequests; flat++) {
-            results.requests.push({
-                index: flat,
-                ...queue[flat % queue.length],
-                iteration: Math.floor(flat / queue.length) + 1,
-                status: 'skipped',
-                error: reason
-            });
-            results.skipped++;
-        }
-    }
-
-    /**
-     * @param {{path: string, name: string}|null|undefined} dataFile
-     * @returns {Promise<Array<Object<string, string>>|null>}
-     */
-    async _loadDataRows(dataFile) {
-        if (!dataFile?.path) {
-            return null;
-        }
-        let rows;
-        try {
-            const file = await this.backendAPI.runner.readDataFile(dataFile.path);
-            rows = parseDataFile(file.name || dataFile.name, file.content);
-        } catch (error) {
-            throw new Error(translate('runner.data_file_error', 'Data file {{name}}: {{message}}', {
-                name: dataFile.name,
-                message: error?.message || String(error)
-            }), { cause: error });
-        }
-        if (rows.length === 0) {
-            throw new Error(translate('runner.data_file_empty', 'Data file {{name}} has no rows', { name: dataFile.name }));
-        }
-        return rows;
-    }
-
-    /**
-     * @param {Object} request
-     * @param {Object} runtimeVariables
-     * @param {number} index
-     * @param {Object|null} [runContext]
-     * @param {{index: number, count: number, data: Object<string, string>|null}|null} [iteration]
-     * @returns {Promise<Object>}
-     */
-    async _executeRequest(request, runtimeVariables, index, runContext = null, iteration = null) {
-        this.variableProcessor.clearDynamicCache();
-        const startTime = Date.now();
-        const result = {
-            index,
-            collectionId: request.collectionId,
-            endpointId: request.endpointId,
-            name: request.name,
-            method: request.method,
-            path: request.path,
-            status: 'pending',
-            statusCode: null,
-            responseTime: null,
-            error: null,
-            variablesSet: {},
-            logs: [],
-            testResults: []
-        };
-
-        try {
-            let variables = await this._buildVariables(request.collectionId, runtimeVariables, runContext, iteration?.data ?? null);
-            const scriptIteration = {
-                iteration: iteration?.index ?? 0,
-                iterationCount: iteration?.count ?? 1,
-                data: iteration?.data ?? {},
-                requestName: request.name || null
-            };
-
-            const { collection, endpoint } = await this._resolveRunTarget(request, runContext);
-
-            const scripts = await this._getEndpointScripts(collection.id, endpoint.id);
-            const prepared = await this._buildRequestConfig(collection, endpoint, variables, request.overrides, runContext);
-            const outcome = { variablesSet: {}, logs: [], testResults: [], errors: [] };
-
-            let { requestConfig } = prepared;
-            if (scripts.preRequestScript.trim()) {
-                const errorsBefore = outcome.errors.length;
-                requestConfig = await this._runPreRequestScript(scripts.preRequestScript, prepared, variables, outcome, scriptIteration, collection.id);
-                variables = mergeVariables(variables, outcome.variablesSet);
-                if (outcome.errors.length > errorsBefore) {
-                    result.logs = outcome.logs;
-                    result.variablesSet = outcome.variablesSet;
-                    throw new Error(translate(
-                        'runner.pre_request_failed',
-                        'Pre-request script failed, so the request was not sent: {{message}}',
-                        { message: outcome.errors.slice(errorsBefore).join('; ') }
-                    ));
-                }
-            }
-
-            if (this.shouldStop) {
-                return result;
-            }
-
-            const response = await this._sendTracked(requestConfig, runContext);
-
-            if (this.shouldStop || response.cancelled) {
-                return result;
-            }
-
-            this._captureResponse(result, response, startTime);
-
-            await this._storeResponseCookies(response, requestConfig.url);
-            this._recordHistory(requestConfig, response, collection.id, endpoint.id, prepared.authData, runContext);
-
-            for (const script of [scripts.testScript, request.postResponseScript]) {
-                if (script && script.trim()) {
-                    await this._runTestScript(script, requestConfig, response, variables, outcome, scriptIteration, collection.id);
-                    variables = mergeVariables(variables, outcome.variablesSet);
-                }
-            }
-
-            this._finalizeStatus(result, response, outcome);
-        } catch (error) {
-            result.status = 'error';
-            result.error = error.message;
-            result.responseTime = Date.now() - startTime;
-            result.time = result.responseTime;
-        }
-
-        return result;
-    }
-
-    /**
-     * @param {Object} request
-     * @param {Object|null} runContext
-     * @returns {Promise<{collection: Object, endpoint: Object}>}
-     */
-    async _resolveRunTarget(request, runContext) {
-        const collection = await this._getCollectionForRun(request.collectionId, runContext);
-        if (!collection) {
-            throw new Error(translate(
-                'runner.error_collection_missing',
-                'The collection this request came from is not open. Remove the request and add it again from Available Requests.'
-            ));
-        }
-
-        const endpoint = findRequest(collection, request.endpointId);
-        if (!endpoint) {
-            throw new Error(translate(
-                'runner.error_endpoint_missing',
-                '"{{name}}" no longer exists in {{collection}}. Remove it and add it again from Available Requests.',
-                { name: request.name, collection: collection.name }
-            ));
-        }
-
-        const protocol = endpoint.protocol || 'http';
-        if (!RUNNABLE_PROTOCOLS.has(protocol)) {
-            throw new Error(translate(
-                'runner.error_protocol',
-                '{{protocol}} requests cannot be run by the collection runner',
-                { protocol }
-            ));
-        }
-
-        return { collection, endpoint };
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @param {Object|null} runContext
-     * @returns {Promise<Object>}
-     */
-    async _sendTracked(requestConfig, runContext) {
-        if (!runContext?.certificatesLoaded) {
-            try {
-                await this.certificateService.getItems();
-            } catch {
-            }
-        }
-        await this.pipeline.finalize(requestConfig);
-
-        requestConfig.requestId = newRequestId();
-        this._inFlightRequestId = requestConfig.requestId;
-        try {
-            return await this.backendAPI.sendApiRequest(requestConfig);
-        } finally {
-            if (this._inFlightRequestId === requestConfig.requestId) {
-                this._inFlightRequestId = null;
-            }
-        }
-    }
-
-    /**
-     * @param {Object} result
-     * @param {Object} response
-     * @param {number} startTime
-     * @returns {void}
-     */
-    _captureResponse(result, response, startTime) {
-        result.statusCode = response.status || null;
-        result.responseTime = Date.now() - startTime;
-        result.time = result.responseTime;
-        result.httpSuccess = Boolean(response.success);
-        result.body = response.data ?? null;
-        result.headers = response.headers || {};
-        result.cookies = responseCookies(response);
-        result.response = {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            body: response.data
-        };
-    }
-
-    /**
-     * @param {Object} result
-     * @param {Object} response
-     * @param {{variablesSet: Object, logs: Array, testResults: Array, errors: Array<string>}} outcome
-     * @returns {void}
-     */
-    _finalizeStatus(result, response, outcome) {
-        result.variablesSet = outcome.variablesSet;
-        result.logs = outcome.logs;
-        result.testResults = outcome.testResults;
-        if (outcome.errors.length > 0) {
-            result.scriptError = outcome.errors.join('; ');
-        }
-
-        const failureSummary = this._summarizePostScriptFailure(outcome.testResults, result.scriptError || null);
-        if (failureSummary) {
-            result.status = 'error';
-            result.error = failureSummary;
-        } else if (outcome.testResults.length > 0 || response.success) {
-            result.status = 'success';
-        } else {
-            result.status = 'error';
-            result.error = response.message || describeFailedResponse(response);
-        }
-    }
-
-    /**
-     * @param {Array<{passed: boolean, message: string}>} testResults
-     * @param {string|null} scriptError
-     * @returns {string|null}
-     */
-    _summarizePostScriptFailure(testResults, scriptError) {
-        const failedTests = (testResults || []).filter(test => !test.passed);
-        if (failedTests.length === 0 && !scriptError) {
-            return null;
-        }
-
-        const parts = [];
-        if (failedTests.length > 0) {
-            const count = translateCount('runner.tests_failed', failedTests.length, {
-                one: '{{count}} test failed',
-                other: '{{count}} tests failed'
-            });
-            const names = failedTests.map(test => test.message).filter(Boolean);
-            parts.push(names.length > 0 ? `${count}: ${names.join('; ')}` : count);
-        }
-        if (scriptError) {
-            parts.push(translate('runner.script_error', 'Script error: {{message}}', { message: scriptError }));
-        }
-        return parts.join(' | ');
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {Object} runtimeVariables
-     * @param {Object|null} [runContext]
-     * @param {Object<string, string>|null} [dataRow]
-     * @returns {Promise<Object>}
-     */
-    async _buildVariables(collectionId, runtimeVariables, runContext = null, dataRow = null) {
-        let variables = {};
-
-        try {
-            let collectionVars = runContext?.collectionVars.get(collectionId);
-            if (!collectionVars) {
-                collectionVars = await this.variableRepository.getVariablesForCollection(collectionId);
-                runContext?.collectionVars.set(collectionId, collectionVars);
-            }
-            variables = { ...variables, ...collectionVars };
-        } catch {
-        }
-
-        try {
-            const envVars = runContext
-                ? runContext.envVars
-                : await this.environmentRepository.getActiveEnvironmentVariables();
-            variables = { ...variables, ...envVars };
-        } catch {
-        }
-
-        return { ...mergeVariables(variables, runtimeVariables), ...dataRow };
-    }
-
-    /** @returns {Promise<Object>} */
-    async _buildRunContext() {
-        const context = {
-            settings: null,
-            envVars: {},
-            environmentName: null,
-            collections: new Map(),
-            collectionVars: new Map(),
-            mockBaseUrls: new Map(),
-            certificatesLoaded: false
-        };
-
-        context.settings = await this._loadSettings();
-
-        try {
-            context.envVars = await this.environmentRepository.getActiveEnvironmentVariables();
-        } catch {
-        }
-
-        try {
-            const activeEnvironment = await app.environmentController?.service?.getActiveEnvironment();
-            context.environmentName = activeEnvironment?.name || null;
-        } catch {
-        }
-
-        try {
-            await this.certificateService.getItems();
-            context.certificatesLoaded = true;
-        } catch {
-        }
-
-        return context;
-    }
-
-    /** @returns {Promise<Object|null>} */
-    async _loadSettings() {
-        try {
-            return await this.backendAPI.settings.get();
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {Object|null} runContext
-     * @returns {Promise<Object|null>}
-     */
-    async _getCollectionForRun(collectionId, runContext) {
-        if (runContext?.collections.has(collectionId)) {
-            return runContext.collections.get(collectionId);
-        }
-        const collection = await this.collectionRepository.getById(collectionId);
-        runContext?.collections.set(collectionId, collection);
-        return collection;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @returns {Promise<{preRequestScript: string, testScript: string}>}
-     */
-    async _getEndpointScripts(collectionId, endpointId) {
-        try {
-            const scripts = await app.scriptController?.getScriptsForEndpoint(collectionId, endpointId);
-            return {
-                preRequestScript: scripts?.preRequestScript || '',
-                testScript: scripts?.testScript || ''
-            };
-        } catch {
-            return { preRequestScript: '', testScript: '' };
-        }
-    }
-
-    /**
-     * @param {Object} collection
-     * @param {Object} endpoint
-     * @param {Object} variables
-     * @param {Object} [overrides]
-     * @param {Object|null} [runContext]
-     * @returns {Promise<{requestConfig: Object, rawUrl: string, authData: Object, mockRewrite: Object|null}>}
-     */
-    async _buildRequestConfig(collection, endpoint, variables, overrides, runContext = null) {
-        const processor = this.variableProcessor;
-        const persisted = await this.collectionRepository.getAllPersistedEndpointData(collection.id, endpoint.id);
-        const isGraphQL = (endpoint.protocol || 'http') === 'graphql';
-        const method = isGraphQL ? 'POST' : endpoint.method;
-
-        const effectiveVariables = {
-            ...variables,
-            baseUrl: variables.baseUrl || collection.baseUrl || ''
-        };
-
-        const rawUrl = buildEndpointUrl({
-            ...endpoint,
-            persistedUrl: persisted.url,
-            collectionBaseUrl: !ABSOLUTE_OR_TEMPLATED_PATH.test(endpoint.path)
-        });
-
-        const pathParams = this._effectivePathParams(endpoint, overrides, persisted);
-        const headers = this._effectiveHeaders(collection, endpoint, overrides, persisted);
-        const queryRows = this._effectiveQueryRows(endpoint, overrides, persisted);
-        const queryParams = Object.fromEntries(queryRows.map(row => [row.key, row.value]));
-
-        const authData = await this._resolveAuthData(collection, endpoint, persisted, effectiveVariables);
-        this.requestBuilder.mergeAuthData(headers, queryParams, authData);
-
-        appendAuthQueryRows(queryRows, authData.queryParams);
-
-        const { url: resolvedUrl, queryString, pathParams: processedPathParams } = this.requestBuilder.processRequestComponents({
-            url: rawUrl,
-            pathParams,
-            headers,
-            queryParams,
-            queryRows,
-            variables: effectiveVariables,
-            processor
-        });
-
-        const { url, mockRewrite } = await this._applyMockRewrite({
-            collection,
-            endpoint,
-            url: resolvedUrl,
-            queryString,
-            pathParams: processedPathParams,
-            runContext
-        });
-
-        const { body, bodyType } = this._buildBody({
-            endpoint,
-            method,
-            isGraphQL,
-            persisted,
-            overrides,
-            variables: effectiveVariables
-        });
-
-        const settings = deriveRequestSettings(runContext ? runContext.settings : await this._loadSettings());
-
-        return {
-            requestConfig: this.pipeline.assembleRequestConfig({
-                protocol: isGraphQL ? 'graphql' : 'http',
-                method,
-                url,
-                rawUrl,
-                headers,
-                queryParams,
-                pathParams: processedPathParams,
-                body,
-                bodyType,
-                settings,
-                authData
-            }),
-            rawUrl,
-            authData,
-            mockRewrite
-        };
-    }
-
-    /**
-     * @param {Object} collection
-     * @param {Object} endpoint
-     * @param {Object} persisted
-     * @param {Object} effectiveVariables
-     * @returns {Promise<Object>}
-     */
-    async _resolveAuthData(collection, endpoint, persisted, effectiveVariables) {
-        const { authData, warnings } = await this.pipeline.resolveAuth({
-            authConfig: persisted.authConfig || endpoint.security || { type: 'inherit', config: {} },
-            endpoint: { collectionId: collection.id, endpointId: endpoint.id },
-            variables: effectiveVariables,
-            processor: this.variableProcessor,
-            bearerFallback: true
-        });
-        warnings.forEach((warning) => this.statusDisplay?.update(warning, null));
-        return authData;
-    }
-
-    /**
-     * @param {Object} opts
-     * @param {Object} opts.collection
-     * @param {Object} opts.endpoint
-     * @param {string} opts.url
-     * @param {string} opts.queryString
-     * @param {Object} opts.pathParams
-     * @param {Object|null} opts.runContext
-     * @returns {Promise<{url: string, mockRewrite: Object|null}>}
-     */
-    async _applyMockRewrite({ collection, endpoint, url, queryString, pathParams, runContext }) {
-        return this.pipeline.resolveMockRewrite({
-            endpoint: { collectionId: collection.id, endpointId: endpoint.id },
-            url,
-            queryString,
-            pathParams,
-            mockBaseUrl: await this._mockBaseUrlFor(collection.id, runContext),
-            endpointPath: endpoint.path || null
-        });
-    }
-
-    /**
-     * @param {Object} endpoint
-     * @param {Object} [overrides]
-     * @param {Object} persisted
-     * @returns {Object}
-     */
-    _effectivePathParams(endpoint, overrides, persisted) {
-        const rows = overrides?.pathParams?.length ? overrides.pathParams : persisted.pathParams || [];
-        const pathParams = {};
-        if (rows.length > 0) {
-            for (const row of rows) {
-                if (row.key && row.value) {
-                    pathParams[row.key] = row.value;
-                }
-            }
-        } else if (endpoint.parameters?.path) {
-            for (const [key, param] of Object.entries(endpoint.parameters.path)) {
-                if (param.example) {
-                    pathParams[key] = String(param.example);
-                }
-            }
-        }
-        return pathParams;
-    }
-
-    /**
-     * @param {Object} collection
-     * @param {Object} endpoint
-     * @param {Object} [overrides]
-     * @param {Object} persisted
-     * @returns {Object}
-     */
-    _effectiveHeaders(collection, endpoint, overrides, persisted) {
-        const headers = { ...collection.defaultHeaders, ...endpoint.headers };
-        const rows = activeKeyValueRows(Array.isArray(overrides?.headers) ? overrides.headers : persisted.headers);
-        for (const row of rows) {
-            headers[row.key] = row.value;
-        }
-        for (const [key, value] of Object.entries(headers)) {
-            headers[key] = value === null || value === undefined ? '' : String(value);
-        }
-        return headers;
-    }
-
-    /**
-     * @param {Object} endpoint
-     * @param {Object} [overrides]
-     * @param {Object} persisted
-     * @returns {Array<{key: string, value: string}>}
-     */
-    _effectiveQueryRows(endpoint, overrides, persisted) {
-        const rows = activeKeyValueRows(
-            Array.isArray(overrides?.queryParams) ? overrides.queryParams : persisted.queryParams
-        ).map(row => ({ key: row.key, value: row.value }));
-
-        if (rows.length === 0 && endpoint.parameters?.query) {
-            for (const [key, param] of Object.entries(endpoint.parameters.query)) {
-                if (param.example) {
-                    rows.push({ key, value: String(param.example) });
-                }
-            }
-        }
-        return rows;
-    }
-
-    /**
-     * @param {Object} opts
-     * @param {Object} opts.endpoint
-     * @param {string} opts.method
-     * @param {boolean} opts.isGraphQL
-     * @param {Object} opts.persisted
-     * @param {Object} [opts.overrides]
-     * @param {Object} opts.variables
-     * @returns {{body: *, bodyType: string|undefined}}
-     */
-    _buildBody({ endpoint, method, isGraphQL, persisted, overrides, variables }) {
-        const process = (text) => this.variableProcessor.processTemplate(text, variables);
-        const hasBodyOverride = typeof overrides?.body === 'string';
-        const overrideBody = hasBodyOverride && overrides.body.trim() !== '' ? overrides.body : null;
-        const form = persisted.formBodyData;
-
-        if (!overrideBody) {
-            if (isGraphQL && persisted.graphqlData) {
-                return { body: this._buildGraphQLBody(persisted.graphqlData, process), bodyType: undefined };
-            }
-
-            if (form?.mode === 'formdata' || form?.mode === 'urlencoded') {
-                const processed = processFormRows(normalizeFormRows(form.fields), process);
-                return { body: processed.length > 0 ? processed : undefined, bodyType: form.mode };
-            }
-
-            if (form?.mode === 'binary') {
-                if (!form.filePath) {
-                    throw new Error(translate('runner.error_no_binary_file', 'No file selected for binary body'));
-                }
-                return {
-                    body: { filePath: process(form.filePath), contentType: form.contentType || undefined },
-                    bodyType: 'binary'
-                };
-            }
-
-            if (!methodCarriesBody(method)) {
-                return { body: undefined, bodyType: undefined };
-            }
-        }
-
-        if (form?.mode === 'text') {
-            const text = overrideBody || (hasBodyOverride ? '' : form.content || '');
-            return { body: text ? process(text) : undefined, bodyType: 'text' };
-        }
-
-        let bodyContent = overrideBody || (hasBodyOverride ? null : persisted.modifiedBody);
-        if (!bodyContent && !hasBodyOverride && endpoint.requestBody) {
-            if (endpoint.requestBody.example && endpoint.requestBody.example !== 'null') {
-                bodyContent = endpoint.requestBody.example;
-            } else if (endpoint.requestBody.schema) {
-                bodyContent = JSON.stringify(endpoint.requestBody.schema.example || {}, null, 2);
-            }
-        }
-        if (typeof bodyContent !== 'string') {
-            bodyContent = bodyContent ? JSON.stringify(bodyContent) : '';
-        }
-        if (!bodyContent.trim()) {
-            return { body: undefined, bodyType: undefined };
-        }
-
-        try {
-            return { body: JSON.parse(process(bodyContent.trim())), bodyType: undefined };
-        } catch (e) {
-            throw new Error(translate('runner.error_invalid_body', 'Invalid Body JSON: {{message}}', { message: e.message }), { cause: e });
-        }
-    }
-
-    /**
-     * @param {Object} graphqlData
-     * @param {function(string): string} process
-     * @returns {Object}
-     */
-    _buildGraphQLBody(graphqlData, process) {
-        const built = buildGraphQLBody(graphqlData, process);
-        if (built.error) {
-            throw new Error(
-                translate('runner.error_invalid_graphql_variables', 'Invalid GraphQL Variables JSON: {{message}}', { message: built.error.message }),
-                { cause: built.error }
-            );
-        }
-        return built.body;
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {Object|null} runContext
-     * @returns {Promise<string|null>}
-     */
-    async _mockBaseUrlFor(collectionId, runContext) {
-        if (runContext?.mockBaseUrls.has(collectionId)) {
-            return runContext.mockBaseUrls.get(collectionId);
-        }
-        const mockBaseUrl = await this.pipeline.mockBaseUrlFor(collectionId);
-        runContext?.mockBaseUrls.set(collectionId, mockBaseUrl);
-        return mockBaseUrl;
-    }
-
-    /**
-     * @param {Object} response
-     * @param {string} requestUrl
-     * @returns {Promise<void>}
-     */
-    async _storeResponseCookies(response, requestUrl) {
-        if (app.cookieController && response.setCookies?.length > 0) {
-            await app.cookieController.handleCookiesFromResponse(response.setCookies, requestUrl);
-        }
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @param {Object} response
-     * @param {string} collectionId
-     * @param {string} endpointId
-     * @param {Object} authData
-     * @param {Object|null} runContext
-     */
-    _recordHistory(requestConfig, response, collectionId, endpointId, authData, runContext) {
-        if (!app.historyController) {
+        if (!this.isRunning) {
             return;
         }
-        const sensitive = {
-            headerNames: Object.keys(authData.headers || {}),
-            queryNames: Object.keys(authData.queryParams || {})
-        };
-        app.historyController
-            .addHistoryEntry(requestConfig, response, { collectionId, endpointId }, runContext?.environmentName ?? null, sensitive)
-            .catch(() => {});
+        this.shouldStop = true;
+        this._execution?.cancel().catch(() => {});
+        this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
     }
 
-    /**
-     * @param {string} script
-     * @param {Object} prepared
-     * @param {Object} variables
-     * @param {Object} outcome
-     * @param {Object} iteration
-     * @param {string} collectionId
-     * @returns {Promise<Object>}
-     */
-    async _runPreRequestScript(script, prepared, variables, outcome, iteration, collectionId) {
-        const scriptService = app.scriptController?.service;
-        const { requestConfig } = prepared;
-        if (!scriptService) {
-            return requestConfig;
-        }
-
-        const snapshot = {
-            url: requestConfig.url,
-            queryParams: { ...requestConfig.queryParams },
-            pathParams: { ...requestConfig.pathParams }
-        };
-        const { modifiedRequest, result } = await scriptService.executePreRequestScript(script, requestConfig, {
-            environment: variables,
-            iteration,
-            collectionId
-        });
-        this._collectScriptResult(result, outcome);
-
-        const authStripped = this.pipeline.applyScriptMutations(modifiedRequest, {
-            snapshot,
-            rawUrl: prepared.rawUrl,
-            variables,
-            processor: this.variableProcessor,
-            mockRewrite: prepared.mockRewrite,
-            authData: prepared.authData
-        });
-        if (authStripped) {
-            outcome.logs.push({
-                level: 'warn',
-                message: translate(
-                    'runner.auth_stripped',
-                    'Authentication was not sent: the pre-request script changed the request host.'
-                ),
-                timestamp: Date.now()
-            });
-        }
-        return modifiedRequest;
-    }
-
-    /**
-     * @param {string} script
-     * @param {Object} requestConfig
-     * @param {Object} response
-     * @param {Object} variables
-     * @param {Object} outcome
-     * @param {Object} iteration
-     * @param {string} collectionId
-     * @returns {Promise<void>}
-     */
-    async _runTestScript(script, requestConfig, response, variables, outcome, iteration, collectionId) {
-        const scriptService = app.scriptController?.service;
-        if (!scriptService) {
-            return;
-        }
-        const result = await scriptService.executeTestScript(
-            script,
-            requestConfig,
-            { ...response, cookies: responseCookies(response) },
-            { environment: variables, iteration, collectionId }
+    async _recordHistory(data) {
+        await app.historyController?.addHistoryEntry(
+            data.requestConfig,
+            data.response,
+            { collectionId: data.collectionId, endpointId: data.endpointId },
+            data.environmentName,
+            data.historySensitive
         );
-        this._collectScriptResult(result, outcome);
     }
 
-    /**
-     * @param {Object} result
-     * @param {Object} outcome
-     */
-    _collectScriptResult(result, outcome) {
-        outcome.logs.push(...(result?.logs || []));
-        outcome.testResults.push(...(result?.testResults || []));
-        outcome.errors.push(...(result?.errors || []));
-        Object.assign(outcome.variablesSet, result?.modifiedCollectionVariables || {});
-        Object.assign(outcome.variablesSet, result?.modifiedEnvironment || {});
-    }
-
-    /**
-     * @param {number} ms
-     * @returns {Promise<void>}
-     */
-    _delay(ms) {
-        return new Promise(resolve => {
-            let timer = null;
-            const wake = () => {
-                clearTimeout(timer);
-                this._stopWaiters.delete(wake);
-                resolve();
-            };
-            timer = setTimeout(wake, ms);
-            this._stopWaiters.add(wake);
-        });
-    }
-
-    /** @param {Function} listener */
     addListener(listener) {
         this._events.add(listener);
     }
-
-    /**
-     * @param {string} event
-     * @param {*} data
-     */
     _notifyListeners(event, data) {
         this._events.emit(event, data);
     }
 }
-
-const MAX_ITERATIONS = 1000;
-
-/**
- * @param {*} value
- * @returns {number}
- */
-function clampIterations(value) {
-    const count = parseInt(value, 10);
-    return Number.isFinite(count) ? Math.min(MAX_ITERATIONS, Math.max(1, count)) : 1;
-}
-
-/**
- * @param {Object<string, string>} row
- * @returns {string}
- */
-function describeDataRow(row) {
-    const [first] = Object.entries(row);
-    return first ? `${first[0]}=${first[1]}` : '';
-}
-
-/**
- * @param {Object} response
- * @returns {string}
- */
-function describeFailedResponse(response) {
-    if (response.status) {
-        return `${response.status} ${response.statusText || ''}`.trim();
-    }
-    return translate('runner.error_request_failed', 'Request failed');
-}
-
-/**
- * @param {Object} base
- * @param {Object} changes
- * @returns {Object}
- */
-function mergeVariables(base, changes) {
-    const merged = { ...base };
-    for (const [key, value] of Object.entries(changes || {})) {
-        if (value === null || value === undefined) {
-            delete merged[key];
-        } else {
-            merged[key] = value;
-        }
-    }
-    return merged;
-}
-

@@ -40,6 +40,7 @@ import { requestPipelineFeature } from './modules/requestPipeline.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
 import { historyFeature } from './modules/history.feature.js';
 import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
+import { runnerFeature } from './modules/runner.feature.js';
 import { graphqlBodyFeature } from './modules/graphqlBody.feature.js';
 import { formBodyFeature } from './modules/formBody.feature.js';
 import { settingsFeature } from './modules/settings.feature.js';
@@ -91,6 +92,7 @@ featureRegistry
     .register(schemaFeature)
     .register(historyFeature)
     .register(workspaceTabFeature)
+    .register(runnerFeature)
     .boot();
 
 const environment = featureRegistry.get('environment');

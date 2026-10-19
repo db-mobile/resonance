@@ -6,15 +6,16 @@
 import { RunnerRepository } from '../storage/RunnerRepository.js';
 import { RunnerService } from '../services/RunnerService.js';
 import { RunnerPanel } from '../ui/RunnerPanel.js';
+import { groupRunnersByCollection } from '../ui/runner/RunnerSelectorMenu.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { StatusDisplayAdapter } from '../interfaces/IStatusDisplay.js';
 import { updateStatusDisplay } from '../statusDisplay.js';
 import { toast } from '../ui/Toast.js';
 import { updateSetting } from '../state/settingsCache.js';
 import { translate, translateCount } from '../utils/translate.js';
-import { OVERRIDES_VERSION, endpointDefaults, stripUnchangedOverrides } from '../utils/requestOverrides.js';
 import { resolveRequestLinks } from '../utils/runnerRequestLinks.js';
 import { parseDataFile } from '../utils/dataFile.js';
+import { isAbsolutePath, toCollectionRelativePath } from '../utils/dataFilePath.js';
 import { summarizeRun, toJsonReport, toJunitXml, reportFileName } from '../utils/runnerReport.js';
 import { RunnerHistoryRepository } from '../storage/RunnerHistoryRepository.js';
 
@@ -38,6 +39,7 @@ export class RunnerController {
 
         this.panel = null;
         this._currentRunnerId = null;
+        this._currentCollectionId = null;
 
         this._handleSave = this._handleSave.bind(this);
         this._handleLoadRunners = this._handleLoadRunners.bind(this);
@@ -55,9 +57,17 @@ export class RunnerController {
 
     set currentRunnerId(runnerId) {
         this._currentRunnerId = runnerId;
+        if (!runnerId) {
+            this._currentCollectionId = null;
+        }
         if (this.panel) {
             this.panel.currentRunnerId = runnerId;
         }
+    }
+
+    /** @type {string|null} */
+    get currentCollectionId() {
+        return this._currentCollectionId;
     }
 
     /**
@@ -101,16 +111,50 @@ export class RunnerController {
         }
     }
 
+    /**
+     * @param {Object} runnerData
+     * @returns {Object}
+     */
+    _named(runnerData) {
+        return { ...runnerData, name: runnerData.name || translate('runner.untitled', 'Untitled Runner') };
+    }
+
+    /**
+     * @param {Object} runnerData
+     * @returns {string|null}
+     */
+    _collectionFor(runnerData) {
+        const collectionId = this._currentCollectionId || runnerData.collectionId || null;
+        if (!collectionId) {
+            toast.error(translate('runner.no_collection', 'Add a request first so the runner belongs to a collection'));
+        }
+        return collectionId;
+    }
+
+    /**
+     * @param {Object} runnerData
+     * @returns {Promise<string|null>}
+     */
+    async _persist(runnerData) {
+        const collectionId = this._collectionFor(runnerData);
+        if (!collectionId) {
+            return null;
+        }
+        const named = this._named(runnerData);
+        if (this.currentRunnerId) {
+            await this.service.updateRunner(collectionId, this.currentRunnerId, named);
+            return this.currentRunnerId;
+        }
+        const runner = await this.service.createRunner(collectionId, named);
+        this._currentCollectionId = collectionId;
+        this.currentRunnerId = runner.id;
+        return runner.id;
+    }
+
     /** @param {Object} runnerData */
     async _handleSave(runnerData) {
-        const named = { ...runnerData, name: runnerData.name || translate('runner.untitled', 'Untitled Runner') };
         try {
-            if (this.currentRunnerId) {
-                await this.service.updateRunner(this.currentRunnerId, named);
-            } else {
-                const runner = await this.service.createRunner(named);
-                this.currentRunnerId = runner.id;
-            }
+            await this._persist(runnerData);
         } catch (error) {
             toast.error(translate('runner.error_saving', 'Error saving runner: {{message}}', { message: error.message }));
         }
@@ -119,7 +163,11 @@ export class RunnerController {
     /** @returns {Promise<Array>} */
     async _handleLoadRunners() {
         try {
-            return await this.service.getAllRunners();
+            const [runners, collections] = await Promise.all([
+                this.service.getAllRunners({ fresh: true }),
+                this.getCollections()
+            ]);
+            return groupRunnersByCollection(runners, collections || []);
         } catch (error) {
             toast.error(translate('runner.error_loading_runners', 'Error loading runners: {{message}}', { message: error.message }));
             return [];
@@ -127,24 +175,29 @@ export class RunnerController {
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} runnerId
      * @returns {Promise<Object|null>}
      */
-    async _applyRunner(runnerId) {
-        const { runner, missing } = await this._prepareRunner(await this.service.getRunner(runnerId));
+    async _applyRunner(collectionId, runnerId) {
+        const { runner, missing } = await this._prepareRunner(await this.service.getRunner(collectionId, runnerId));
         if (!runner) {
             return null;
         }
+        this._currentCollectionId = collectionId;
         this.currentRunnerId = runnerId;
         this.panel?.loadRunner(runner, missing);
-        this._checkDataFile(runner.options?.dataFile);
+        this._checkDataFile(collectionId, runner.options?.dataFile);
         return runner;
     }
 
-    /** @param {string} runnerId */
-    async _handleRunnerSelect(runnerId) {
+    /**
+     * @param {string} runnerId
+     * @param {string} collectionId
+     */
+    async _handleRunnerSelect(runnerId, collectionId) {
         try {
-            const runner = await this._applyRunner(runnerId);
+            const runner = await this._applyRunner(collectionId, runnerId);
             if (runner) {
                 await this._saveLastRunnerId(runnerId);
                 updateStatusDisplay(translate('runner.loaded', 'Loaded runner: {{name}}', { name: runner.name }), null);
@@ -178,7 +231,7 @@ export class RunnerController {
         }
 
         try {
-            await this.service.deleteRunner(runnerId);
+            await this.service.deleteRunner(this._currentCollectionId, runnerId);
             this.historyRepository.remove(runnerId).catch(() => {});
             this.currentRunnerId = null;
             await this._saveLastRunnerId(null);
@@ -194,19 +247,15 @@ export class RunnerController {
         try {
             let runnerId = this.currentRunnerId;
 
-            if (runnerId) {
-                await this.service.updateRunner(runnerId, runnerData);
-            } else if (runnerData.name) {
-                const runner = await this.service.createRunner(runnerData);
-                runnerId = runner.id;
-                this.currentRunnerId = runnerId;
+            if (runnerId || runnerData.name) {
+                runnerId = await this._persist(runnerData);
             }
 
             const onProgress = (index, total, result) => {
                 this.panel?.updateResultWithResponse(index, result);
             };
             const results = runnerId
-                ? await this.service.executeRunner(runnerId, onProgress)
+                ? await this.service.executeRunner(this._currentCollectionId, runnerId, onProgress)
                 : await this.service.executeRunnerData(runnerData, onProgress);
 
             this.panel?.showResults(results);
@@ -234,7 +283,7 @@ export class RunnerController {
     _handleServiceEvent(event, data) {
         switch (event) {
             case 'run-started':
-                this.panel?.prepareResults?.(data.iterations, data.iterationLabels);
+                this.panel?.prepareResults?.(data.iterations, data.iterationLabels, data.timeline);
                 updateStatusDisplay(translateCount('runner.running_requests', data.total, {
                     one: 'Running {{count}} request...',
                     other: 'Running {{count}} requests...'
@@ -242,7 +291,7 @@ export class RunnerController {
                 break;
 
             case 'request-started':
-                this.panel?.markRequestRunning?.(data.index);
+                this.panel?.markRequestRunning?.(data.index, data);
                 break;
 
             case 'request-completed': {
@@ -259,12 +308,12 @@ export class RunnerController {
 
             case 'run-completed':
                 updateStatusDisplay(
-                    translate('runner.completed', 'Completed: {{passed}} passed, {{failed}} failed ({{time}}ms)', {
+                    data.error || translate('runner.completed', 'Completed: {{passed}} passed, {{failed}} failed ({{time}}ms)', {
                         passed: data.passed,
                         failed: data.failed,
                         time: data.totalTime
                     }),
-                    data.failed === 0 ? 200 : null
+                    data.failed === 0 && !data.error ? 200 : null
                 );
                 break;
         }
@@ -278,8 +327,12 @@ export class RunnerController {
     async _loadLastRunner(settings) {
         try {
             const lastRunnerId = settings?.lastRunnerId;
-            if (lastRunnerId) {
-                await this._applyRunner(lastRunnerId);
+            if (!lastRunnerId) {
+                return;
+            }
+            const runner = await this.service.findRunner(lastRunnerId);
+            if (runner) {
+                await this._applyRunner(runner.collectionId, runner.id);
             }
         } catch (error) {
         }
@@ -299,44 +352,27 @@ export class RunnerController {
             collections = await this.getCollections() || [];
         } catch {}
 
-        const links = resolveRequestLinks(runner.requests, collections);
-        let { requests } = links;
-        const needsMigration = runner.overridesVersion !== OVERRIDES_VERSION;
-
-        if (needsMigration) {
-            requests = await Promise.all(requests.map(async (request, index) => {
-                if (links.missing.has(index)) {
-                    return request;
-                }
-                try {
-                    const config = await this.service.getEndpointRequestConfig(request.collectionId, request.endpointId);
-                    return { ...request, overrides: stripUnchangedOverrides(request.overrides, endpointDefaults(config)) };
-                } catch {
-                    return request;
-                }
-            }));
-        }
-
-        if (needsMigration || links.relinked > 0) {
-            try {
-                await this.repository.update(runner.id, { requests, overridesVersion: OVERRIDES_VERSION });
-            } catch {}
-        }
+        const own = collections.filter(collection => collection.id === runner.collectionId);
+        const links = resolveRequestLinks(runner.requests, own);
+        const { requests } = links;
 
         if (links.relinked > 0) {
+            try {
+                await this.repository.update(runner.collectionId, runner.id, { requests });
+            } catch {}
             toast.info(translateCount('runner.relinked', links.relinked, {
-                one: 'Re-linked {{count}} request to the open collections',
-                other: 'Re-linked {{count}} requests to the open collections'
+                one: 'Re-linked {{count}} request within its collection',
+                other: 'Re-linked {{count}} requests within its collection'
             }));
         }
         if (links.missing.size > 0) {
             toast.warning(translateCount('runner.missing_requests', links.missing.size, {
-                one: '{{count}} request in "{{name}}" no longer exists in any open collection',
-                other: '{{count}} requests in "{{name}}" no longer exist in any open collection'
+                one: '{{count}} request in "{{name}}" no longer exists in its collection',
+                other: '{{count}} requests in "{{name}}" no longer exist in its collection'
             }, { name: runner.name }));
         }
 
-        return { runner: { ...runner, requests, overridesVersion: OVERRIDES_VERSION }, missing: links.missing };
+        return { runner: { ...runner, requests }, missing: links.missing };
     }
 
     /**
@@ -364,8 +400,13 @@ export class RunnerController {
         }
     }
 
-    /** @returns {Promise<{path: string, name: string, rowCount: number}|null>} */
+    /** @returns {Promise<{path: string, name: string, rowCount: number, portable: boolean}|null>} */
     async _pickDataFile() {
+        const collectionId = this.panel?.collectionId || this._currentCollectionId;
+        if (!collectionId) {
+            toast.error(translate('runner.no_collection', 'Add a request first so the runner belongs to a collection'));
+            return null;
+        }
         try {
             const file = await this.backendAPI.runner.pickDataFile();
             if (!file) {
@@ -376,7 +417,12 @@ export class RunnerController {
                 toast.error(translate('runner.data_file_empty', 'Data file {{name}} has no rows', { name: file.name }));
                 return null;
             }
-            return { path: file.path, name: file.name, rowCount: rows.length };
+            let storagePath = null;
+            try {
+                storagePath = (await this.getCollections() || []).find(collection => collection.id === collectionId)?.storagePath || null;
+            } catch {}
+            const { path, portable } = toCollectionRelativePath(file.path, storagePath);
+            return { path, name: file.name, rowCount: rows.length, portable };
         } catch (error) {
             toast.error(translate('runner.data_file_unusable', 'Could not use this data file: {{message}}', {
                 message: error?.message || String(error)
@@ -386,18 +432,20 @@ export class RunnerController {
     }
 
     /**
+     * @param {string} collectionId
      * @param {{path: string, name: string}|null|undefined} dataFile
      * @returns {Promise<void>}
      */
-    async _checkDataFile(dataFile) {
+    async _checkDataFile(collectionId, dataFile) {
         if (!dataFile?.path) {
             return;
         }
+        const portable = !isAbsolutePath(dataFile.path);
         try {
-            const file = await this.backendAPI.runner.readDataFile(dataFile.path);
-            this.panel?.setDataFile(dataFile, { rowCount: parseDataFile(file.name, file.content).length });
+            const file = await this.backendAPI.collections.runners.readData(collectionId, dataFile.path);
+            this.panel?.setDataFile(dataFile, { rowCount: parseDataFile(file.name, file.content).length, portable });
         } catch (error) {
-            this.panel?.setDataFile(dataFile, { error: error?.message || String(error) });
+            this.panel?.setDataFile(dataFile, { error: error?.message || String(error), portable });
         }
     }
 

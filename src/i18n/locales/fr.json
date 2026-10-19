@@ -128,7 +128,8 @@
     "import_success": "Collection importée avec succès",
     "import_error": "Échec de l'importation de la collection",
     "close_title": "Fermer la collection",
-    "confirm_close": "Retirer \"{{name}}\" de la liste ?\n\nLe dossier et ses fichiers restent sur le disque, et les identifiants enregistrés sont conservés. Vous pourrez le rouvrir plus tard."
+    "confirm_close": "Retirer \"{{name}}\" de la liste ?\n\nLe dossier et ses fichiers restent sur le disque, et les identifiants enregistrés sont conservés. Vous pourrez le rouvrir plus tard.",
+    "reveal_failed": "Impossible d’afficher le dossier de la collection : {{message}}"
   },
   "endpoint": {
     "delete_title": "Supprimer la requête",
@@ -162,7 +163,8 @@
     "rename_folder": "Renommer le dossier",
     "delete_folder": "Supprimer le dossier",
     "duplicate_request": "Dupliquer la requête",
-    "move_request": "Déplacer vers un dossier…"
+    "move_request": "Déplacer vers un dossier…",
+    "show_in_file_manager": "Afficher dans le gestionnaire de fichiers"
   },
   "docs": {
     "title": "Générer la documentation",
@@ -528,7 +530,7 @@
     "status_skipped": "Ignorée",
     "status_failed": "Échec",
     "status_pending": "En attente",
-    "request_missing": "Cette requête n’existe plus dans aucune collection ouverte",
+    "request_missing": "Cette requête n’existe plus dans sa collection",
     "untitled": "Runner sans titre",
     "loaded": "Runner chargé : {{name}}",
     "created": "Runner « {{name}} » créé",
@@ -566,10 +568,10 @@
     "running_requests_other": "Exécution de {{count}} requêtes...",
     "tests_failed_one": "{{count}} test échoué",
     "tests_failed_other": "{{count}} tests échoués",
-    "relinked_one": "{{count}} requête reliée aux collections ouvertes",
-    "relinked_other": "{{count}} requêtes reliées aux collections ouvertes",
-    "missing_requests_one": "{{count}} requête de « {{name}} » n’existe plus dans aucune collection ouverte",
-    "missing_requests_other": "{{count}} requêtes de « {{name}} » n’existent plus dans aucune collection ouverte",
+    "relinked_one": "{{count}} requête reliée au sein de sa collection",
+    "relinked_other": "{{count}} requêtes reliées au sein de leur collection",
+    "missing_requests_one": "{{count}} requête dans « {{name}} » n’existe plus dans sa collection",
+    "missing_requests_other": "{{count}} requêtes dans « {{name}} » n’existent plus dans leur collection",
     "add_all": "Ajouter toutes les requêtes",
     "nothing_runnable": "Il n’y a aucune requête HTTP ou GraphQL à exécuter ici",
     "iterations": "Itérations",
@@ -600,7 +602,35 @@
     "history_failed": "{{count}} échouées",
     "history_source": "Exécution du {{date}}",
     "history_no_body": "Les corps de réponse, en-têtes et cookies ne sont pas conservés dans l’historique",
-    "pre_request_failed": "Le script de pré-requête a échoué, la requête n’a pas été envoyée : {{message}}"
+    "pre_request_failed": "Le script de pré-requête a échoué, la requête n’a pas été envoyée : {{message}}",
+    "flow": {
+      "max_executions": "Exécutions max. / itération",
+      "invalid_limit": "Le maximum d’exécutions doit être un entier entre {{min}} et {{max}}.",
+      "limit_reached": "Limite de {{limit}} exécutions atteinte à l’itération {{iteration}}.",
+      "ambiguous_target": "La requête suivante « {{target}} » est ambiguë dans la sélection.",
+      "missing_target": "La requête suivante « {{target}} » ne figure pas dans la sélection.",
+      "skipped": "Ignorée par le script préalable",
+      "running": "En cours · {{count}} passages terminés",
+      "attempt": "Tentative {{attempt}}",
+      "counts": "{{visited}} passages · {{sent}} envoyées · {{planned}} prévues",
+      "stoppedByUser": "Arrêté par l’utilisateur",
+      "stoppedOnError": "Arrêté après l’échec d’une requête",
+      "executionLimit": "Limite d’exécutions atteinte",
+      "invalidTarget": "Requête suivante invalide",
+      "executionError": "Erreur d’exécution",
+      "jump": "Suivante : {{target}}",
+      "end_iteration": "Terminer l’itération"
+    },
+    "collection_locked": "Ce runner appartient à « {{name}} ». Démarrez un nouveau runner pour utiliser une autre collection.",
+    "in_collection": "dans {{name}}",
+    "no_collection": "Ajoutez d’abord une requête pour que le runner appartienne à une collection",
+    "data_file_not_portable": "Hors du dossier de la collection : ce chemin ne fonctionne que sur cette machine",
+    "migration_moved_one": "{{count}} runner enregistré déplacé dans le dossier de sa collection",
+    "migration_moved_other": "{{count}} runners enregistrés déplacés dans les dossiers de leurs collections",
+    "migration_dropped_one": "{{count}} runner a perdu des requêtes d’autres collections : {{names}}",
+    "migration_dropped_other": "{{count}} runners ont perdu des requêtes d’autres collections : {{names}}",
+    "migration_skipped_one": "{{count}} runner enregistré n’a aucune requête et n’a pas été déplacé",
+    "migration_skipped_other": "{{count}} runners enregistrés n’ont aucune requête et n’ont pas été déplacés"
   },
   "mqtt": {
     "title": "MQTT",

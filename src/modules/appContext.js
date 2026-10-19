@@ -9,6 +9,7 @@
  * @property {*} [inlineScriptManager]
  * @property {*} [schemaController]
  * @property {*} [historyController]
+ * @property {*} [runnerBookkeeping]
  * @property {*} [workspaceTabController]
  * @property {*} [responseContainerManager]
  * @property {*} [collectionController]

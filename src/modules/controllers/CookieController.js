@@ -54,12 +54,15 @@ export class CookieController {
      * @param {Array<Object>} changes
      * @returns {Promise<void>}
      */
-    async applyScriptCookieChanges(changes) {
+    async applyScriptCookieChanges(changes, environmentId = this._activeEnvironmentId) {
         for (const change of changes) {
             if (change?.op === 'set' && change.cookie) {
-                await this.service.putCookie(change.cookie, this._activeEnvironmentId);
+                if (typeof change.cookie.expires === 'number' && change.cookie.expires <= Date.now()) {
+                    await this.applyScriptCookieChanges([{ op: 'delete', name: change.cookie.name,
+                        domain: change.cookie.domain, path: change.cookie.path || '/' }], environmentId);
+                } else { await this.service.putCookie(change.cookie, environmentId); }
             } else if (change?.op === 'delete' && change.name) {
-                const stored = await this.service.getAll(this._activeEnvironmentId);
+                const stored = await this.service.getAll(environmentId);
                 const matches = stored.filter((cookie) => {
                     if (cookie.name !== change.name) { return false; }
                     if (change.domain && cookie.domain?.toLowerCase() !== change.domain.toLowerCase()) { return false; }
@@ -70,7 +73,7 @@ export class CookieController {
                     await this.service.delete(cookie.id);
                 }
             } else if (change?.op === 'clear') {
-                await this.service.deleteAll(this._activeEnvironmentId);
+                await this.service.deleteAll(environmentId);
             }
         }
     }

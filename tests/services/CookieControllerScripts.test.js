@@ -80,6 +80,16 @@ describe('CookieController.applyScriptCookieChanges', () => {
         expect(stored.map((c) => c.name)).toEqual(['b']);
     });
 
+    it('an expired response cookie deletes only the captured environment cookie', async () => {
+        const cookie = { name: 'sid', value: 'present', domain: 'api.test', path: '/' };
+        await service.putCookie(cookie, 'original');
+        await service.putCookie(cookie, 'selected-later');
+        controller.setActiveEnvironment('selected-later', 'Later');
+        await controller.applyScriptCookieChanges([{ op: 'set', cookie: { ...cookie, expires: 0 } }], 'original');
+        expect(await service.getAll('original')).toEqual([]);
+        expect(await service.getAll('selected-later')).toHaveLength(1);
+    });
+
     it('script-set cookies are injected into a matching request', async () => {
         await controller.applyScriptCookieChanges([
             { op: 'set', cookie: { name: 'token', value: 'xyz', domain: 'api.example.com', path: '/' } }

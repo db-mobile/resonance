@@ -1,269 +1,162 @@
-import { RunnerRepository } from '../../src/modules/storage/RunnerRepository.js';
+import { RunnerRepository, LAST_RUNS_KEY } from '../../src/modules/storage/RunnerRepository.js';
+
+function doc(id, name, extra = {}) {
+    return { id, name, options: { stopOnError: true }, requests: [{ requestId: 'req_1', name: 'Health', method: 'GET', path: '/health' }], ...extra };
+}
 
 describe('RunnerRepository', () => {
     let repository;
-    let mockBackendAPI;
+    let backendAPI;
+    let files;
+    let store;
 
     beforeEach(() => {
-        mockBackendAPI = {
+        files = { c1: [doc('runner_a', 'Alpha', { seq: 10 })], c2: [doc('runner_b', 'Beta')] };
+        let minted = 0;
+        store = { [LAST_RUNS_KEY]: { runner_a: 1000 } };
+        backendAPI = {
+            collections: {
+                list: jest.fn(async () => Object.keys(files)),
+                runners: {
+                    list: jest.fn(async (collectionId) => files[collectionId] ?? []),
+                    save: jest.fn(async (collectionId, runnerDoc) => {
+                        const stored = { ...runnerDoc, id: runnerDoc.id || `runner_new_${++minted}`, seq: runnerDoc.seq || 20 };
+                        files[collectionId] = [...(files[collectionId] || []).filter(r => r.id !== stored.id), stored];
+                        return stored;
+                    }),
+                    delete: jest.fn(async (collectionId, runnerId) => {
+                        const before = files[collectionId]?.length ?? 0;
+                        files[collectionId] = (files[collectionId] || []).filter(r => r.id !== runnerId);
+                        return files[collectionId].length !== before;
+                    })
+                }
+            },
             store: {
-                get: jest.fn(),
-                set: jest.fn()
+                get: jest.fn(async (key) => store[key] ?? null),
+                set: jest.fn(async (key, value) => { store[key] = value; })
             }
         };
-
-        repository = new RunnerRepository(mockBackendAPI);
+        repository = new RunnerRepository(backendAPI);
     });
 
-    describe('getAll', () => {
-        test('should return empty array when no runners exist', async () => {
-            mockBackendAPI.store.get.mockResolvedValue(null);
+    test('getAll lists every collection and maps requestId to endpointId with the owning collectionId', async () => {
+        const runners = await repository.getAll();
 
-            const result = await repository.getAll();
-
-            expect(result).toEqual([]);
-            expect(mockBackendAPI.store.set).toHaveBeenCalledWith('collectionRunners', []);
+        expect(runners.map(r => [r.id, r.collectionId])).toEqual([['runner_a', 'c1'], ['runner_b', 'c2']]);
+        expect(runners[0].requests[0]).toEqual({
+            collectionId: 'c1', endpointId: 'req_1', name: 'Health', method: 'GET', path: '/health', postResponseScript: '', overrides: {}
         });
-
-        test('should return runners array from storage', async () => {
-            const runners = [
-                { id: 'runner_1', name: 'Test Runner 1' },
-                { id: 'runner_2', name: 'Test Runner 2' }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(runners);
-
-            const result = await repository.getAll();
-
-            expect(result).toEqual(runners);
-        });
-
-        test('should return empty array on storage error', async () => {
-            mockBackendAPI.store.get.mockRejectedValue(new Error('Storage error'));
-
-            const result = await repository.getAll();
-
-            expect(result).toEqual([]);
-        });
-
-        test('should initialize storage when data is not an array', async () => {
-            mockBackendAPI.store.get.mockResolvedValue({ invalid: 'data' });
-
-            const result = await repository.getAll();
-
-            expect(result).toEqual([]);
-            expect(mockBackendAPI.store.set).toHaveBeenCalledWith('collectionRunners', []);
-        });
+        expect(runners[0].seq).toBe(10);
     });
 
-    describe('save', () => {
-        test('should save runners to storage', async () => {
-            const runners = [{ id: 'runner_1', name: 'Test Runner' }];
-            mockBackendAPI.store.set.mockResolvedValue();
+    test('getAll merges lastRunAt from the local store', async () => {
+        const runners = await repository.getAll();
 
-            await repository.save(runners);
-
-            expect(mockBackendAPI.store.set).toHaveBeenCalledWith('collectionRunners', runners);
-        });
-
-        test('should throw error on storage failure', async () => {
-            mockBackendAPI.store.set.mockRejectedValue(new Error('Write failed'));
-
-            await expect(repository.save([])).rejects.toThrow('Failed to save runners: Write failed');
-        });
+        expect(runners.find(r => r.id === 'runner_a').lastRunAt).toBe(1000);
+        expect(runners.find(r => r.id === 'runner_b').lastRunAt).toBeNull();
     });
 
-    describe('getById', () => {
-        test('should return runner by ID', async () => {
-            const runners = [
-                { id: 'runner_1', name: 'Test Runner 1' },
-                { id: 'runner_2', name: 'Test Runner 2' }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(runners);
+    test('add sends an empty id and returns the runner the backend assigned', async () => {
+        const added = await repository.add('c1', { name: 'Smoke', requests: [{ collectionId: 'c1', endpointId: 'req_1' }], options: { delayMs: 50 } });
 
-            const result = await repository.getById('runner_2');
-
-            expect(result).toEqual({ id: 'runner_2', name: 'Test Runner 2' });
-        });
-
-        test('should return undefined for non-existent runner', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-
-            const result = await repository.getById('non_existent');
-
-            expect(result).toBeUndefined();
-        });
+        const sent = backendAPI.collections.runners.save.mock.calls[0][1];
+        expect(sent.id).toBe('');
+        expect(sent.requests[0]).toMatchObject({ requestId: 'req_1' });
+        expect(sent.requests[0].collectionId).toBeUndefined();
+        expect(added.id).toBe('runner_new_1');
+        expect(added.collectionId).toBe('c1');
+        expect(added.options).toMatchObject({ stopOnError: true, delayMs: 50, iterations: 1 });
+        expect((await repository.getAllByCollection('c1')).map(r => r.id)).toEqual(['runner_a', 'runner_new_1']);
     });
 
-    describe('add', () => {
-        test('should add new runner with generated ID and timestamps', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-            mockBackendAPI.store.set.mockResolvedValue();
+    test('update merges onto the stored runner and replaces options whole', async () => {
+        const updated = await repository.update('c1', 'runner_a', { name: 'Renamed', options: { stopOnError: false } });
 
-            const runnerData = {
-                name: 'My Runner',
-                requests: [{ endpointId: 'endpoint_1' }]
-            };
-
-            const result = await repository.add(runnerData);
-
-            expect(result.id).toMatch(/^runner_\d+_[a-z0-9]+$/);
-            expect(result.name).toBe('My Runner');
-            expect(result.requests).toEqual([{ endpointId: 'endpoint_1' }]);
-            expect(result.options.stopOnError).toBe(true);
-            expect(result.options.delayMs).toBe(0);
-            expect(result.createdAt).toBeDefined();
-            expect(result.lastModifiedAt).toBeDefined();
-            expect(result.lastRunAt).toBeNull();
-        });
-
-        test('should use default values for missing properties', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-            mockBackendAPI.store.set.mockResolvedValue();
-
-            const result = await repository.add({});
-
-            expect(result.name).toBe('Untitled Runner');
-            expect(result.requests).toEqual([]);
-        });
-
-        test('should merge custom options with defaults', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-            mockBackendAPI.store.set.mockResolvedValue();
-
-            const result = await repository.add({
-                name: 'Test',
-                options: { delayMs: 500 }
-            });
-
-            expect(result.options.stopOnError).toBe(true);
-            expect(result.options.delayMs).toBe(500);
-        });
+        const sent = backendAPI.collections.runners.save.mock.calls[0][1];
+        expect(sent).toMatchObject({ id: 'runner_a', name: 'Renamed', seq: 10 });
+        expect(sent.options).toEqual({ stopOnError: false, delayMs: 0, iterations: 1, dataFile: null });
+        expect(updated.name).toBe('Renamed');
+        expect(updated.lastRunAt).toBe(1000);
     });
 
-    describe('update', () => {
-        test('should update existing runner', async () => {
-            const existingRunner = {
-                id: 'runner_1',
-                name: 'Old Name',
-                requests: [],
-                lastModifiedAt: 1000
-            };
-            mockBackendAPI.store.get.mockResolvedValue([existingRunner]);
-            mockBackendAPI.store.set.mockResolvedValue();
-
-            const result = await repository.update('runner_1', { name: 'New Name' });
-
-            expect(result.name).toBe('New Name');
-            expect(result.lastModifiedAt).toBeGreaterThan(1000);
-        });
-
-        test('should return null for non-existent runner', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-
-            const result = await repository.update('non_existent', { name: 'New Name' });
-
-            expect(result).toBeNull();
-        });
-
-        test('should preserve existing properties not being updated', async () => {
-            const existingRunner = {
-                id: 'runner_1',
-                name: 'Test',
-                options: { stopOnError: false, delayMs: 250 },
-                requests: [{ id: 'req_1' }]
-            };
-            mockBackendAPI.store.get.mockResolvedValue([existingRunner]);
-            mockBackendAPI.store.set.mockResolvedValue();
-
-            const result = await repository.update('runner_1', { name: 'Updated' });
-
-            expect(result.options).toEqual({ stopOnError: false, delayMs: 250 });
-            expect(result.requests).toEqual([{ id: 'req_1' }]);
-        });
+    test('update of an unknown runner returns null without saving', async () => {
+        expect(await repository.update('c1', 'nope', { name: 'x' })).toBeNull();
+        expect(backendAPI.collections.runners.save).not.toHaveBeenCalled();
     });
 
-    describe('delete', () => {
-        test('should delete runner by ID', async () => {
-            const runners = [
-                { id: 'runner_1', name: 'Runner 1' },
-                { id: 'runner_2', name: 'Runner 2' }
-            ];
-            mockBackendAPI.store.get.mockResolvedValue(runners);
-            mockBackendAPI.store.set.mockResolvedValue();
+    test('delete removes the file and the last-run entry', async () => {
+        expect(await repository.delete('c1', 'runner_a')).toBe(true);
 
-            const result = await repository.delete('runner_1');
-
-            expect(result).toBe(true);
-            expect(mockBackendAPI.store.set).toHaveBeenCalledWith('collectionRunners', [
-                { id: 'runner_2', name: 'Runner 2' }
-            ]);
-        });
-
-        test('should return false for non-existent runner', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-
-            const result = await repository.delete('non_existent');
-
-            expect(result).toBe(false);
-        });
+        expect(backendAPI.collections.runners.delete).toHaveBeenCalledWith('c1', 'runner_a');
+        expect(store[LAST_RUNS_KEY]).toEqual({});
+        expect(await repository.getAllByCollection('c1')).toEqual([]);
+        expect(await repository.delete('c1', 'runner_a')).toBe(false);
     });
 
-    describe('updateLastRun', () => {
-        test('should update lastRunAt timestamp', async () => {
-            const existingRunner = {
-                id: 'runner_1',
-                name: 'Test',
-                lastRunAt: null
-            };
-            mockBackendAPI.store.get.mockResolvedValue([existingRunner]);
-            mockBackendAPI.store.set.mockResolvedValue();
+    test('updateLastRun writes only the local store, never a file', async () => {
+        await repository.getAll();
+        await repository.updateLastRun('runner_b');
 
-            const result = await repository.updateLastRun('runner_1');
-
-            expect(result.lastRunAt).toBeDefined();
-            expect(typeof result.lastRunAt).toBe('number');
-        });
+        expect(backendAPI.collections.runners.save).not.toHaveBeenCalled();
+        expect(typeof store[LAST_RUNS_KEY].runner_b).toBe('number');
+        expect((await repository.getById('c2', 'runner_b')).lastRunAt).toBe(store[LAST_RUNS_KEY].runner_b);
     });
 
-    describe('shared cache integrity', () => {
-        test('RunnerRepository.shared hands every runner tab the same instance', () => {
-            expect(RunnerRepository.shared(mockBackendAPI)).toBe(RunnerRepository.shared(mockBackendAPI));
-        });
+    test('mergeLastRuns never overwrites a newer timestamp', async () => {
+        await repository.mergeLastRuns({ runner_a: 500, runner_b: 700 });
 
-        test('reads are copies, so unsaved UI edits never leak into the cache', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([{ id: 'r1', name: 'R', requests: [{ postResponseScript: '' }] }]);
+        expect(store[LAST_RUNS_KEY]).toEqual({ runner_a: 1000, runner_b: 700 });
+    });
 
-            const loaded = await repository.getById('r1');
-            loaded.requests[0].postResponseScript = 'unsaved edit';
+    test('a saved error carries a message even when the backend rejects with a string', async () => {
+        backendAPI.collections.runners.save.mockRejectedValueOnce('legacy format');
 
-            const reloaded = await repository.getById('r1');
-            expect(reloaded.requests[0].postResponseScript).toBe('');
-        });
+        await expect(repository.add('c1', { name: 'x' })).rejects.toThrow('Failed to save runner: legacy format');
+    });
 
-        test('concurrent writes do not lose each other', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-            mockBackendAPI.store.set.mockResolvedValue();
+    test('invalidate forces the next read to list again', async () => {
+        await repository.getAllByCollection('c1');
+        await repository.getAllByCollection('c1');
+        expect(backendAPI.collections.runners.list).toHaveBeenCalledTimes(1);
 
-            await Promise.all([
-                repository.add({ name: 'A' }),
-                repository.add({ name: 'B' })
-            ]);
+        repository.invalidate('c1');
+        await repository.getAllByCollection('c1');
+        expect(backendAPI.collections.runners.list).toHaveBeenCalledTimes(2);
 
-            const names = (await repository.getAll()).map(runner => runner.name).sort();
-            expect(names).toEqual(['A', 'B']);
-            const lastWrite = mockBackendAPI.store.set.mock.calls.at(-1)[1];
-            expect(lastWrite.map(runner => runner.name).sort()).toEqual(['A', 'B']);
-        });
+        await repository.getAll({ fresh: true });
+        expect(backendAPI.collections.runners.list).toHaveBeenCalledTimes(4);
+    });
 
-        test('a failed write does not block later writes', async () => {
-            mockBackendAPI.store.get.mockResolvedValue([]);
-            mockBackendAPI.store.set.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue();
+    test('a failing list yields no runners for that collection and is not cached', async () => {
+        backendAPI.collections.runners.list.mockRejectedValueOnce(new Error('closed'));
 
-            await expect(repository.add({ name: 'A' })).rejects.toThrow('disk full');
-            const added = await repository.add({ name: 'B' });
+        expect(await repository.getAllByCollection('c1')).toEqual([]);
+        expect((await repository.getAllByCollection('c1')).map(r => r.id)).toEqual(['runner_a']);
+    });
 
-            expect(added.name).toBe('B');
-            expect((await repository.getAll()).map(runner => runner.name)).toEqual(['B']);
-        });
+    test('findById scans every open collection', async () => {
+        expect((await repository.findById('runner_b')).collectionId).toBe('c2');
+        expect(await repository.findById('missing')).toBeUndefined();
+    });
+
+    test('reads are copies, so unsaved UI edits never leak into the cache', async () => {
+        const loaded = await repository.getById('c1', 'runner_a');
+        loaded.requests[0].postResponseScript = 'unsaved edit';
+
+        expect((await repository.getById('c1', 'runner_a')).requests[0].postResponseScript).toBe('');
+    });
+
+    test('concurrent saves are serialised and both land', async () => {
+        await Promise.all([
+            repository.add('c1', { name: 'A' }),
+            repository.add('c1', { name: 'B' })
+        ]);
+
+        expect(backendAPI.collections.runners.save).toHaveBeenCalledTimes(2);
+        expect((await repository.getAllByCollection('c1')).map(r => r.name)).toEqual(['Alpha', 'A', 'B']);
+    });
+
+    test('RunnerRepository.shared hands every runner tab the same instance', () => {
+        expect(RunnerRepository.shared(backendAPI)).toBe(RunnerRepository.shared(backendAPI));
     });
 });

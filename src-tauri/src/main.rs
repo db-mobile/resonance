@@ -5,17 +5,17 @@ mod commands;
 mod window_state;
 
 use commands::{
-    api_request::{
-        RequestState, cancel_api_request, pick_upload_file, save_response_body, send_api_request,
-    },
+    api_request::{RequestState, pick_upload_file, save_response_body, send_api_request},
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
         CollectionLoadErrors, collection_close, collection_delete, collection_delete_endpoint_data,
         collection_delete_folder, collection_get, collection_get_endpoint_data,
-        collection_get_variables, collection_relocate, collection_save,
-        collection_save_endpoint_data, collection_save_variables, collections_get_all,
-        collections_get_path, collections_git_branches, collections_list, collections_load_errors,
+        collection_get_variables, collection_relocate, collection_reveal,
+        collection_runner_data_read, collection_runners_delete, collection_runners_list,
+        collection_runners_save, collection_save, collection_save_endpoint_data,
+        collection_save_variables, collections_get_all, collections_get_path,
+        collections_git_branches, collections_list, collections_load_errors,
         collections_open_existing, collections_pick_directory,
     },
     data_migrations::{MigrationStatus, data_migration_status},
@@ -33,8 +33,8 @@ use commands::{
     grpc_streaming::{GrpcStreamingState, grpc_stream_cancel, grpc_stream_send, grpc_stream_start},
     import_export::{
         collections_pick_import_file, export_openapi, export_postman, import_collection_file,
-        import_cookie_file, import_postman_environment, pick_runner_data_file,
-        read_runner_data_file, save_documentation, save_json_export, save_text_export,
+        import_cookie_file, import_postman_environment, pick_runner_data_file, save_documentation,
+        save_json_export, save_text_export,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -48,7 +48,7 @@ use commands::{
     proxy::{ProxyState, proxy_get, proxy_set, proxy_test},
     response_inspection::response_inspect,
     schema::{schema_check, schema_validate},
-    scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
+    scripts::{script_get, script_save},
     secrets::{secret_delete, secret_get, secret_keychain_available, secret_set},
     sse::{SseState, sse_close, sse_connect},
     store::{settings_get, settings_set, store_get, store_set},
@@ -78,6 +78,7 @@ fn main() {
             builder.build()
         })
         .manage(RequestState::default())
+        .manage(commands::execution::ExecutionState::default())
         .manage(CollectionLoadErrors::default())
         .manage(ProxyState::default())
         .manage(ProtoState::default())
@@ -90,6 +91,14 @@ fn main() {
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
         .manage(MigrationStatus::default())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                use tauri::Manager;
+                window
+                    .state::<commands::execution::ExecutionState>()
+                    .cancel_window(window.label());
+            }
+        })
         .setup(|app| {
             use tauri::Manager;
             #[cfg(target_os = "linux")]
@@ -128,7 +137,9 @@ fn main() {
             secret_keychain_available,
             // API Requests
             send_api_request,
-            cancel_api_request,
+            commands::execution::execute_request,
+            commands::execution::execute_run,
+            commands::execution::cancel_execution,
             pick_upload_file,
             save_response_body,
             // Proxy
@@ -145,7 +156,6 @@ fn main() {
             save_json_export,
             save_text_export,
             pick_runner_data_file,
-            read_runner_data_file,
             save_documentation,
             // gRPC Reflection
             grpc_reflection_list_services,
@@ -176,8 +186,6 @@ fn main() {
             // Scripts
             script_get,
             script_save,
-            script_execute_pre_request,
-            script_execute_test,
             // Response schemas
             schema_check,
             schema_validate,
@@ -219,6 +227,11 @@ fn main() {
             collection_delete_endpoint_data,
             collection_get_variables,
             collection_save_variables,
+            collection_runners_list,
+            collection_runners_save,
+            collection_runners_delete,
+            collection_runner_data_read,
+            collection_reveal,
             collections_get_path,
             collections_git_branches,
             collections_pick_directory,

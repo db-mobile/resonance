@@ -46,7 +46,8 @@ export class RunnerResultsPanel {
      * @param {number} [options.iterations]
      * @param {string[]|null} [options.labels]
      */
-    open(selectedRequests, { iterations = 1, labels = null } = {}) {
+    open(selectedRequests, { iterations = 1, labels = null, timeline = false } = {}) {
+        this.timeline = timeline;
         this.selectedRequests = selectedRequests || [];
         this.iterations = Math.max(1, iterations);
         this.iterationLabels = labels;
@@ -111,7 +112,20 @@ export class RunnerResultsPanel {
     }
 
     /** @param {number} index */
-    markRequestRunning(index) {
+    markRequestRunning(index, visit) {
+        if (this.timeline && visit && !this.data[index]) {
+            if (this.iterations > 1 && this.data.at(-1)?.iteration !== visit.iteration) {
+                this.dom.resultsList.appendChild(this._createIterationHeader(visit.iteration - 1));
+            }
+            const result = { ...visit.request, index, iteration: visit.iteration, attempt: visit.attempt, queuePosition: visit.queuePosition, status: 'running', logs: [], testResults: [] };
+            this.data[index] = result;
+            this.dom.resultsList.appendChild(this._createResultItemElement(result, index));
+        }
+        if (this.dom.notice) {
+            this.dom.notice.classList.remove('is-hidden');
+            this.dom.notice.setAttribute('aria-busy', 'true');
+            this.dom.notice.textContent = translate('runner.flow.running', 'Running · {{count}} visits completed', { count: index });
+        }
         this._updateResultItem(index, { status: 'running' });
     }
 
@@ -191,7 +205,8 @@ export class RunnerResultsPanel {
             noLogs: this.panel.querySelector('[data-role="no-logs"]'),
             exportButton: this.panel.querySelector('[data-action="toggle-export"]'),
             exportMenu: this.panel.querySelector('[data-role="export-menu"]'),
-            source: this.panel.querySelector('[data-role="results-source"]')
+            source: this.panel.querySelector('[data-role="results-source"]'),
+            notice: this.panel.querySelector('[data-role="run-notice"]')
         };
     }
 
@@ -290,7 +305,7 @@ export class RunnerResultsPanel {
             return resultData;
         });
 
-        this._updateSummary({ ...summary.summary, totalTime: summary.totalTime });
+        this._updateSummary({ ...summary.summary, totalTime: summary.totalTime, error: summary.error, terminationReason: summary.terminationReason, plannedRequests: summary.plannedRequests, sentRequests: summary.sentRequests, totalRequests: summary.totalRequests, requests: summary.requests });
         this.setSummary(summary);
         this._setSource(label);
     }
@@ -338,6 +353,7 @@ export class RunnerResultsPanel {
 
         this.dom.resultsList.innerHTML = '';
         this.data = [];
+        if (this.timeline) { return; }
 
         const queueLength = this.selectedRequests.length;
         for (let iteration = 0; iteration < this.iterations; iteration++) {
@@ -403,7 +419,8 @@ export class RunnerResultsPanel {
 
         const nameEl = row.querySelector('[data-role="name"]');
         if (nameEl) {
-            nameEl.textContent = result.name;
+            nameEl.textContent = result.attempt
+                ? `${result.name} · ${translate('runner.flow.attempt', 'Attempt {{attempt}}', { attempt: result.attempt })}` : result.name;
         }
 
         const statusIcon = row.querySelector('[data-role="status-icon"]');
@@ -453,6 +470,20 @@ export class RunnerResultsPanel {
         row.classList.remove(...ALL_STATUS_CLASSES);
         row.classList.add(statusClass);
         row.title = result.error || '';
+        const nameEl = row.querySelector('[data-role="name"]');
+        const current = this.data[index];
+        if (nameEl && current) {
+            const attempt = current.attempt ? ` · ${translate('runner.flow.attempt', 'Attempt {{attempt}}', { attempt: current.attempt })}` : '';
+            let navigation = '';
+            const next = current.execution?.next;
+            if (next?.kind === 'request' && current.status === 'success') {
+                const target = this.selectedRequests.find(request => request.endpointId === next.target)?.name || next.target;
+                navigation = ` · ${translate('runner.flow.jump', 'Next: {{target}}', { target })}`;
+            } else if (next?.kind === 'stopIteration' && current.status === 'success') {
+                navigation = ` · ${translate('runner.flow.end_iteration', 'End iteration')}`;
+            }
+            nameEl.textContent = `${current.name}${attempt}${navigation}`;
+        }
 
         const statusCodeEl = row.querySelector('[data-role="status-code"]');
         if (statusCodeEl && result.statusCode != null) {
@@ -663,6 +694,17 @@ export class RunnerResultsPanel {
 
     /** @param {Object} results */
     _updateSummary(results) {
+        if (this.dom.notice) {
+            this.dom.notice.setAttribute('aria-busy', 'false');
+            const reason = results.terminationReason && results.terminationReason !== 'completed'
+                ? translate(`runner.flow.${results.terminationReason}`, results.terminationReason) : '';
+            const counts = results.plannedRequests === undefined ? '' : translate('runner.flow.counts', '{{visited}} visited · {{sent}} sent · {{planned}} planned', {
+                visited: results.totalRequests ?? results.requests?.length ?? 0, sent: results.sentRequests || 0, planned: results.plannedRequests
+            });
+            this.dom.notice.textContent = [results.error || reason, counts].filter(Boolean).join(' · ');
+            this.dom.notice.classList.toggle('is-hidden', !this.dom.notice.textContent);
+            this.dom.notice.classList.toggle('is-error', Boolean(results.error));
+        }
         if (this.dom.passed) {
             this.dom.passed.textContent = `${results.passed || 0}`;
         }

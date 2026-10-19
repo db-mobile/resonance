@@ -1,0 +1,27 @@
+[package]
+name = "resonance-cli"
+description = "Runs Resonance collections and runners from the command line"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "resonance"
+path = "src/main.rs"
+
+[dependencies]
+resonance-core.workspace = true
+resonance-collections.workspace = true
+clap = { version = "4", features = ["derive"] }
+tokio = { workspace = true, features = ["signal"] }
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+axum.workspace = true
+regex.workspace = true

@@ -1,0 +1,547 @@
+[
+  {
+    "name": "pre-request failures never send",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "preRequestScript": "throw new Error('pre failed')"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "sentRequests": 0
+    }
+  },
+  {
+    "name": "assertion failures persist variables for later visits",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.environment.set('token','next');pm.test('fails',()=>pm.expect(1).to.equal(2));"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/{{token}}",
+        "method": "GET",
+        "testScript": "pm.test('next',()=>pm.expect(pm.response.text()).to.equal('/next'))"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "passed": 1,
+      "sentRequests": 2,
+      "variablesSet": {
+        "token": "next"
+      }
+    }
+  },
+  {
+    "name": "404 can pass explicit tests",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/404",
+        "method": "GET",
+        "testScript": "pm.test('expected 404',()=>pm.response.to.have.status(404))"
+      }
+    ],
+    "expected": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  {
+    "name": "404 without tests fails",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/404",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "passed": 0
+    }
+  },
+  {
+    "name": "endpoint and runner scripts execute in order",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.environment.set('fromTest','yes');console.log('endpoint');",
+        "postResponseScript": "pm.test('ordering',()=>pm.expect(pm.environment.get('fromTest')).to.equal('yes'));console.log('runner');"
+      }
+    ],
+    "expected": {
+      "passed": 1,
+      "variablesSet": {
+        "fromTest": "yes"
+      }
+    }
+  },
+  {
+    "name": "scripts throw without losing previous environment writes",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.environment.set('token','kept');throw new Error('post failed')"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "variablesSet": {
+        "token": "kept"
+      }
+    }
+  },
+  {
+    "name": "skip is immediate and discards navigation",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "preRequestScript": "pm.execution.setNextRequest('missing');pm.environment.set('skip','yes');pm.execution.skipRequest();throw new Error('unreachable');"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "skipped": 1,
+      "passed": 1,
+      "sentRequests": 1,
+      "variablesSet": {
+        "skip": "yes"
+      }
+    }
+  },
+  {
+    "name": "typed locals survive across collections without persistence",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "preRequestScript": "pm.variables.set('obj',{n:7});pm.variables.set('nil',null);pm.variables.set('flag',false);"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c2",
+        "url": "{{server}}/{{nil}}/{{flag}}",
+        "method": "GET",
+        "testScript": "pm.test('typed',()=>{pm.expect(pm.variables.get('obj')).to.deep.equal({n:7});pm.expect(pm.response.text()).to.equal('/null/false');});"
+      }
+    ],
+    "expected": {
+      "passed": 2,
+      "variablesSet": {}
+    }
+  },
+  {
+    "name": "local deletion reveals iteration over environment over collection",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/{{v}}",
+        "method": "GET",
+        "preRequestScript": "pm.variables.set('v','local');pm.variables.unset('v');",
+        "testScript": "pm.test('precedence',()=>pm.expect(pm.response.text()).to.equal('/data'));"
+      }
+    ],
+    "expected": {
+      "passed": 1
+    },
+    "context": {
+      "environment": {
+        "v": "env"
+      },
+      "collections": {
+        "c1": {
+          "v": "collection"
+        }
+      }
+    },
+    "dataFile": {
+      "name": "rows.json",
+      "content": "[{\"v\":\"data\"}]"
+    }
+  },
+  {
+    "name": "environment deletion reveals collection value on later visits",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "preRequestScript": "pm.environment.unset('v');"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/{{v}}",
+        "method": "GET",
+        "testScript": "pm.test('deleted',()=>pm.expect(pm.response.text()).to.equal('/collection'))"
+      }
+    ],
+    "expected": {
+      "passed": 2,
+      "variablesSet": {
+        "v": null
+      }
+    },
+    "context": {
+      "environment": {
+        "v": "env"
+      },
+      "collections": {
+        "c1": {
+          "v": "collection"
+        }
+      }
+    }
+  },
+  {
+    "name": "iterations repeat full queue with stable flat visits",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "passed": 4,
+      "iterations": 2,
+      "totalRequests": 4
+    },
+    "options": {
+      "iterations": 2
+    }
+  },
+  {
+    "name": "CSV rows set iteration count and expose iteration data",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/{{id}}",
+        "method": "GET",
+        "testScript": "pm.test('row',()=>pm.expect(pm.response.text()).to.equal('/'+pm.iterationData.get('id')));pm.test('count',()=>pm.expect(pm.info.iterationCount).to.equal(2));"
+      }
+    ],
+    "expected": {
+      "passed": 2,
+      "iterations": 2
+    },
+    "dataFile": {
+      "name": "rows.csv",
+      "content": "id\n1\n2"
+    }
+  },
+  {
+    "name": "stop on error leaves later requests unvisited",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/404",
+        "method": "GET"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "totalRequests": 1,
+      "terminationReason": "stoppedOnError"
+    },
+    "options": {
+      "iterations": 3,
+      "stopOnError": true
+    }
+  },
+  {
+    "name": "backward branching retains queue attempt identity",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "var n=pm.variables.get('visits')||0;pm.variables.set('visits',n+1);"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c2",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "if(pm.variables.get('visits')<2)pm.execution.setNextRequest('a');"
+      }
+    ],
+    "expected": {
+      "passed": 4,
+      "sentRequests": 4
+    }
+  },
+  {
+    "name": "self branching preserves duplicate queue entries",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "if(!pm.variables.get('once')){pm.variables.set('once',true);pm.execution.setNextRequest('a')};"
+      },
+      {
+        "endpointId": "a",
+        "name": "variant",
+        "collectionId": "c1",
+        "url": "{{server}}/other",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "passed": 3,
+      "totalRequests": 3
+    }
+  },
+  {
+    "name": "stop iteration skips remaining entries then starts next",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.execution.setNextRequest(null);"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "passed": 2,
+      "iterations": 2,
+      "totalRequests": 2
+    },
+    "options": {
+      "iterations": 2
+    }
+  },
+  {
+    "name": "execution limit preserves completed partial results",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.execution.setNextRequest('a')"
+      }
+    ],
+    "expected": {
+      "passed": 2,
+      "totalRequests": 2,
+      "terminationReason": "executionLimit"
+    },
+    "options": {
+      "maxExecutionsPerIteration": 2
+    }
+  },
+  {
+    "name": "invalid target fails the current visit",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.execution.setNextRequest('missing')"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "passed": 0,
+      "totalRequests": 1,
+      "terminationReason": "invalidTarget"
+    }
+  },
+  {
+    "name": "failed tests discard navigation",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.execution.setNextRequest('missing');pm.test('fails',()=>pm.expect(1).to.equal(2))"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "passed": 1,
+      "terminationReason": "completed"
+    }
+  },
+  {
+    "name": "dynamic values are cached per visit but renewed on the next",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/{{$uuid}}",
+        "method": "GET",
+        "headers": {
+          "X-ID": "{{$uuid}}"
+        },
+        "testScript": "pm.test('same',()=>pm.expect(pm.response.text()).to.equal('/'+pm.request.headers.get('X-ID')));pm.variables.set('previous',pm.response.text());"
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/{{$uuid}}",
+        "method": "GET",
+        "testScript": "pm.test('fresh',()=>pm.expect(pm.response.text()).not.to.equal(pm.variables.get('previous')))"
+      }
+    ],
+    "expected": {
+      "passed": 2
+    }
+  },
+  {
+    "name": "response cookies are visible to post scripts",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "testScript": "pm.test('cookie',()=>pm.expect(pm.cookies.get('sid')).to.equal('abc'))"
+      }
+    ],
+    "expected": {
+      "passed": 1
+    }
+  },
+  {
+    "name": "non runnable protocol fails before scripts or network",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "protocol": "websocket",
+        "preRequestScript": "throw new Error('unreachable')"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "sentRequests": 0
+    }
+  },
+  {
+    "name": "missing collection is a per visit failure",
+    "requests": [
+      {
+        "endpointId": "a",
+        "name": "a",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET",
+        "captureError": {
+          "code": "missingCollection",
+          "details": null
+        }
+      },
+      {
+        "endpointId": "b",
+        "name": "b",
+        "collectionId": "c1",
+        "url": "{{server}}/ok",
+        "method": "GET"
+      }
+    ],
+    "expected": {
+      "failed": 1,
+      "passed": 1
+    }
+  }
+]

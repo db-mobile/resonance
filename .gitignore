@@ -39,3 +39,6 @@ coverage/
 *.temp
 
 CLAUDE.md
+
+# Workspace build output (every member builds into the root target directory)
+/target

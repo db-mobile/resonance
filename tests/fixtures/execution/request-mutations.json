@@ -1,0 +1,720 @@
+[
+  {
+    "name": "RequestBuilderService applyScriptParamMutations returns the URL unchanged when the script touched nothing",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users?a=1",
+    "request": {
+      "url": "https://api.example.com/users?a=1",
+      "queryParams": {
+        "a": "1"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations rebuilds the query string when the script mutates queryParams",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1",
+          "token": "abc"
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users?a=1&token=abc",
+    "request": {
+      "url": "https://api.example.com/users?a=1",
+      "queryParams": {
+        "a": "1",
+        "token": "abc"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations strips the query when the script empties queryParams",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {},
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users",
+    "request": {
+      "url": "https://api.example.com/users?a=1",
+      "queryParams": {},
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations drops parameters a script set to null",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users?a=1&b=2",
+        "queryParams": {
+          "a": null,
+          "b": "2"
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1&b=2",
+        "queryParams": {
+          "a": "1",
+          "b": "2"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users?b=2",
+    "request": {
+      "url": "https://api.example.com/users?a=1&b=2",
+      "queryParams": {
+        "b": "2"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations lets an explicit request.url edit supply the base for mutated queryParams",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://other.example.com/items?inline=1",
+        "queryParams": {
+          "a": "1",
+          "token": "abc"
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://other.example.com/items?a=1&token=abc",
+    "request": {
+      "url": "https://other.example.com/items?inline=1",
+      "queryParams": {
+        "a": "1",
+        "token": "abc"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations leaves an explicit request.url edit alone when params are untouched",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://other.example.com/items?inline=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://other.example.com/items?inline=1",
+    "request": {
+      "url": "https://other.example.com/items?inline=1",
+      "queryParams": {
+        "a": "1"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations re-bakes the URL from the raw template when the script mutates pathParams",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users/1?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {
+          "id": "2"
+        }
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users/1?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {
+          "id": "1"
+        }
+      },
+      "rawUrl": "https://api.example.com/users/{{id}}",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users/2?a=1",
+    "request": {
+      "url": "https://api.example.com/users/1?a=1",
+      "queryParams": {
+        "a": "1"
+      },
+      "pathParams": {
+        "id": "2"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations resolves environment variables and keeps dynamic variable values stable on re-bake",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/v/ba4dc52c-d5e0-4694-9a42-b7a2a6aba9ad/users/1",
+        "queryParams": {},
+        "pathParams": {
+          "id": "2"
+        }
+      },
+      "snapshot": {
+        "url": "https://api.example.com/v/ba4dc52c-d5e0-4694-9a42-b7a2a6aba9ad/users/1",
+        "queryParams": {},
+        "pathParams": {
+          "id": "1"
+        }
+      },
+      "rawUrl": "{{host}}/v/{{$uuid}}/users/{{id}}",
+      "variables": {
+        "host": "api.example.com"
+      },
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/v/ba4dc52c-d5e0-4694-9a42-b7a2a6aba9ad/users/2",
+    "request": {
+      "url": "https://api.example.com/v/ba4dc52c-d5e0-4694-9a42-b7a2a6aba9ad/users/1",
+      "queryParams": {},
+      "pathParams": {
+        "id": "2"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations lets an explicit request.url edit win over pathParams changes",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://other.example.com/items",
+        "queryParams": {},
+        "pathParams": {
+          "id": "2"
+        }
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users/1",
+        "queryParams": {},
+        "pathParams": {
+          "id": "1"
+        }
+      },
+      "rawUrl": "https://api.example.com/users/{{id}}",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://other.example.com/items",
+    "request": {
+      "url": "https://other.example.com/items",
+      "queryParams": {},
+      "pathParams": {
+        "id": "2"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations re-applies mutated pathParams to the mock-server path template",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "http://localhost:3000/users/1?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {
+          "id": "2"
+        }
+      },
+      "snapshot": {
+        "url": "http://localhost:3000/users/1?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {
+          "id": "1"
+        }
+      },
+      "rawUrl": "https://api.example.com/users/{{id}}",
+      "variables": {},
+      "mockRewrite": {
+        "baseUrl": "http://localhost:3000",
+        "pathTemplate": "/users/{id}"
+      }
+    },
+    "result": "http://localhost:3000/users/2?a=1",
+    "request": {
+      "url": "http://localhost:3000/users/1?a=1",
+      "queryParams": {
+        "a": "1"
+      },
+      "pathParams": {
+        "id": "2"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations normalizes script-supplied param values in place",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users",
+        "queryParams": {
+          "n": 5,
+          "o": {
+            "a": 1
+          }
+        },
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users",
+        "queryParams": {},
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users?n=5&o=%7B%22a%22%3A1%7D",
+    "request": {
+      "url": "https://api.example.com/users",
+      "queryParams": {
+        "n": "5",
+        "o": "{\"a\":1}"
+      },
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService applyScriptParamMutations treats a non-object queryParams reassignment as an empty map",
+    "method": "applyScriptParamMutations",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": "garbage",
+        "pathParams": {}
+      },
+      "snapshot": {
+        "url": "https://api.example.com/users?a=1",
+        "queryParams": {
+          "a": "1"
+        },
+        "pathParams": {}
+      },
+      "rawUrl": "https://api.example.com/users",
+      "variables": {},
+      "mockRewrite": null
+    },
+    "result": "https://api.example.com/users",
+    "request": {
+      "url": "https://api.example.com/users?a=1",
+      "queryParams": {},
+      "pathParams": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth returns false and keeps auth when the origin is unchanged",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com/v2/users",
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "auth": {
+          "username": "u",
+          "password": "p"
+        },
+        "awsAuth": {
+          "accessKeyId": "AKIA"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": false,
+    "request": {
+      "url": "https://api.example.com/v2/users",
+      "headers": {
+        "Authorization": "Bearer secret-token"
+      },
+      "auth": {
+        "username": "u",
+        "password": "p"
+      },
+      "awsAuth": {
+        "accessKeyId": "AKIA"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth strips the app-injected auth header when the host changes",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect",
+        "headers": {
+          "Authorization": "Bearer secret-token",
+          "Accept": "application/json"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://attacker.example/collect",
+      "headers": {
+        "Accept": "application/json"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth recognizes generated auth headers after scripts change their casing",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://outside.example",
+        "headers": {
+          "authorization": "Bearer secret-token"
+        }
+      },
+      "originalUrl": "https://api.example.com",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://outside.example",
+      "headers": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth strips digest and AWS credentials when the host changes",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect",
+        "headers": {},
+        "auth": {
+          "username": "u",
+          "password": "p"
+        },
+        "awsAuth": {
+          "accessKeyId": "AKIA",
+          "secretAccessKey": "x"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {},
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://attacker.example/collect",
+      "headers": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth strips NTLM credentials when the host changes",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect",
+        "headers": {},
+        "ntlm": {
+          "username": "ada",
+          "password": "hunter2",
+          "domain": "CORP",
+          "workstation": ""
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {},
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://attacker.example/collect",
+      "headers": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth strips an app-injected query api-key when the host changes",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect",
+        "headers": {},
+        "queryParams": {
+          "api_key": "k",
+          "page": "1"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {},
+        "queryParams": {
+          "api_key": "k"
+        }
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://attacker.example/collect",
+      "headers": {},
+      "queryParams": {
+        "page": "1"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth removes generated query credentials from the assembled URL while keeping explicit different values",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect?api_key=k&api_key=custom&page=1",
+        "queryParams": {
+          "api_key": "k",
+          "page": "1"
+        }
+      },
+      "originalUrl": "https://api.example.com",
+      "authData": {
+        "headers": {},
+        "queryParams": {
+          "api_key": "k"
+        }
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://attacker.example/collect?page=1&api_key=custom",
+      "queryParams": {
+        "page": "1"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth leaves a header the script overrode with a different value",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://attacker.example/collect",
+        "headers": {
+          "Authorization": "Bearer script-chosen"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": false,
+    "request": {
+      "url": "https://attacker.example/collect",
+      "headers": {
+        "Authorization": "Bearer script-chosen"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth treats a port change as a different origin",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com:8443/users",
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "https://api.example.com:8443/users",
+      "headers": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth treats a scheme downgrade to the default http port as a different origin",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "http://api.example.com/users",
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "http://api.example.com/users",
+      "headers": {}
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth treats explicit default ports as the same origin",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "https://api.example.com:443/v2/users",
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": false,
+    "request": {
+      "url": "https://api.example.com:443/v2/users",
+      "headers": {
+        "Authorization": "Bearer secret-token"
+      }
+    }
+  },
+  {
+    "name": "RequestBuilderService stripCrossOriginAuth strips credentials when the post-script URL is unparseable",
+    "method": "stripCrossOriginAuth",
+    "input": {
+      "requestConfig": {
+        "url": "not a url",
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "auth": {
+          "username": "u",
+          "password": "p"
+        }
+      },
+      "originalUrl": "https://api.example.com/users",
+      "authData": {
+        "headers": {
+          "Authorization": "Bearer secret-token"
+        },
+        "queryParams": {}
+      }
+    },
+    "result": true,
+    "request": {
+      "url": "not a url",
+      "headers": {}
+    }
+  }
+]

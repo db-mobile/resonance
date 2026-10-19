@@ -1,0 +1,6 @@
+[
+  {"input":"{{host}}/{{missing}}","variables":{"host":"{{scheme}}://api.test","scheme":"https"},"expected":"https://api.test/{{missing}}"},
+  {"input":"{{zero}}/{{flag}}/{{nil}}/{{array}}/{{object}}","variables":{"zero":0,"flag":false,"nil":null,"array":[1,2],"object":{"id":1}},"expected":"0/false/{{nil}}/1,2/[object Object]"},
+  {"input":"{{a-b}}/{{ 0.token }}","variables":{"a-b":"x","0.token":"y"},"expected":"x/y"},
+  {"input":"{{$unknown}}/{{loop}}","variables":{"loop":"{{loop}}"},"expected":"{{$unknown}}/{{loop}}"}
+]

@@ -42,3 +42,32 @@ describe('RequestQueue.appendRequests', () => {
         expect(onChange).not.toHaveBeenCalled();
     });
 });
+
+describe('RequestQueue collection binding', () => {
+    let queue;
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.join(process.cwd(), 'src/templates/runner/runnerPanel.html'), 'utf8');
+        templateLoader.cache.set(RUNNER_TEMPLATE, new DOMParser().parseFromString(html, 'text/html'));
+        queue = new RequestQueue({});
+        queue.mount(document.createElement('div'));
+    });
+
+    test('collectionId reflects the first queued request and clears with the queue', () => {
+        expect(queue.collectionId).toBeNull();
+        queue.addRequest({ id: 'c1' }, { id: 'e1', method: 'GET', path: '/a' });
+        expect(queue.collectionId).toBe('c1');
+        queue.reset();
+        expect(queue.collectionId).toBeNull();
+    });
+
+    test('entries from another collection are ignored once bound', () => {
+        queue.addRequest({ id: 'c1' }, { id: 'e1', method: 'GET', path: '/a' });
+        queue.appendRequests([
+            { collection: { id: 'c2' }, endpoint: { id: 'x', method: 'GET', path: '/x' } },
+            { collection: { id: 'c1' }, endpoint: { id: 'e2', method: 'GET', path: '/b' } }
+        ]);
+
+        expect(queue.getRequests().map(r => r.endpointId)).toEqual(['e1', 'e2']);
+    });
+});

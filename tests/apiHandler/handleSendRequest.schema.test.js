@@ -1,3 +1,4 @@
+import { installExecutionMock } from '../helpers/coreExecution.js';
 /* global document, window */
 import { requestBarMarkup, requestFormMarkup } from '../helpers/requestBarMarkup.js';
 
@@ -68,6 +69,7 @@ async function loadApiHandler() {
             validate: jest.fn().mockResolvedValue(validResult)
         }
     };
+    installExecutionMock(window.backendAPI);
     const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
     await installTestRequestPipeline(app, window.backendAPI);
 
@@ -313,17 +315,17 @@ describe('HTTP response schema validation', () => {
     test('an older error response delayed in scripts does not clear the newer badge or inference response', async () => {
         loaded = await loadApiHandler();
         const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
-        setCurrentEndpoint({ collectionId: 'collection-A', endpointId: 'endpoint-A' });
+        setCurrentEndpoint(null);
         const firstScript = deferred();
         loaded.app.scriptController = {
             executePreRequest: jest.fn((_collection, _endpoint, request) => Promise.resolve(request)),
             executeTest: jest.fn().mockReturnValueOnce(firstScript.promise).mockResolvedValue(undefined)
         };
         loaded.backendAPI.sendApiRequest
-            .mockResolvedValueOnce({ ...loaded.response, status: 500, data: { error: 'older' } })
+            .mockImplementationOnce(async () => { await firstScript.promise; return { ...loaded.response, status: 500, data: { error: 'older' } }; })
             .mockResolvedValueOnce({ ...loaded.response, data: { id: 99 } });
         const olderSend = loaded.handleSendRequest();
-        await untilCalled(loaded.app.scriptController.executeTest);
+        await untilCalled(loaded.backendAPI.sendApiRequest);
 
         await loaded.handleSendRequest();
         expect(document.querySelector('.response-validation-badge').textContent).toBe('Schema Valid');

@@ -1,6 +1,6 @@
 import { methodCarriesBody, requestSendsBody } from '../../src/modules/utils/bodyMethods.js';
 import { generateCode } from '../../src/modules/codeGenerator.js';
-import { RunnerService } from '../../src/modules/services/RunnerService.js';
+import { captureRunnerEntry } from '../../src/modules/services/CoreExecutionService.js';
 
 describe('methodCarriesBody', () => {
     test.each(['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'delete', 'PROPFIND'])('%s sends the body', (method) => {
@@ -36,15 +36,10 @@ describe('DELETE requests keep their body', () => {
     });
 
     test('in the collection runner', () => {
-        const service = new RunnerService({}, {}, null, { pipeline: {} });
-        const { body } = service._buildBody({
-            endpoint: { id: 'e1' },
-            method: 'DELETE',
-            isGraphQL: false,
-            persisted: { modifiedBody: '{"ids":[1]}', formBodyData: null },
-            overrides: {},
-            variables: {}
-        });
-        expect(body).toEqual({ ids: [1] });
+        const request = captureRunnerEntry({}, { collection: { id: 'c' }, endpoint: { id: 'e', method: 'DELETE' },
+            persisted: { modifiedBody: '{"ids":[1]}' }, inheritedAuth: [], scripts: {} });
+        expect(request.method).toBe('DELETE');
+        expect(request.body.content).toBe('{"ids":[1]}');
+
     });
 });

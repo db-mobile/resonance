@@ -43,8 +43,24 @@ if (isTauri) {
                 void _meta;
             }
         },
+        execution: {
+            request: (input) => invoke('execute_request', { input }),
+            run: (input) => invoke('execute_run', { input }),
+            cancel: (executionId) => invoke('cancel_execution', { executionId }),
+            listen: async (handler) => {
+                const internals = window.__TAURI_INTERNALS__;
+                const callback = internals.transformCallback(event => handler(event.payload));
+                let eventId;
+                try {
+                    eventId = await invoke('plugin:event|listen', { event: 'execution-event', target: { kind: 'Any' }, handler: callback });
+                } catch (error) { internals.unregisterCallback(callback); throw error; }
+                return async () => {
+                    try { await invoke('plugin:event|unlisten', { event: 'execution-event', eventId }); }
+                    finally { internals.unregisterCallback(callback); }
+                };
+            }
+        },
         sendApiRequest: (requestOptions) => invoke('send_api_request', { requestOptions }),
-        cancelApiRequest: (requestId) => invoke('cancel_api_request', { requestId }),
         pickUploadFile: () => invoke('pick_upload_file'),
         saveResponseBody: (defaultFileName, base64Data) => invoke('save_response_body', { defaultFileName, base64Data }),
         websocket: {
@@ -82,6 +98,7 @@ if (isTauri) {
             save: (collection, newRequestIds = null) => invoke('collection_save', { collection, newRequestIds }),
             delete: (collectionId) => invoke('collection_delete', { collectionId }),
             close: (collectionId) => invoke('collection_close', { collectionId }),
+            reveal: (collectionId) => invoke('collection_reveal', { collectionId }),
             openExisting: (path) => invoke('collections_open_existing', { path }),
             relocate: (collectionId, path) => invoke('collection_relocate', { collectionId, path }),
             gitBranches: () => invoke('collections_git_branches'),
@@ -96,6 +113,12 @@ if (isTauri) {
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
             importCollectionFile: (filePath = null, storageParentPath = null) => invoke('import_collection_file', { filePath, storageParentPath }),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
+            runners: {
+                list: (collectionId) => invoke('collection_runners_list', { collectionId }),
+                save: (collectionId, runner) => invoke('collection_runners_save', { collectionId, runner }),
+                delete: (collectionId, runnerId) => invoke('collection_runners_delete', { collectionId, runnerId }),
+                readData: (collectionId, path) => invoke('collection_runner_data_read', { collectionId, path })
+            },
             exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
             exportPostman: (collectionId) => invoke('export_postman', { collectionId })
         },
@@ -105,8 +128,7 @@ if (isTauri) {
         runner: {
             saveReport: (defaultFileName, content, filterName, extensions) =>
                 invoke('save_text_export', { defaultFileName, content, filterName, extensions }),
-            pickDataFile: () => invoke('pick_runner_data_file'),
-            readDataFile: (path) => invoke('read_runner_data_file', { path })
+            pickDataFile: () => invoke('pick_runner_data_file')
         },
         cookies: {
             importCookieFile: () => invoke('import_cookie_file')
@@ -159,9 +181,7 @@ if (isTauri) {
         },
         scripts: {
             get: (collectionId, endpointId) => invoke('script_get', { collectionId, endpointId }),
-            save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts }),
-            executePreRequest: (scriptData) => invoke('script_execute_pre_request', { scriptData }),
-            executeTest: (scriptData) => invoke('script_execute_test', { scriptData })
+            save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts })
         },
         updater: {
             check: () => invoke('updater_check'),

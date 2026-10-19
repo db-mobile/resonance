@@ -93,14 +93,16 @@ pub struct Endpoint {
     pub graphql_data: Option<Value>,
 }
 
-/// An environment carried inside an Insomnia export, returned to the frontend
-/// for creation through the environment manager (environment storage is
-/// frontend-owned).
-#[derive(Serialize)]
+/// An environment carried inside an Insomnia export or read from a Postman
+/// environment file, returned to the frontend for creation through the
+/// environment manager (environment storage is frontend-owned).
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedEnvironmentResult {
     pub name: String,
     pub variables: Value,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub secret_keys: Vec<String>,
 }
 
 /// Result of the consolidated collection import: the created collection tagged
@@ -221,6 +223,7 @@ pub async fn import_collection_file(
                     .map(|env| ImportedEnvironmentResult {
                         name: env.name,
                         variables: Value::Object(env.variables),
+                        secret_keys: Vec::new(),
                     })
                     .collect(),
                 skipped_requests: import.skipped_requests,
@@ -279,32 +282,75 @@ pub async fn import_cookie_file(app: AppHandle) -> Result<Option<Value>, String>
 }
 
 #[tauri::command]
-pub async fn import_postman_environment(app: AppHandle) -> Result<Option<Value>, String> {
+pub async fn import_postman_environment(
+    app: AppHandle,
+) -> Result<Option<ImportedEnvironmentResult>, String> {
     let Some(file_path) = pick_import_file_with_kind(&app, "postman_environment").await? else {
         return Ok(None);
     };
 
     let content =
-        std::fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     let env: Value = serde_json::from_str(content.trim_start_matches('\u{feff}'))
         .map_err(|e| format!("Failed to parse Postman environment: {}", e))?;
 
-    // Extract variables
-    let mut variables = HashMap::new();
+    let fallback_name = file_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("Imported Environment");
 
-    if let Some(values) = env.get("values").and_then(|v| v.as_array()) {
-        for value in values {
-            if let (Some(key), Some(val)) = (
-                value.get("key").and_then(|k| k.as_str()),
-                value.get("value").and_then(|v| v.as_str()),
-            ) {
-                variables.insert(key.to_string(), val.to_string());
-            }
+    parse_postman_environment(&env, fallback_name).map(Some)
+}
+
+/// Postman marks secrets with `type: "secret"`; disabled entries are skipped
+/// and scalar values are kept as strings.
+fn parse_postman_environment(
+    env: &Value,
+    fallback_name: &str,
+) -> Result<ImportedEnvironmentResult, String> {
+    let values = env
+        .get("values")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "Not a Postman environment file".to_string())?;
+
+    let name = env
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or(fallback_name)
+        .to_string();
+
+    let mut variables = serde_json::Map::new();
+    let mut secret_keys = Vec::new();
+
+    for entry in values {
+        if entry.get("enabled").and_then(Value::as_bool) == Some(false) {
+            continue;
         }
+        let Some(key) = entry.get("key").and_then(Value::as_str) else {
+            continue;
+        };
+        let value = match entry.get("value") {
+            Some(Value::String(text)) => text.clone(),
+            Some(Value::Number(number)) => number.to_string(),
+            Some(Value::Bool(flag)) => flag.to_string(),
+            _ => String::new(),
+        };
+        if entry.get("type").and_then(Value::as_str) == Some("secret")
+            && !secret_keys.iter().any(|existing| existing == key)
+        {
+            secret_keys.push(key.to_string());
+        }
+        variables.insert(key.to_string(), Value::String(value));
     }
 
-    Ok(Some(serde_json::to_value(variables).unwrap()))
+    Ok(ImportedEnvironmentResult {
+        name,
+        variables: Value::Object(variables),
+        secret_keys,
+    })
 }
 
 #[tauri::command]
@@ -510,7 +556,7 @@ const MAX_RUNNER_DATA_FILE_BYTES: u64 = 10 * 1024 * 1024;
 
 /// Read a collection-runner data file. Only `.csv` and `.json` are accepted
 /// because the path is stored with the runner and re-read on later runs.
-fn read_runner_data(path: &Path) -> Result<Value, String> {
+pub(crate) fn read_runner_data(path: &Path) -> Result<Value, String> {
     let extension = path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -547,15 +593,69 @@ pub async fn pick_runner_data_file(app: AppHandle) -> Result<Option<Value>, Stri
     read_runner_data(&file_path).map(Some)
 }
 
-#[tauri::command]
-pub async fn read_runner_data_file(path: String) -> Result<Value, String> {
-    read_runner_data(Path::new(&path))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn postman_environment_keeps_name_values_and_secret_keys() {
+        let env = json!({
+            "name": "Staging",
+            "values": [
+                { "key": "baseUrl", "value": "https://staging.example.com", "enabled": true },
+                { "key": "token", "value": "s3cret", "type": "secret", "enabled": true },
+                { "key": "unused", "value": "x", "enabled": false },
+                { "key": "port", "value": 8080 },
+                { "key": "debug", "value": true },
+                { "value": "no key" }
+            ]
+        });
+
+        let result = parse_postman_environment(&env, "file").unwrap();
+
+        assert_eq!(result.name, "Staging");
+        assert_eq!(
+            result.variables,
+            json!({
+                "baseUrl": "https://staging.example.com",
+                "token": "s3cret",
+                "port": "8080",
+                "debug": "true"
+            })
+        );
+        assert_eq!(result.secret_keys, vec!["token".to_string()]);
+    }
+
+    #[test]
+    fn postman_environment_without_a_name_uses_the_fallback() {
+        let env = json!({ "name": "  ", "values": [] });
+
+        let result = parse_postman_environment(&env, "dev.postman_environment").unwrap();
+
+        assert_eq!(result.name, "dev.postman_environment");
+    }
+
+    #[test]
+    fn postman_environment_rejects_other_json() {
+        let error = parse_postman_environment(&json!({ "info": {}, "item": [] }), "x").unwrap_err();
+
+        assert_eq!(error, "Not a Postman environment file");
+    }
+
+    #[test]
+    fn imported_environment_omits_empty_secret_keys() {
+        let result = ImportedEnvironmentResult {
+            name: "Env".to_string(),
+            variables: json!({}),
+            secret_keys: Vec::new(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            json!({ "name": "Env", "variables": {} })
+        );
+    }
 
     #[test]
     fn runner_data_is_read_with_the_bom_stripped() {

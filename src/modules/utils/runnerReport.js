@@ -12,6 +12,7 @@ export const MAX_SUMMARY_REQUESTS = 2000;
 export function summarizeRun(results) {
     const requests = (results.requests || []).map(request => ({
         iteration: request.iteration || 1,
+        ...(request.attempt !== undefined ? { attempt: request.attempt, queuePosition: request.queuePosition, index: request.index, execution: request.execution || null } : {}),
         name: request.name || '',
         method: request.method || '',
         path: request.path || '',
@@ -34,12 +35,14 @@ export function summarizeRun(results) {
         finishedAt: results.endTime ?? results.finishedAt ?? null,
         totalTime: results.totalTime ?? 0,
         iterations: results.iterations || 1,
+        ...(results.plannedRequests !== undefined ? { plannedRequests: results.plannedRequests, sentRequests: results.sentRequests || 0,
+            totalRequests: results.totalRequests ?? requests.length, terminationReason: results.terminationReason || 'completed', error: results.error || null } : {}),
         summary: {
             passed: results.passed ?? results.summary?.passed ?? 0,
             failed: results.failed ?? results.summary?.failed ?? 0,
             skipped: results.skipped ?? results.summary?.skipped ?? 0
         },
-        truncated: requests.length > MAX_SUMMARY_REQUESTS,
+        truncated: Boolean(results.truncated) || requests.length > MAX_SUMMARY_REQUESTS,
         requests: requests.slice(0, MAX_SUMMARY_REQUESTS)
     };
 }
@@ -108,7 +111,11 @@ function testCasesFor(request) {
  * @returns {string}
  */
 export function toJunitXml(summary) {
-    const scored = summary.requests.map(request => {
+    const requests = [...summary.requests];
+    if (summary.error && !requests.some(request => request.status === 'error' && request.error === summary.error)) {
+        requests.push({ name: 'Runner execution', method: '', status: 'error', error: summary.error, tests: [] });
+    }
+    const scored = requests.map(request => {
         const cases = testCasesFor(request);
         return {
             request,
@@ -119,7 +126,7 @@ export function toJunitXml(summary) {
     });
 
     const suites = scored.map(({ request, cases, failures, skipped }) => {
-        const label = `${request.method} ${request.name}`.trim();
+        const label = `${request.method} ${request.name}${request.attempt ? ` · Attempt ${request.attempt}` : ''}`.trim();
         const name = summary.iterations > 1 ? `Iteration ${request.iteration} › ${label}` : label;
         const caseTime = seconds(cases.length > 0 ? (request.time || 0) / cases.length : 0);
 

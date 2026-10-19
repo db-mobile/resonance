@@ -8,7 +8,7 @@ export default [
             'dist/**',
             'coverage/**',
             'node_modules/**',
-            'src-tauri/target/**',
+            '**/target/**',
             '**/*.bundle.js',
             'build.js',
             '*.html',
@@ -162,7 +162,7 @@ export default [
     // Glue evaluated inside the Boa script engine (src-tauri): a classic
     // script in the same ES5 style as the glue embedded in scripts.rs
     {
-        files: ['src-tauri/src/commands/script_glue/**/*.js'],
+        files: ['crates/resonance-core/src/script_glue/**/*.js'],
         languageOptions: {
             sourceType: 'script',
             globals: {
@@ -176,7 +176,10 @@ export default [
                 __randomUUID__: 'readonly',
                 __collectionVariables__: 'readonly',
                 __setCollectionVariable__: 'readonly',
-                __environmentVariables__: 'readonly'
+                __environmentVariables__: 'readonly',
+                __localVariables__: 'readonly',
+                __setLocalVariable__: 'readonly',
+                __unsetLocalVariable__: 'readonly'
             }
         },
         rules: {

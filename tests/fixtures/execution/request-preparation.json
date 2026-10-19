@@ -1,0 +1,2607 @@
+[
+  {
+    "name": "RunnerService _buildRequestConfig with per-request overrides should prefer overrides over persisted config",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "{{baseUrl}}/users/{{userId}}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {
+        "userId": "override-id"
+      },
+      "headers": {
+        "X-Override": "yes"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "overridden"
+        }
+      ],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"from\":\"override\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [
+        "userId"
+      ],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "baseUrl": "https://api.test"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/users/override-id?q=overridden",
+      "rawUrl": "{{baseUrl}}/users/{{userId}}",
+      "headers": {
+        "X-Override": "yes"
+      },
+      "queryParams": {
+        "q": "overridden"
+      },
+      "pathParams": {
+        "userId": "override-id"
+      },
+      "body": {
+        "from": "override"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with per-request overrides honors explicitly cleared overrides instead of resurrecting persisted config",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "{{baseUrl}}/users/{{userId}}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [
+        "userId"
+      ],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "baseUrl": "https://api.test"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/users/persisted-id",
+      "rawUrl": "{{baseUrl}}/users/{{userId}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with per-request overrides empty path params still fall back so URL templates keep their values",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "{{baseUrl}}/users/{{userId}}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [
+        "userId"
+      ],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "baseUrl": "https://api.test"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/users/persisted-id",
+      "rawUrl": "{{baseUrl}}/users/{{userId}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with per-request overrides should behave as before when no overrides are provided",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "{{baseUrl}}/users/{{userId}}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "headers": {
+        "X-Persisted": "persisted"
+      },
+      "queryRows": [
+        {
+          "key": "persistedQ",
+          "value": "pq"
+        }
+      ],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"from\":\"collection\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [
+        "userId"
+      ],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "baseUrl": "https://api.test"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/users/persisted-id?persistedQ=pq",
+      "rawUrl": "{{baseUrl}}/users/{{userId}}",
+      "headers": {
+        "X-Persisted": "persisted"
+      },
+      "queryParams": {
+        "persistedQ": "pq"
+      },
+      "pathParams": {
+        "userId": "persisted-id"
+      },
+      "body": {
+        "from": "collection"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with form and binary bodies should assemble form-data rows, filter disabled rows, and substitute variables",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/upload",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "formdata",
+        "content": "",
+        "fields": [
+          {
+            "key": "title",
+            "value": "{{val}}",
+            "type": "text",
+            "filePath": "",
+            "contentType": "",
+            "enabled": true
+          },
+          {
+            "key": "skipped",
+            "value": "x",
+            "type": "text",
+            "filePath": "",
+            "contentType": "",
+            "enabled": false
+          },
+          {
+            "key": "avatar",
+            "value": "",
+            "type": "file",
+            "filePath": "{{dir}}/pic.png",
+            "contentType": "image/png",
+            "enabled": true
+          }
+        ],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "val": "hello",
+      "dir": "/tmp"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/upload",
+      "rawUrl": "https://api.test/upload",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "body": [
+        {
+          "key": "title",
+          "value": "hello",
+          "type": "text"
+        },
+        {
+          "key": "avatar",
+          "value": "",
+          "type": "file",
+          "filePath": "/tmp/pic.png",
+          "contentType": "image/png"
+        }
+      ],
+      "bodyType": "formdata",
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with form and binary bodies should convert legacy flat-object fields to rows",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/upload",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "urlencoded",
+        "content": "",
+        "fields": [
+          {
+            "key": "a",
+            "value": "1",
+            "type": "text",
+            "filePath": "",
+            "contentType": "",
+            "enabled": true
+          },
+          {
+            "key": "b",
+            "value": "2",
+            "type": "text",
+            "filePath": "",
+            "contentType": "",
+            "enabled": true
+          }
+        ],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/upload",
+      "rawUrl": "https://api.test/upload",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "body": [
+        {
+          "key": "a",
+          "value": "1",
+          "type": "text"
+        },
+        {
+          "key": "b",
+          "value": "2",
+          "type": "text"
+        }
+      ],
+      "bodyType": "urlencoded",
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with form and binary bodies should assemble binary bodies with variable substitution",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/upload",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "binary",
+        "content": "",
+        "fields": [],
+        "filePath": "{{dir}}/payload.bin",
+        "contentType": "application/pdf",
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "dir": "/tmp"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/upload",
+      "rawUrl": "https://api.test/upload",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "body": {
+        "filePath": "/tmp/payload.bin",
+        "contentType": "application/pdf"
+      },
+      "bodyType": "binary",
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with form and binary bodies sends text-mode bodies as text instead of a JSON string literal",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/upload",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "text",
+        "content": "hello {{name}}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "name": "ada"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "POST",
+      "url": "https://api.test/upload",
+      "rawUrl": "https://api.test/upload",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "body": "hello ada",
+      "bodyType": "text",
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path builds a GraphQL POST from the persisted query, variables and operation name",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/graphql",
+      "method": "GET",
+      "protocol": "graphql",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": {
+          "query": "query Get($id: ID!) { user(id: $id) { name } }",
+          "variables": "{\"id\": \"{{userId}}\"}",
+          "operationName": "Get"
+        }
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "userId": "7"
+    },
+    "expected": {
+      "protocol": "graphql",
+      "method": "POST",
+      "url": "https://api.test/graphql",
+      "rawUrl": "{{baseUrl}}/graphql",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "body": {
+        "query": "query Get($id: ID!) { user(id: $id) { name } }",
+        "variables": {
+          "id": "7"
+        },
+        "operationName": "Get"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path keeps empty-valued and duplicate query params in order",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [
+        {
+          "key": "tag",
+          "value": "a"
+        },
+        {
+          "key": "flag",
+          "value": ""
+        },
+        {
+          "key": "tag",
+          "value": "b"
+        }
+      ],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items?tag=a&flag=&tag=b",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {
+        "tag": "b",
+        "flag": ""
+      },
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path uses the persisted editor URL when the endpoint has one",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "https://other.test/v2/items",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://other.test/v2/items",
+      "rawUrl": "https://other.test/v2/items",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path substitutes OpenAPI single-brace path parameters",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/users/{id}",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [
+        "id"
+      ],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users/42",
+      "rawUrl": "{{baseUrl}}/users/{{id}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path passes the TLS and redirect settings through",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 0,
+        "verifySsl": false,
+        "followRedirects": false
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": null,
+      "verifySsl": false,
+      "followRedirects": false
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path adds api-key query auth to the URL",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{key}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "key": "s3cret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items?api_key=s3cret",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {
+        "api_key": "s3cret"
+      },
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path falls back to the bearerToken variable for an empty bearer token",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": ""
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "bearerToken": "tok"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {
+        "Authorization": "Bearer tok"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig parity with the editor send path interpolates variables into NTLM credentials",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "ntlm",
+        "config": {
+          "username": "{{u}}",
+          "password": "{{p}}",
+          "domain": "CORP",
+          "workstation": ""
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "u": "ada",
+      "p": "pw"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true,
+      "ntlm": {
+        "username": "ada",
+        "password": "pw",
+        "domain": "CORP",
+        "workstation": ""
+      }
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance endpoint without persisted auth inherits the collection auth",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "shared-token"
+            }
+          },
+          "source": {
+            "kind": "collection"
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {
+        "Authorization": "Bearer shared-token"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance explicit persisted none opts out of collection auth",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "none",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "shared-token"
+            }
+          },
+          "source": {
+            "kind": "collection"
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance persisted endpoint auth wins over collection auth",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "endpoint-token"
+        }
+      },
+      "inheritedAuth": [
+        {
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "shared-token"
+            }
+          },
+          "source": {
+            "kind": "collection"
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {
+        "Authorization": "Bearer endpoint-token"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance persisted inherit resolves to collection auth with variable substitution",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "{{apiToken}}"
+            }
+          },
+          "source": {
+            "kind": "collection"
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "apiToken": "resolved-secret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {
+        "Authorization": "Bearer resolved-secret"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance an expired inherited OAuth token is renewed, sent and saved back to the collection",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "authConfig": {
+            "type": "oauth2",
+            "config": {
+              "token": "stale",
+              "expiresAt": 1792341890496,
+              "refreshToken": "r1",
+              "tokenUrl": "https://{{authHost}}/token",
+              "clientId": "app"
+            }
+          },
+          "source": {
+            "kind": "collection"
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "authHost": "auth.test"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {
+        "Authorization": "Bearer fresh"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    },
+    "refreshedAuth": {
+      "type": "oauth2",
+      "config": {
+        "token": "fresh",
+        "expiresAt": 1792341890496,
+        "refreshToken": "r1",
+        "tokenUrl": "https://{{authHost}}/token",
+        "clientId": "app"
+      }
+    }
+  },
+  {
+    "name": "RunnerService _buildRequestConfig with collection auth inheritance inherit with no collection auth sends unauthenticated",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/users",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/users",
+      "rawUrl": "https://api.test/users",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline runs tests on a 404 and passes when they pass",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline fails a non-2xx response without tests and reports the status",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline runs the endpoint pre-request and test scripts before the runner script",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline sends jar cookies and stores Set-Cookie values",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline records a history entry for each request",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline tells pre-request and test scripts which iteration and data row they run in",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "email": "cy@x.io"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService _executeRequest through the shared script and cookie pipeline a request run outside the iteration loop is iteration 0 of 1",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/x",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/x",
+      "rawUrl": "{{baseUrl}}/x",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline strips old generated header auth when local refresh and script map edits accompany an origin change",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{credential}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "credential": "original-secret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {
+        "Authorization": "Bearer original-secret"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline strips old generated header auth when local refresh and script map edits accompany an origin change",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{credential}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "credential": "renewed-secret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {
+        "Authorization": "Bearer renewed-secret"
+      },
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline strips old generated query auth when local refresh and script map edits accompany an origin change",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{credential}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "credential": "original-secret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items?api_key=original-secret",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {
+        "api_key": "original-secret"
+      },
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline strips old generated query auth when local refresh and script map edits accompany an origin change",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "/items",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{credential}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "credential": "renewed-secret"
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items?api_key=renewed-secret",
+      "rawUrl": "{{baseUrl}}/items",
+      "headers": {},
+      "queryParams": {
+        "api_key": "renewed-secret"
+      },
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline runs actual script orchestration for skips, typed local chaining, and per-iteration termination",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "skip",
+      "name": "",
+      "path": "/skip",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/skip",
+      "rawUrl": "{{baseUrl}}/skip",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline runs actual script orchestration for skips, typed local chaining, and per-iteration termination",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "send",
+      "name": "",
+      "path": "/{{token}}",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "token": "chained",
+      "typed": {
+        "valid": false,
+        "count": 0
+      }
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/chained",
+      "rawUrl": "{{baseUrl}}/{{token}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline runs actual script orchestration for skips, typed local chaining, and per-iteration termination",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "skip",
+      "name": "",
+      "path": "/skip",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "token": "chained",
+      "typed": {
+        "valid": false,
+        "count": 0
+      }
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/skip",
+      "rawUrl": "{{baseUrl}}/skip",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService request chaining timeline runs actual script orchestration for skips, typed local chaining, and per-iteration termination",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "send",
+      "name": "",
+      "path": "/{{token}}",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {
+      "token": "chained",
+      "typed": {
+        "valid": false,
+        "count": 0
+      }
+    },
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/chained",
+      "rawUrl": "{{baseUrl}}/{{token}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService dynamic variables per request two requests in one run resolve {{$uuid}} independently",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/items/{{$uuid}}",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items/377f082e-ad88-4332-b3e7-6e6728ecb4e6",
+      "rawUrl": "https://api.test/items/{{$uuid}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  },
+  {
+    "name": "RunnerService dynamic variables per request two requests in one run resolve {{$uuid}} independently",
+    "request": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "",
+      "path": "https://api.test/items/{{$uuid}}",
+      "method": "GET",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "",
+      "defaultHeaders": {},
+      "pathParams": {},
+      "headers": {},
+      "queryRows": [],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "pathParameterNames": [],
+      "bearerFallback": true
+    },
+    "context": {
+      "settings": {
+        "httpVersion": "auto",
+        "requestTimeout": 30000,
+        "verifySsl": true,
+        "followRedirects": true
+      }
+    },
+    "variables": {},
+    "expected": {
+      "protocol": "http",
+      "method": "GET",
+      "url": "https://api.test/items/5f3f512e-c09c-4556-a9dd-4d89abce637a",
+      "rawUrl": "https://api.test/items/{{$uuid}}",
+      "headers": {},
+      "queryParams": {},
+      "pathParams": {},
+      "httpVersion": "auto",
+      "timeout": 30000,
+      "verifySsl": true,
+      "followRedirects": true
+    }
+  }
+]

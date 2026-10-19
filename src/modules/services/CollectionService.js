@@ -123,6 +123,14 @@ export class CollectionService {
 
     /**
      * @param {string} collectionId
+     * @returns {Promise<void>}
+     */
+    async revealCollection(collectionId) {
+        await this.repository.reveal(collectionId);
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} path
      * @returns {Promise<Object>}
      */

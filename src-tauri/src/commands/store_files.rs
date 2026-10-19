@@ -189,6 +189,7 @@ mod tests {
             "linkedCollections",
             "proxySettings",
             "persistedScripts",
+            "collectionRunners",
             "theme",
             "accent",
             "sidebarWidth",

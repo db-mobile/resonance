@@ -128,7 +128,8 @@
     "import_success": "Coleção importada com sucesso",
     "import_error": "Falha ao importar coleção",
     "close_title": "Fechar coleção",
-    "confirm_close": "Remover \"{{name}}\" da lista?\n\nA pasta e seus arquivos permanecem no disco, e as credenciais salvas são mantidas. Você pode abri-la novamente depois."
+    "confirm_close": "Remover \"{{name}}\" da lista?\n\nA pasta e seus arquivos permanecem no disco, e as credenciais salvas são mantidas. Você pode abri-la novamente depois.",
+    "reveal_failed": "Não foi possível mostrar a pasta da coleção: {{message}}"
   },
   "endpoint": {
     "delete_title": "Excluir Requisição",
@@ -162,7 +163,8 @@
     "rename_folder": "Renomear pasta",
     "delete_folder": "Excluir pasta",
     "duplicate_request": "Duplicar requisição",
-    "move_request": "Mover para pasta…"
+    "move_request": "Mover para pasta…",
+    "show_in_file_manager": "Mostrar no gerenciador de arquivos"
   },
   "docs": {
     "title": "Gerar Documentação",
@@ -536,7 +538,7 @@
     "status_skipped": "Ignorada",
     "status_failed": "Falhou",
     "status_pending": "Pendente",
-    "request_missing": "Esta requisição não existe mais em nenhuma coleção aberta",
+    "request_missing": "Esta requisição não existe mais na sua coleção",
     "untitled": "Runner sem título",
     "loaded": "Runner carregado: {{name}}",
     "created": "Runner \"{{name}}\" criado",
@@ -574,10 +576,10 @@
     "running_requests_other": "Executando {{count}} requisições...",
     "tests_failed_one": "{{count}} teste falhou",
     "tests_failed_other": "{{count}} testes falharam",
-    "relinked_one": "{{count}} requisição revinculada às coleções abertas",
-    "relinked_other": "{{count}} requisições revinculadas às coleções abertas",
-    "missing_requests_one": "{{count}} requisição de \"{{name}}\" não existe mais em nenhuma coleção aberta",
-    "missing_requests_other": "{{count}} requisições de \"{{name}}\" não existem mais em nenhuma coleção aberta",
+    "relinked_one": "{{count}} requisição revinculada dentro da sua coleção",
+    "relinked_other": "{{count}} requisições revinculadas dentro da sua coleção",
+    "missing_requests_one": "{{count}} requisição em “{{name}}” não existe mais na sua coleção",
+    "missing_requests_other": "{{count}} requisições em “{{name}}” não existem mais na sua coleção",
     "add_all": "Adicionar todas as requisições",
     "nothing_runnable": "Não há requisições HTTP ou GraphQL para executar aqui",
     "iterations": "Iterações",
@@ -608,7 +610,35 @@
     "history_failed": "{{count}} com falha",
     "history_source": "Execução de {{date}}",
     "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies",
-    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}"
+    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}",
+    "flow": {
+      "max_executions": "Máx. execuções / iteração",
+      "invalid_limit": "O máximo de execuções deve ser um inteiro entre {{min}} e {{max}}.",
+      "limit_reached": "Limite de {{limit}} execuções atingido na iteração {{iteration}}.",
+      "ambiguous_target": "A próxima requisição \"{{target}}\" é ambígua na seleção.",
+      "missing_target": "A próxima requisição \"{{target}}\" não está na seleção.",
+      "skipped": "Ignorada pelo script prévio",
+      "running": "Em execução · {{count}} etapas concluídas",
+      "attempt": "Tentativa {{attempt}}",
+      "counts": "{{visited}} etapas · {{sent}} enviadas · {{planned}} planejadas",
+      "stoppedByUser": "Interrompido pelo usuário",
+      "stoppedOnError": "Interrompido após falha de requisição",
+      "executionLimit": "Limite de execuções atingido",
+      "invalidTarget": "Próxima requisição inválida",
+      "executionError": "Erro de execução",
+      "jump": "Próxima: {{target}}",
+      "end_iteration": "Encerrar iteração"
+    },
+    "collection_locked": "Este runner pertence a “{{name}}”. Inicie um novo runner para usar outra coleção.",
+    "in_collection": "em {{name}}",
+    "no_collection": "Adicione uma requisição primeiro para que o runner pertença a uma coleção",
+    "data_file_not_portable": "Fora da pasta da coleção: este caminho só funciona nesta máquina",
+    "migration_moved_one": "{{count}} runner salvo movido para a pasta da sua coleção",
+    "migration_moved_other": "{{count}} runners salvos movidos para as pastas das suas coleções",
+    "migration_dropped_one": "{{count}} runner perdeu requisições de outras coleções: {{names}}",
+    "migration_dropped_other": "{{count}} runners perderam requisições de outras coleções: {{names}}",
+    "migration_skipped_one": "{{count}} runner salvo não tem requisições e não foi movido",
+    "migration_skipped_other": "{{count}} runners salvos não têm requisições e não foram movidos"
   },
   "mqtt": {
     "title": "MQTT",

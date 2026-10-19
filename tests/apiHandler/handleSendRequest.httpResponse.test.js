@@ -1,3 +1,4 @@
+import { installExecutionMock } from '../helpers/coreExecution.js';
 /* global document, window */
 import { requestBarMarkup, requestFormMarkup } from '../helpers/requestBarMarkup.js';
 
@@ -46,6 +47,7 @@ async function loadApiHandler(sendResult) {
         sendApiRequest: jest.fn().mockResolvedValue(sendResult)
     };
 
+    installExecutionMock(window.backendAPI);
     const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
     await installTestRequestPipeline(app, window.backendAPI);
 
@@ -114,7 +116,7 @@ describe('HTTP responses of every status are treated as responses', () => {
         expect(saved.status).toBe(500);
         expect(saved.data).toEqual({ error: 'boom' });
         expect(saved.cookies.map(c => c.name)).toEqual(['a', 'b']);
-        expect(handleCookiesFromResponse).toHaveBeenCalledWith(['a=1; Path=/', 'b=2; Path=/'], 'https://api.example.com/items');
+        expect(handleCookiesFromResponse).not.toHaveBeenCalled(); // Cookie deltas are persisted by CoreExecutionService.
         expect(document.getElementById('status-display').textContent).toContain('500');
         delete app.workspaceTabController;
         delete app.cookieController;
@@ -168,12 +170,12 @@ describe('cancelling targets the active tab\'s own request', () => {
 
     test('cancel sends the id of the request running in the active tab', async () => {
         const { handleCancelRequest, sending, finish, app } = await startPendingSend();
-        const { requestId } = window.backendAPI.sendApiRequest.mock.calls[0][0];
+        const { executionId: requestId } = window.backendAPI.execution.request.mock.calls[0][0];
 
         await handleCancelRequest();
 
         expect(requestId).toEqual(expect.any(String));
-        expect(window.backendAPI.cancelApiRequest).toHaveBeenCalledWith(requestId);
+        expect(window.backendAPI.execution.cancel).toHaveBeenCalledWith(requestId);
         finish({ cancelled: true, success: false });
         await sending;
         delete app.workspaceTabController;
@@ -186,7 +188,7 @@ describe('cancelling targets the active tab\'s own request', () => {
 
         await handleCancelRequest();
 
-        expect(window.backendAPI.cancelApiRequest).not.toHaveBeenCalled();
+        expect(window.backendAPI.execution.cancel).not.toHaveBeenCalled();
         finish({ success: true, status: 200, headers: {}, data: 'ok' });
         await sending;
         delete app.workspaceTabController;
@@ -207,56 +209,8 @@ describe('cancelling a unary gRPC call', () => {
         await loaded.handleCancelRequest();
 
         expect(window.backendAPI.grpc.unaryCancel).toHaveBeenCalledWith('grpc-req-1');
-        expect(window.backendAPI.cancelApiRequest).not.toHaveBeenCalled();
+        expect(window.backendAPI.execution.cancel).not.toHaveBeenCalled();
         untrack();
-        delete loaded.app.workspaceTabController;
-        delete loaded.app.cookieController;
-    });
-});
-
-describe('OAuth tokens are renewed before sending', () => {
-    test('an expired request-level token is refreshed, sent, and shown in the auth form', async () => {
-        const loaded = await loadApiHandler({ success: true, status: 200, headers: {}, data: 'ok' });
-        const { authManager } = loaded.app;
-        authManager.currentAuthConfig = {
-            type: 'oauth2',
-            config: { token: 'stale', expiresAt: Date.now() - 1000, refreshToken: 'r1', tokenUrl: 'https://auth.test/token', clientId: 'app' }
-        };
-        window.backendAPI.oauth2 = { getToken: jest.fn().mockResolvedValue({ success: true, accessToken: 'fresh', expiresIn: 60 }) };
-
-        await loaded.handleSendRequest();
-
-        expect(window.backendAPI.oauth2.getToken).toHaveBeenCalledWith(expect.objectContaining({ grantType: 'refresh_token' }));
-        const sent = window.backendAPI.sendApiRequest.mock.calls[0][0];
-        expect(sent.headers.Authorization).toBe('Bearer fresh');
-        expect(authManager.currentAuthConfig.config.token).toBe('fresh');
-        expect(authManager.currentAuthConfig.config.expiresAt).toBeGreaterThan(Date.now());
-        delete loaded.app.workspaceTabController;
-        delete loaded.app.cookieController;
-    });
-});
-
-describe('a failing pre-request script stops the send', () => {
-    test('the request is not sent and the error is shown in its place', async () => {
-        const loaded = await loadApiHandler({ success: true, status: 200, headers: {}, data: 'ok' });
-        const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
-        const { toast } = await import('../../src/modules/ui/Toast.js');
-        const toastError = jest.spyOn(toast, 'error').mockImplementation(() => {});
-        setCurrentEndpoint({ collectionId: 'c1', endpointId: 'e1' });
-        const scriptError = new Error('ReferenceError: foo is not defined');
-        scriptError.name = 'PreRequestScriptError';
-        loaded.app.scriptController = { executePreRequest: jest.fn().mockRejectedValue(scriptError) };
-
-        await loaded.handleSendRequest();
-
-        expect(loaded.app.scriptController.executePreRequest).toHaveBeenCalled();
-        expect(window.backendAPI.sendApiRequest).not.toHaveBeenCalled();
-        expect(document.getElementById('status-display').textContent).toContain('Pre-request script error');
-        expect(toastError).toHaveBeenCalledWith(expect.stringContaining('foo is not defined'));
-        expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
-        toastError.mockRestore();
-        setCurrentEndpoint(null);
-        delete loaded.app.scriptController;
         delete loaded.app.workspaceTabController;
         delete loaded.app.cookieController;
     });

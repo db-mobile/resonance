@@ -371,6 +371,7 @@ mod tests {
 
         assert!(collection.join("collection.yaml").exists());
         assert!(!collection.join("collection.json").exists());
+        assert!(!collection.join("runners").exists());
         let request = fs::read_to_string(collection.join("list.yaml")).unwrap();
         assert!(request.contains("check();"), "{}", request);
         let main = read_main(temp.path());
