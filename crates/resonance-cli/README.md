@@ -13,7 +13,7 @@ Download the archive for your platform from the
 verify it against `SHA256SUMS`, and put the `resonance` binary on your `PATH`:
 
 ```sh
-VERSION=3.4.0
+VERSION=3.5.0
 curl -fsSLO "https://github.com/db-mobile/resonance/releases/download/v${VERSION}/resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
 tar -xzf "resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
 sudo install "resonance-cli_${VERSION}_x86_64-unknown-linux-musl/resonance" /usr/local/bin/
@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install Resonance CLI
         run: |
-          VERSION=3.4.0
+          VERSION=3.5.0
           curl -fsSLO "https://github.com/db-mobile/resonance/releases/download/v${VERSION}/resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
           tar -xzf "resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
           sudo install "resonance-cli_${VERSION}_x86_64-unknown-linux-musl/resonance" /usr/local/bin/
