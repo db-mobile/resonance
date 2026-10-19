@@ -13,7 +13,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 [![CI](https://img.shields.io/github/actions/workflow/status/db-mobile/resonance/ci.yml?branch=main&label=CI)](https://github.com/db-mobile/resonance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/db-mobile/resonance)](LICENSE)
 
-[Installation](#installation) · [Features](#features) · [Screenshots](#screenshots) · [Documentation](https://db-mobile.github.io/resonance/) · [Scripting](SCRIPTS.md) · [Contributing](#contributing)
+[Installation](#installation) · [Features](#features) · [Command line](#command-line) · [Screenshots](#screenshots) · [Documentation](https://db-mobile.github.io/resonance/) · [Scripting](SCRIPTS.md) · [Contributing](#contributing)
 
 <a href="https://flathub.org/apps/io.github.db_mobile.resonance"><img height="52" alt="Get it on Flathub" src="https://flathub.org/api/badge?svg&locale=en"></a>
 &nbsp;
@@ -29,7 +29,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **Genuinely lightweight** — built with Tauri and a Rust backend: ~15 MB bundle size, ~50 MB memory footprint.
 - **Every protocol you need** — REST, GraphQL (incl. subscriptions), gRPC (with server reflection), WebSocket, Server-Sent Events, and MQTT in one client.
 - **Secrets stay secret** — credentials and secret variables are stored in your OS keychain (GNOME Keyring / KWallet, macOS Keychain, Windows Credential Manager), never in the collection files you commit.
-- **Batteries included** — OpenAPI/Swagger, Postman, Insomnia, HAR & cURL import, mock server, pre-request/test scripting, data-driven collection runner, response schema validation, code generation in 9 languages, API docs generation, mTLS.
+- **Batteries included** — OpenAPI/Swagger, Postman, Insomnia, HAR & cURL import, mock server, pre-request/test scripting, data-driven collection runner, a headless CLI for CI, response schema validation, code generation in 9 languages, API docs generation, mTLS.
 
 ## Features
 
@@ -189,6 +189,21 @@ resonance run collections/petstore --runner smoke \
 resonance list collections/petstore
 ```
 
+Install it on Linux or macOS with one line (the script verifies the download
+against the release checksums):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh
+```
+
+In GitHub Actions, the repository doubles as a setup action that installs the
+CLI on Linux, macOS and Windows runners:
+
+```yaml
+- uses: db-mobile/resonance@v3.5.1   # installs that version; add `with: version:` to pick another
+- run: resonance run collections/petstore --runner smoke --junit reports/junit.xml
+```
+
 Variables come from `--var`, `RESONANCE_VAR_<KEY>` environment variables or an
 environment export of the app (`--env-file`), so secrets never live in the
 repository. Exit code 0 means every test passed, 1 means a failure, 2 a usage
@@ -212,6 +227,7 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 
 - **[Documentation site](https://db-mobile.github.io/resonance/)** — environments, variables, auth, mTLS, mock server, GraphQL, per-protocol guides
 - **[Scripting Reference](SCRIPTS.md)** — pre-request/test script API with examples ([also on the website](https://db-mobile.github.io/resonance/scripts.html))
+- **[Command-line guide](crates/resonance-cli/README.md)** — installing and running `resonance` in CI, options, variables, exit codes
 - **[Architecture](docs/ARCHITECTURE.md)** — project structure and technology stack for contributors
 
 ## Roadmap
@@ -260,6 +276,7 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 - [x] Response JSON Schema validation and inference
 - [x] Git branch display and collection reload on branch changes
 - [x] File uploads: multipart form-data file parts and binary request bodies
+- [x] Command-line runner for CI with static binaries, an install script and a GitHub Action
 
 </details>
 
@@ -269,7 +286,7 @@ Contributions are welcome!
 
 1. Fork the repository and create a feature branch: `git checkout -b feature/amazing-feature`
 2. Follow the existing patterns and conventions (see [Architecture](docs/ARCHITECTURE.md))
-3. Run `npm run lint` and `npm test` before committing
+3. Run `npm run lint`, `npm test` and `cargo test --workspace --locked` before committing
 4. Open a Pull Request
 
 Found a bug or have a feature request? [Open an issue](https://github.com/db-mobile/resonance/issues) — please check existing issues first and include as much detail as possible.

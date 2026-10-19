@@ -289,3 +289,64 @@ jobs:
           exit 1
         fi
         "$BIN" --version
+
+  install-script:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install shellcheck (macOS)
+      if: runner.os == 'macOS'
+      run: command -v shellcheck || brew install shellcheck
+
+    - name: Lint shell scripts
+      run: |
+        shellcheck -s sh install.sh
+        shellcheck scripts/test-install.sh
+
+    - name: Test the install script against a local release
+      run: scripts/test-install.sh
+
+  action-smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install a pinned version with the action
+      id: pinned
+      uses: ./
+      with:
+        version: 3.5.0
+
+    - name: Check the pinned version
+      shell: bash
+      run: |
+        resonance --version | grep -F 'resonance 3.5.0'
+        [ "${{ steps.pinned.outputs.version }}" = "3.5.0" ]
+        [ -n "${{ steps.pinned.outputs.path }}" ]
+
+    - name: Install the latest version into a separate directory
+      if: runner.os == 'Linux'
+      id: latest
+      uses: ./
+      with:
+        install-dir: ${{ runner.temp }}/resonance-latest
+
+    - name: Check the latest version
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        "${{ steps.latest.outputs.path }}/resonance" --version
+        [ -n "${{ steps.latest.outputs.version }}" ]

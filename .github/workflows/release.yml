@@ -522,6 +522,8 @@ jobs:
         - [Installer (arm64)](${BASE_URL}/Resonance_${VERSION}_arm64-setup.exe)
 
         ### Command line (\`resonance run\` for CI)
+        Install on Linux or macOS: \`curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- --version ${VERSION}\`
+        In GitHub Actions: \`uses: ${REPO}@${TAG}\`
         - [Linux x86_64 (static)](${BASE_URL}/resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz)
         - [Linux arm64 (static)](${BASE_URL}/resonance-cli_${VERSION}_aarch64-unknown-linux-musl.tar.gz)
         - [macOS (Universal)](${BASE_URL}/resonance-cli_${VERSION}_universal-apple-darwin.tar.gz)

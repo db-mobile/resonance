@@ -1,0 +1,102 @@
+name: Setup Resonance CLI
+description: Installs the resonance command line for running Resonance collections and runners in CI
+author: db-mobile
+branding:
+  icon: play
+  color: blue
+
+inputs:
+  version:
+    description: Release to install, e.g. 3.5.0. Defaults to the tag this action is referenced at, or to the latest release.
+    required: false
+    default: ''
+  install-dir:
+    description: Directory the binary is installed to and added to PATH. Defaults to a directory under the runner's temp folder.
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: The installed version, e.g. 3.5.0
+    value: ${{ steps.report.outputs.version }}
+  path:
+    description: Directory holding the resonance binary
+    value: ${{ steps.report.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve version and directory
+      id: resolve
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_DIR: ${{ inputs.install-dir }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        version="${INPUT_VERSION#v}"
+        if [ -z "$version" ] && [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          version="${ACTION_REF#v}"
+        fi
+        dir="${INPUT_DIR:-$RUNNER_TEMP/resonance-cli}"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+    - name: Install (Linux, macOS)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        RESONANCE_VERSION: ${{ steps.resolve.outputs.version }}
+        RESONANCE_INSTALL_DIR: ${{ steps.resolve.outputs.dir }}
+      run: |
+        sh "$GITHUB_ACTION_PATH/install.sh"
+        echo "$RESONANCE_INSTALL_DIR" >> "$GITHUB_PATH"
+
+    - name: Install (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        RESONANCE_VERSION: ${{ steps.resolve.outputs.version }}
+        RESONANCE_INSTALL_DIR: ${{ steps.resolve.outputs.dir }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $version = $env:RESONANCE_VERSION
+        $dir = $env:RESONANCE_INSTALL_DIR
+        if (-not $version) {
+          $handler = [System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect = $false
+          $client = [System.Net.Http.HttpClient]::new($handler)
+          $response = $client.GetAsync('https://github.com/db-mobile/resonance/releases/latest').GetAwaiter().GetResult()
+          $location = [string]$response.Headers.Location
+          if ($location -notmatch '/tag/v([^/]+)$') { throw "Could not determine the latest release from '$location'" }
+          $version = $Matches[1]
+        }
+        $name = "resonance-cli_${version}_x86_64-pc-windows-msvc"
+        $base = "https://github.com/db-mobile/resonance/releases/download/v$version"
+        $tmp = Join-Path $env:RUNNER_TEMP ("resonance-cli-" + [guid]::NewGuid().ToString())
+        New-Item -ItemType Directory -Force -Path $tmp, $dir | Out-Null
+        Write-Host "Installing resonance $version (x86_64-pc-windows-msvc) to $dir"
+        Invoke-WebRequest -Uri "$base/$name.zip" -OutFile "$tmp/$name.zip"
+        Invoke-WebRequest -Uri "$base/SHA256SUMS" -OutFile "$tmp/SHA256SUMS"
+        $pattern = '^([0-9a-fA-F]{64}) [ *]' + [regex]::Escape("$name.zip") + '$'
+        $line = Get-Content "$tmp/SHA256SUMS" | Where-Object { $_ -match $pattern } | Select-Object -First 1
+        if (-not $line) { throw "$name.zip is not listed in SHA256SUMS" }
+        $expected = ([regex]::Match($line, $pattern)).Groups[1].Value
+        $actual = (Get-FileHash "$tmp/$name.zip" -Algorithm SHA256).Hash
+        if ($actual -ne $expected) { throw "checksum mismatch for $name.zip (expected $expected, got $actual)" }
+        Write-Host 'Verified SHA-256 checksum'
+        Expand-Archive -Path "$tmp/$name.zip" -DestinationPath $tmp -Force
+        Copy-Item "$tmp/$name/resonance.exe" (Join-Path $dir 'resonance.exe') -Force
+        Remove-Item -Recurse -Force $tmp
+        Add-Content -Path $env:GITHUB_PATH -Value $dir
+        & (Join-Path $dir 'resonance.exe') --version
+
+    - name: Report
+      id: report
+      shell: bash
+      env:
+        DIR: ${{ steps.resolve.outputs.dir }}
+      run: |
+        output=$(resonance --version)
+        echo "version=${output#resonance }" >> "$GITHUB_OUTPUT"
+        echo "path=$DIR" >> "$GITHUB_OUTPUT"

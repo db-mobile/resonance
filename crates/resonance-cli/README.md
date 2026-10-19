@@ -8,9 +8,28 @@ certificates behave exactly as in the app.
 
 ## Install
 
-Download the archive for your platform from the
+On Linux and macOS, one line downloads the archive for your platform, verifies
+it against the release's `SHA256SUMS`, and installs the `resonance` binary
+into `/usr/local/bin` when that is writable, otherwise into `~/.local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh
+```
+
+Pin a version or choose the directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh -s -- --version 3.5.0 --dir ~/.local/bin
+```
+
+The script also reads `RESONANCE_VERSION`, `RESONANCE_INSTALL_DIR` and
+`RESONANCE_TARGET` (to override platform detection, e.g.
+`aarch64-unknown-linux-musl`). It never calls `sudo`; prefix the `sh` with
+`sudo` yourself for a system-wide directory you cannot write to.
+
+Manual install: download the archive for your platform from the
 [latest release](https://github.com/db-mobile/resonance/releases/latest),
-verify it against `SHA256SUMS`, and put the `resonance` binary on your `PATH`:
+check it against `SHA256SUMS`, and put the `resonance` binary on your `PATH`:
 
 ```sh
 VERSION=3.5.0
@@ -21,7 +40,7 @@ resonance --version
 ```
 
 Archives exist for Linux x86_64 and arm64 (static, no system libraries
-needed), macOS (universal) and Windows x64. From a checkout:
+needed), macOS (universal) and Windows x64 (`.zip`). From a checkout:
 `cargo build -p resonance-cli --profile cli --locked` produces
 `target/cli/resonance`.
 
@@ -109,11 +128,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install Resonance CLI
-        run: |
-          VERSION=3.5.0
-          curl -fsSLO "https://github.com/db-mobile/resonance/releases/download/v${VERSION}/resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
-          tar -xzf "resonance-cli_${VERSION}_x86_64-unknown-linux-musl.tar.gz"
-          sudo install "resonance-cli_${VERSION}_x86_64-unknown-linux-musl/resonance" /usr/local/bin/
+        uses: db-mobile/resonance@v3.5.1   # the tag doubles as the default CLI version
+        # with:
+        #   version: 3.5.1                 # pick another release explicitly
       - name: Run smoke tests
         env:
           RESONANCE_VAR_apiToken: ${{ secrets.API_TOKEN }}
@@ -128,5 +145,9 @@ jobs:
           path: reports/
 ```
 
-Any CI system that understands JUnit XML (GitLab, Jenkins, Azure Pipelines,
-CircleCI) can render the `--junit` file as test results.
+The action works on Linux, macOS and Windows runners and exposes `version`
+and `path` outputs. Referencing it at a release tag installs that version;
+`uses: db-mobile/resonance@main` installs the latest release.
+
+Any other CI system (GitLab, Jenkins, Azure Pipelines, CircleCI) can run the
+install one-liner in a job step and render the `--junit` file as test results.
