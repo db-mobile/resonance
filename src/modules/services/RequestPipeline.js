@@ -1,5 +1,5 @@
 /**
- * @fileoverview One request pipeline shared by the editor send path and the collection runner:
+ * @fileoverview Request preparation helpers for previews, introspection, and streaming protocols.
  * @module services/RequestPipeline
  */
 
@@ -18,8 +18,6 @@ const REQUIRED_DEPS = Object.freeze([
     'requestBuilder',
     'mockServerService'
 ]);
-
-const BODY_TYPES = new Set(['formdata', 'urlencoded', 'text', 'binary']);
 
 /**
  * @typedef {Object} EndpointRef
@@ -179,59 +177,6 @@ export class RequestPipeline {
     }
 
     /**
-     * @param {Object} parts
-     * @param {string} parts.protocol
-     * @param {string} parts.method
-     * @param {string} parts.url
-     * @param {string} parts.rawUrl
-     * @param {Object} parts.headers
-     * @param {Object} parts.queryParams
-     * @param {Object} parts.pathParams
-     * @param {*} parts.body
-     * @param {string|undefined} parts.bodyType
-     * @param {{httpVersion: string, timeout: number|null, verifySsl: boolean, followRedirects: boolean}} parts.settings
-     * @param {Object} parts.authData
-     * @returns {Object}
-     */
-    assembleRequestConfig({ protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyType, settings, authData }) {
-        const requestConfig = {
-            protocol,
-            method,
-            url,
-            rawUrl,
-            headers,
-            queryParams,
-            pathParams,
-            body,
-            bodyType: BODY_TYPES.has(bodyType) ? bodyType : undefined,
-            httpVersion: settings.httpVersion,
-            timeout: settings.timeout,
-            verifySsl: settings.verifySsl,
-            followRedirects: settings.followRedirects
-        };
-        this.attachAuthTransport(requestConfig, authData);
-        return requestConfig;
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @param {{snapshot: Object, rawUrl: string, variables: Object, processor: Object, mockRewrite: Object|null, authData: Object}} ctx
-     * @returns {boolean}
-     */
-    applyScriptMutations(requestConfig, { snapshot, rawUrl, variables, processor, mockRewrite, authData, originalAuthData }) {
-        requestConfig.url = this.requestBuilder.applyScriptParamMutations({
-            requestConfig, snapshot, rawUrl, variables, processor, mockRewrite
-        });
-        let stripped = false;
-        for (const credentials of [originalAuthData, authData]) {
-            if (credentials) {
-                stripped = this.requestBuilder.stripCrossOriginAuth({ requestConfig, originalUrl: snapshot.url, authData: credentials }) || stripped;
-            }
-        }
-        return stripped;
-    }
-
-    /**
      * @param {{url: string, clientCert?: Object}} requestConfig
      * @returns {void}
      */
@@ -247,30 +192,4 @@ export class RequestPipeline {
         } catch {}
     }
 
-    /**
-     * @param {Object} requestConfig
-     * @returns {Promise<void>}
-     */
-    async attachCookieHeader(requestConfig) {
-        if (!this.cookies) {
-            return;
-        }
-        const cookieHeader = await this.cookies.getCookieHeader(requestConfig.url);
-        if (!cookieHeader) {
-            return;
-        }
-        requestConfig.headers = requestConfig.headers || {};
-        if (!requestConfig.headers['Cookie'] && !requestConfig.headers['cookie']) {
-            requestConfig.headers['Cookie'] = cookieHeader;
-        }
-    }
-
-    /**
-     * @param {Object} requestConfig
-     * @returns {Promise<void>}
-     */
-    async finalize(requestConfig) {
-        this.attachClientCert(requestConfig);
-        await this.attachCookieHeader(requestConfig);
-    }
 }

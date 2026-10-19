@@ -5,9 +5,7 @@ mod commands;
 mod window_state;
 
 use commands::{
-    api_request::{
-        RequestState, cancel_api_request, pick_upload_file, save_response_body, send_api_request,
-    },
+    api_request::{RequestState, pick_upload_file, save_response_body, send_api_request},
     app::app_get_version,
     certificates::pick_certificate_file,
     collections::{
@@ -48,7 +46,7 @@ use commands::{
     proxy::{ProxyState, proxy_get, proxy_set, proxy_test},
     response_inspection::response_inspect,
     schema::{schema_check, schema_validate},
-    scripts::{script_execute_pre_request, script_execute_test, script_get, script_save},
+    scripts::{script_get, script_save},
     secrets::{secret_delete, secret_get, secret_keychain_available, secret_set},
     sse::{SseState, sse_close, sse_connect},
     store::{settings_get, settings_set, store_get, store_set},
@@ -78,6 +76,7 @@ fn main() {
             builder.build()
         })
         .manage(RequestState::default())
+        .manage(commands::execution::ExecutionState::default())
         .manage(CollectionLoadErrors::default())
         .manage(ProxyState::default())
         .manage(ProtoState::default())
@@ -90,6 +89,14 @@ fn main() {
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
         .manage(MigrationStatus::default())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                use tauri::Manager;
+                window
+                    .state::<commands::execution::ExecutionState>()
+                    .cancel_window(window.label());
+            }
+        })
         .setup(|app| {
             use tauri::Manager;
             #[cfg(target_os = "linux")]
@@ -128,7 +135,9 @@ fn main() {
             secret_keychain_available,
             // API Requests
             send_api_request,
-            cancel_api_request,
+            commands::execution::execute_request,
+            commands::execution::execute_run,
+            commands::execution::cancel_execution,
             pick_upload_file,
             save_response_body,
             // Proxy
@@ -176,8 +185,6 @@ fn main() {
             // Scripts
             script_get,
             script_save,
-            script_execute_pre_request,
-            script_execute_test,
             // Response schemas
             schema_check,
             schema_validate,

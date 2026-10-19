@@ -1,0 +1,808 @@
+[
+  {
+    "name": "unsaved json",
+    "input": {
+      "endpoint": {
+        "collectionId": "collection",
+        "endpointId": "request"
+      },
+      "inputs": {
+        "method": "POST",
+        "url": "{{unsaved}}",
+        "headers": {
+          "X-Unsaved": "yes"
+        },
+        "pathParams": {
+          "id": "unsaved"
+        },
+        "queryRows": [
+          {
+            "key": "tag",
+            "value": "a"
+          },
+          {
+            "key": "tag",
+            "value": "b"
+          }
+        ]
+      },
+      "authConfig": {
+        "type": "inherit",
+        "config": {}
+      },
+      "bodySource": {
+        "bodyMode": "json",
+        "jsonContent": "{\"unsaved\":true}",
+        "text": "unsaved text",
+        "form": {
+          "filePath": "/tmp/unsaved.bin"
+        },
+        "graphql": null
+      },
+      "scripts": {
+        "preRequestScript": "unsaved pre",
+        "testScript": ""
+      }
+    },
+    "target": {
+      "collection": {
+        "id": "collection",
+        "baseUrl": "https://api.test",
+        "defaultHeaders": {
+          "Accept": "application/json"
+        }
+      },
+      "endpoint": {
+        "id": "request",
+        "path": "/items/{id}",
+        "method": "POST",
+        "parameters": {
+          "path": {
+            "id": {
+              "example": 7
+            },
+            "zero": {
+              "example": 0
+            }
+          },
+          "query": {
+            "q": {
+              "example": "example"
+            },
+            "empty": {
+              "example": ""
+            }
+          }
+        }
+      },
+      "persisted": {},
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "scripts": {
+        "preRequestScript": "console.log(\"pre\")",
+        "testScript": "console.log(\"test\")"
+      },
+      "mockBaseUrl": "http://localhost:3333/mock"
+    },
+    "expected": {
+      "method": "POST",
+      "url": "{{unsaved}}",
+      "headers": {
+        "X-Unsaved": "yes"
+      },
+      "pathParams": {
+        "id": "unsaved"
+      },
+      "queryRows": [
+        {
+          "key": "tag",
+          "value": "a"
+        },
+        {
+          "key": "tag",
+          "value": "b"
+        }
+      ],
+      "collectionId": "collection",
+      "endpointId": "request",
+      "name": "",
+      "path": "/items/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {
+        "Accept": "application/json"
+      },
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "{\"unsaved\":true}",
+        "fields": [],
+        "filePath": "/tmp/unsaved.bin",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "unsaved pre",
+      "testScript": "",
+      "mockBaseUrl": "http://localhost:3333/mock"
+    }
+  },
+  {
+    "name": "unsaved text",
+    "input": {
+      "endpoint": {
+        "collectionId": "collection",
+        "endpointId": "request"
+      },
+      "inputs": {
+        "method": "POST",
+        "url": "{{unsaved}}",
+        "headers": {
+          "X-Unsaved": "yes"
+        },
+        "pathParams": {
+          "id": "unsaved"
+        },
+        "queryRows": [
+          {
+            "key": "tag",
+            "value": "a"
+          },
+          {
+            "key": "tag",
+            "value": "b"
+          }
+        ]
+      },
+      "authConfig": {
+        "type": "inherit",
+        "config": {}
+      },
+      "bodySource": {
+        "bodyMode": "text",
+        "jsonContent": "{\"unsaved\":true}",
+        "text": "unsaved text",
+        "form": {
+          "filePath": "/tmp/unsaved.bin"
+        },
+        "graphql": null
+      },
+      "scripts": {
+        "preRequestScript": "unsaved pre",
+        "testScript": ""
+      }
+    },
+    "target": {
+      "collection": {
+        "id": "collection",
+        "baseUrl": "https://api.test",
+        "defaultHeaders": {
+          "Accept": "application/json"
+        }
+      },
+      "endpoint": {
+        "id": "request",
+        "path": "/items/{id}",
+        "method": "POST",
+        "parameters": {
+          "path": {
+            "id": {
+              "example": 7
+            },
+            "zero": {
+              "example": 0
+            }
+          },
+          "query": {
+            "q": {
+              "example": "example"
+            },
+            "empty": {
+              "example": ""
+            }
+          }
+        }
+      },
+      "persisted": {},
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "scripts": {
+        "preRequestScript": "console.log(\"pre\")",
+        "testScript": "console.log(\"test\")"
+      },
+      "mockBaseUrl": "http://localhost:3333/mock"
+    },
+    "expected": {
+      "method": "POST",
+      "url": "{{unsaved}}",
+      "headers": {
+        "X-Unsaved": "yes"
+      },
+      "pathParams": {
+        "id": "unsaved"
+      },
+      "queryRows": [
+        {
+          "key": "tag",
+          "value": "a"
+        },
+        {
+          "key": "tag",
+          "value": "b"
+        }
+      ],
+      "collectionId": "collection",
+      "endpointId": "request",
+      "name": "",
+      "path": "/items/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {
+        "Accept": "application/json"
+      },
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "body": {
+        "mode": "text",
+        "content": "unsaved text",
+        "fields": [],
+        "filePath": "/tmp/unsaved.bin",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "unsaved pre",
+      "testScript": "",
+      "mockBaseUrl": "http://localhost:3333/mock"
+    }
+  },
+  {
+    "name": "unsaved graphql",
+    "input": {
+      "endpoint": {
+        "collectionId": "collection",
+        "endpointId": "request"
+      },
+      "inputs": {
+        "method": "POST",
+        "url": "{{unsaved}}",
+        "headers": {
+          "X-Unsaved": "yes"
+        },
+        "pathParams": {
+          "id": "unsaved"
+        },
+        "queryRows": [
+          {
+            "key": "tag",
+            "value": "a"
+          },
+          {
+            "key": "tag",
+            "value": "b"
+          }
+        ]
+      },
+      "authConfig": {
+        "type": "inherit",
+        "config": {}
+      },
+      "bodySource": {
+        "bodyMode": "graphql",
+        "jsonContent": "{\"unsaved\":true}",
+        "text": "unsaved text",
+        "form": {
+          "filePath": "/tmp/unsaved.bin"
+        },
+        "graphql": {
+          "query": "{unsaved}",
+          "variables": "{}"
+        }
+      },
+      "scripts": {
+        "preRequestScript": "unsaved pre",
+        "testScript": ""
+      }
+    },
+    "target": {
+      "collection": {
+        "id": "collection",
+        "baseUrl": "https://api.test",
+        "defaultHeaders": {
+          "Accept": "application/json"
+        }
+      },
+      "endpoint": {
+        "id": "request",
+        "path": "/items/{id}",
+        "method": "POST",
+        "parameters": {
+          "path": {
+            "id": {
+              "example": 7
+            },
+            "zero": {
+              "example": 0
+            }
+          },
+          "query": {
+            "q": {
+              "example": "example"
+            },
+            "empty": {
+              "example": ""
+            }
+          }
+        }
+      },
+      "persisted": {},
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "scripts": {
+        "preRequestScript": "console.log(\"pre\")",
+        "testScript": "console.log(\"test\")"
+      },
+      "mockBaseUrl": "http://localhost:3333/mock"
+    },
+    "expected": {
+      "method": "POST",
+      "url": "{{unsaved}}",
+      "headers": {
+        "X-Unsaved": "yes"
+      },
+      "pathParams": {
+        "id": "unsaved"
+      },
+      "queryRows": [
+        {
+          "key": "tag",
+          "value": "a"
+        },
+        {
+          "key": "tag",
+          "value": "b"
+        }
+      ],
+      "collectionId": "collection",
+      "endpointId": "request",
+      "name": "",
+      "path": "/items/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {
+        "Accept": "application/json"
+      },
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "body": {
+        "mode": "graphql",
+        "content": "{\"unsaved\":true}",
+        "fields": [],
+        "filePath": "/tmp/unsaved.bin",
+        "contentType": null,
+        "graphql": {
+          "query": "{unsaved}",
+          "variables": "{}"
+        },
+        "captureError": null
+      },
+      "preRequestScript": "unsaved pre",
+      "testScript": "",
+      "mockBaseUrl": "http://localhost:3333/mock"
+    }
+  },
+  {
+    "name": "unsaved binary",
+    "input": {
+      "endpoint": {
+        "collectionId": "collection",
+        "endpointId": "request"
+      },
+      "inputs": {
+        "method": "POST",
+        "url": "{{unsaved}}",
+        "headers": {
+          "X-Unsaved": "yes"
+        },
+        "pathParams": {
+          "id": "unsaved"
+        },
+        "queryRows": [
+          {
+            "key": "tag",
+            "value": "a"
+          },
+          {
+            "key": "tag",
+            "value": "b"
+          }
+        ]
+      },
+      "authConfig": {
+        "type": "inherit",
+        "config": {}
+      },
+      "bodySource": {
+        "bodyMode": "binary",
+        "jsonContent": "{\"unsaved\":true}",
+        "text": "unsaved text",
+        "form": {
+          "filePath": "/tmp/unsaved.bin"
+        },
+        "graphql": null
+      },
+      "scripts": {
+        "preRequestScript": "unsaved pre",
+        "testScript": ""
+      }
+    },
+    "target": {
+      "collection": {
+        "id": "collection",
+        "baseUrl": "https://api.test",
+        "defaultHeaders": {
+          "Accept": "application/json"
+        }
+      },
+      "endpoint": {
+        "id": "request",
+        "path": "/items/{id}",
+        "method": "POST",
+        "parameters": {
+          "path": {
+            "id": {
+              "example": 7
+            },
+            "zero": {
+              "example": 0
+            }
+          },
+          "query": {
+            "q": {
+              "example": "example"
+            },
+            "empty": {
+              "example": ""
+            }
+          }
+        }
+      },
+      "persisted": {},
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "scripts": {
+        "preRequestScript": "console.log(\"pre\")",
+        "testScript": "console.log(\"test\")"
+      },
+      "mockBaseUrl": "http://localhost:3333/mock"
+    },
+    "expected": {
+      "method": "POST",
+      "url": "{{unsaved}}",
+      "headers": {
+        "X-Unsaved": "yes"
+      },
+      "pathParams": {
+        "id": "unsaved"
+      },
+      "queryRows": [
+        {
+          "key": "tag",
+          "value": "a"
+        },
+        {
+          "key": "tag",
+          "value": "b"
+        }
+      ],
+      "collectionId": "collection",
+      "endpointId": "request",
+      "name": "",
+      "path": "/items/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {
+        "Accept": "application/json"
+      },
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "body": {
+        "mode": "binary",
+        "content": "{\"unsaved\":true}",
+        "fields": [],
+        "filePath": "/tmp/unsaved.bin",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "unsaved pre",
+      "testScript": "",
+      "mockBaseUrl": "http://localhost:3333/mock"
+    }
+  }
+]

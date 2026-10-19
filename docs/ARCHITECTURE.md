@@ -21,13 +21,13 @@ src/
     ├── state/          # Encapsulated app state modules
     ├── ipcBridge.js    # Tauri IPC compatibility layer
     ├── protocols/              # protocolRegistry: descriptors, ui data and the send/cancel/isLive handler table
-    ├── apiHandler.js           # HTTP send pipeline + per-protocol handler registration
+    ├── apiHandler.js           # HTTP/GraphQL snapshot capture and core result presentation
     ├── responseView.js         # Response pane rendering shared by every protocol handler (leaf)
     ├── sendControls.js         # Send/cancel button state driven by the active handler's isLive
-    ├── requestServices.js      # Variable/auth resolution shared by HTTP and gRPC sends
+    ├── requestServices.js      # Variable/auth helpers for previews and other protocol handlers
     ├── endpointSave.js         # Debounced save of the current endpoint's modifications
     ├── graphqlIntrospection.js # Introspection fetch and client-schema build
-    ├── requestPipeline.feature.js # Builds the RequestPipeline (services/RequestPipeline.js) shared by the editor send path and the runner
+    ├── requestPipeline.feature.js # Wires repositories and preview helpers used by CoreExecutionService
     ├── collection.feature.js   # Composition root of the collection sidebar stack (repository → services → UI → controller)
     ├── auth.feature.js         # Builds the request form's AuthManager; auth types live in auth/authTypes.js
     ├── requestFormReader.js    # Reads the request editor form into plain data for the collection services
@@ -36,13 +36,26 @@ src/
     ├── *.feature.js            # Per-feature wiring descriptors
     └── [60+ other modules]     # Protocol handlers (gRPC, WebSocket, MQTT, SSE), editors, managers
 
+crates/resonance-core/
+├── Cargo.toml         # Independent library; no Tauri, GUI or keychain dependencies
+└── src/
+    ├── model.rs       # Request and runner snapshot inputs
+    ├── context.rs     # Settings, auth, cookies and certificate input types
+    ├── results.rs     # Typed request/run results and termination reasons
+    ├── execution.rs   # Shared Send/runner executor, scripts, effects, cancellation
+    ├── preparation.rs # Variables, auth, URL/body construction, cookies and certificates
+    ├── runner.rs      # Queue traversal, branching, iterations and data parsing
+    ├── api_request.rs # HTTP transport, auth, binary bodies and response timings
+    └── scripts.rs     # Bounded Boa execution and execution-local script state
+
 src-tauri/
 ├── Cargo.toml         # Rust dependencies
 ├── tauri.conf.json    # Tauri configuration
 └── src/
     ├── main.rs        # Application entry point
     └── commands/      # IPC command handlers
-        ├── api_request.rs        # HTTP requests with reqwest (mTLS, multipart/binary bodies)
+        ├── execution.rs          # Window-scoped execution IPC, cancellation and effect receipts
+        ├── api_request.rs        # Low-level HTTP command adapter delegating to resonance-core
         ├── grpc_reflection.rs    # gRPC server reflection (v1/v1alpha negotiation)
         ├── grpc_streaming.rs     # gRPC unary and streaming calls
         ├── grpc_proto.rs         # Proto descriptor handling
@@ -51,17 +64,54 @@ src-tauri/
         ├── mqtt.rs               # MQTT broker connections
         ├── graphql_subscription.rs  # GraphQL subscriptions (graphql-transport-ws)
         ├── mock_server.rs        # Mock server with Axum
-        ├── scripts.rs            # JavaScript execution with Boa Engine
+        ├── scripts.rs            # Desktop script storage (execution lives in resonance-core)
         ├── import_export/        # OpenAPI/Postman import and export
-        ├── collections.rs        # Git-friendly collection file storage
+        ├── collections/          # Git-friendly collection file storage
         ├── store.rs              # Settings/data persistence
         ├── secrets.rs            # OS keychain secret storage
         ├── oauth.rs              # OAuth 2.0 token fetching
         ├── proxy.rs              # Proxy configuration
         ├── certificates.rs       # Native file picker for client certificate (mTLS) files
-        ├── tls.rs                # Shared TLS helpers (PEM loading, skip-verify)
+        ├── tls.rs                # Re-exports core TLS helpers for other desktop protocols
         └── updater.rs            # Auto-update and install-type detection
 ```
+
+## Shared request execution
+
+HTTP and GraphQL Send and collection runs call `resonance-core` with owned startup
+snapshots. The runner uses the same request executor as Send. Preparation,
+variable precedence, OAuth renewal, pre-request/test scripts, transport, cookies,
+branching, limits and cancellation live in Rust. Script mutations update execution
+state for subsequent visits. Boa workers observe cancellation while retaining the
+bounded script runtime.
+
+`CoreExecutionService` captures desktop inputs, including unsaved editor values,
+hydrated secrets and saved request defaults. It registers the event listener before
+invoking execution, applies persistence deltas through the existing repositories,
+and drains those writes before showing completion. The captured environment and
+collection remain the persistence targets even after the user switches tabs or
+environments. `RunnerService` retains saved-run bookkeeping, history and reports;
+`apiHandler` retains response rendering, history and schema validation.
+
+Progress events carry ordered execution/visit identities. A response body appears
+in the response event and canonical invoke result; request-completed and completed
+events carry summaries. The desktop invoke reply also includes the ordered effect
+journal, allowing the GUI to recover missing effect/completion events and deduplicate
+already applied writes. Legacy report body aliases are restored in the GUI by
+reference. JSON/JUnit report formats remain compatible.
+
+The core exposes typed results, statuses, termination reasons and context inputs.
+User body data, script-visible request objects and templatable auth fields remain
+JSON by design. YAML loading, keychain access and desktop repositories are adapters,
+not core dependencies. Capture fixtures in `tests/fixtures/execution/*capture.json`
+pin the remaining saved/editor mapping rules for a future headless file loader;
+this migration does not implement CLI or committed-file loading.
+
+The desktop and core remain separate Cargo packages to preserve the desktop and
+Flathub build paths. `scripts/check-core-resolution.py` enforces matching versions
+and resolved dependency edges in both lockfiles. The standalone CI job runs this
+check and builds/tests the core without frontend or desktop system dependencies.
+Update both lockfiles together; `src-tauri/Cargo.lock` remains the packaging source.
 
 ## Key Technologies
 

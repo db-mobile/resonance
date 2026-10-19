@@ -4,26 +4,17 @@
  */
 
 import { ScriptRepository } from './storage/ScriptRepository.js';
-import { VariableRepository } from './storage/VariableRepository.js';
 import { ScriptService } from './services/ScriptService.js';
 import { InlineScriptManager } from './ui/InlineScriptManager.js';
 import { ScriptConsolePanel } from './ui/ScriptConsolePanel.js';
 import { ScriptController } from './controllers/ScriptController.js';
-import { getSettingsCache } from './state/settingsCache.js';
 
 /** @type {import('./registry/FeatureRegistry.js').FeatureDescriptor} */
 export const scriptFeature = {
     name: 'script',
     create(ctx) {
-        const environmentService = ctx.get('environmentService');
-
         const repository = new ScriptRepository(ctx.backendAPI);
-        const variableRepository = new VariableRepository(ctx.backendAPI, ctx.secretStore);
-        const service = new ScriptService(repository, environmentService, ctx.statusDisplay, variableRepository, {
-            backendAPI: ctx.backendAPI,
-            cookieController: ctx.get('cookieController') ?? null,
-            getSettings: getSettingsCache
-        });
+        const service = new ScriptService(repository);
 
         const inlineScriptManager = new InlineScriptManager();
         inlineScriptManager.initialize();

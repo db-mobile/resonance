@@ -9,7 +9,7 @@ fn run(script: &str, pre: bool) -> ScriptResult {
         "executionContext":{"runner":true,"requestId":"request-1"}
     }))
     .unwrap();
-    run_script_sync(data, pre, ProxySettings::default())
+    run_script_sync(data, pre, ProxySettings::default(), None)
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn manual_navigation_is_a_noop_and_local_unset_reveals_lower_scopes() {
         "environment":{"shared":"environment"}, "localVariables":{"shared": false},
         "executionContext":{"runner":false,"requestId":"manual"}
     })).unwrap();
-    let result = run_script_sync(data, true, ProxySettings::default());
+    let result = run_script_sync(data, true, ProxySettings::default(), None);
     assert!(result.success, "{:?}", result.errors);
     assert!(result.test_results.iter().all(|test| test.passed));
     assert!(matches!(result.execution.next, NextRequest::Unchanged));

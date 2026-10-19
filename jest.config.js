@@ -1,4 +1,5 @@
 export default {
+  modulePathIgnorePatterns: ['<rootDir>/src-tauri/target/', '<rootDir>/crates/resonance-core/target/'],
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   testMatch: ['<rootDir>/tests/**/*.test.js'],

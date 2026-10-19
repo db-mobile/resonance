@@ -14,6 +14,7 @@ prost-build = "0.14"
 protoc-bin-vendored = "3"
 
 [dependencies]
+resonance-core = { path = "../crates/resonance-core" }
 # Tauri defaults minus `dynamic-acl` (no runtime capabilities; required for
 # build.removeUnusedCommands). Recheck this list against the defaults on Tauri upgrades.
 tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus"] }
@@ -49,7 +50,6 @@ bytes = "1"
 http = "1"
 base64 = "0.22"
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
-rustls-pemfile = "2"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -75,29 +75,12 @@ webpki-roots = "0.26"
 # Utilities
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
-# Legacy charset decoding for response bodies (WHATWG labels, pure Rust)
-encoding_rs = "0.8"
 thiserror = "2"
 tracing = "0.1"
 regex = "1"
 url = "2"
-# Pin the idna→ICU4X bridge to the ICU4X 1.5 generation so url/idna share the
-# icu_normalizer/icu_properties data tables boa_engine 0.19 already embeds
-# (idna_adapter 1.2.1+ pulls a second, ICU4X 2.x copy of the Unicode data).
-# Remove when boa_engine moves to ICU4X 2.x.
-idna_adapter = "=1.2.0"
-
-# Digest auth + AWS Signature V4
-md-5 = "0.10"
 sha2 = "0.10"
-sha1 = "0.10"
-hmac = "0.12"
 hex = "0.4"
-
-# NTLM message encoding and NTLMv2 challenge responses. Pure RustCrypto tree
-# (md4, md-5, hmac, des) on non-Windows targets — no OpenSSL; verify with
-# `cargo tree -i openssl-sys`.
-ntlmclient = "0.2"
 
 # Cryptographic RNG for OAuth PKCE verifiers and CSRF state (OS entropy, OpenSSL-free)
 getrandom = "0.3"
@@ -105,8 +88,6 @@ getrandom = "0.3"
 # Proto file parsing (pure Rust; bundles the well-known types, no protoc needed)
 protox = "0.10"
 
-# JavaScript engine for script execution
-boa_engine = "0.19"
 
 # OS keychain for secret storage (encryption at rest). Pinned OpenSSL-free to match the
 # project's rustls/ring-only TLS stack: Linux uses the D-Bus Secret Service with RustCrypto

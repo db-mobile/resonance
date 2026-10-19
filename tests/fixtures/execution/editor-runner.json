@@ -1,0 +1,928 @@
+[
+  {
+    "name": "api-key in the query string",
+    "editor": {
+      "url": "https://api.test/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "pathParams": {
+        "id": "42"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{key}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "mockBaseUrl": null
+    },
+    "runner": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "pathParameterNames": [],
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{key}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "bearerFallback": true
+    },
+    "context": {
+      "environment": {
+        "trace": "t1",
+        "q": "x y",
+        "name": "ada",
+        "key": "s3cret"
+      },
+      "settings": {
+        "verifySsl": false,
+        "requestTimeout": 0,
+        "httpVersion": "h2",
+        "followRedirects": true
+      },
+      "certificates": [
+        {
+          "host": "api.test",
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "api.test",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        }
+      ]
+    },
+    "expected": {
+      "editor": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "api_key": "s3cret",
+          "q": "x y"
+        },
+        "rawUrl": "https://api.test/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y&api_key=s3cret",
+        "verifySsl": false
+      },
+      "runner": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "api_key": "s3cret",
+          "q": "x y"
+        },
+        "rawUrl": "{{baseUrl}}/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y&api_key=s3cret",
+        "verifySsl": false
+      }
+    }
+  },
+  {
+    "name": "bearer token from a variable",
+    "editor": {
+      "url": "https://api.test/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "pathParams": {
+        "id": "42"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{key}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "mockBaseUrl": null
+    },
+    "runner": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "pathParameterNames": [],
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{key}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "bearerFallback": true
+    },
+    "context": {
+      "environment": {
+        "trace": "t1",
+        "q": "x y",
+        "name": "ada",
+        "key": "s3cret"
+      },
+      "settings": {
+        "verifySsl": false,
+        "requestTimeout": 0,
+        "httpVersion": "h2",
+        "followRedirects": true
+      },
+      "certificates": [
+        {
+          "host": "api.test",
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "api.test",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        }
+      ]
+    },
+    "expected": {
+      "editor": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Authorization": "Bearer s3cret",
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "https://api.test/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y",
+        "verifySsl": false
+      },
+      "runner": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Authorization": "Bearer s3cret",
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "{{baseUrl}}/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y",
+        "verifySsl": false
+      }
+    }
+  },
+  {
+    "name": "mock server rewrite",
+    "editor": {
+      "url": "https://api.test/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "pathParams": {
+        "id": "42"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "auth": {
+        "type": "none",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "mockBaseUrl": "http://127.0.0.1:9999"
+    },
+    "runner": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "pathParameterNames": [],
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": "http://127.0.0.1:9999",
+      "bearerFallback": true
+    },
+    "context": {
+      "environment": {
+        "trace": "t1",
+        "q": "x y",
+        "name": "ada",
+        "key": "s3cret"
+      },
+      "settings": {
+        "verifySsl": false,
+        "requestTimeout": 0,
+        "httpVersion": "h2",
+        "followRedirects": true
+      },
+      "certificates": [
+        {
+          "host": "api.test",
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "api.test",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        },
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "127.0.0.1",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        }
+      ]
+    },
+    "expected": {
+      "editor": {
+        "body": {
+          "name": "ada"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "https://api.test/users/{id}",
+        "timeout": null,
+        "url": "http://127.0.0.1:9999/users/42?q=x%20y",
+        "verifySsl": false
+      },
+      "runner": {
+        "body": {
+          "name": "ada"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "{{baseUrl}}/users/{id}",
+        "timeout": null,
+        "url": "http://127.0.0.1:9999/users/42?q=x%20y",
+        "verifySsl": false
+      }
+    }
+  },
+  {
+    "name": "graphql query",
+    "editor": {
+      "url": "https://api.test/graphql",
+      "method": "POST",
+      "protocol": "graphql",
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "pathParams": {
+        "id": "42"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "collectionId": "c1",
+      "endpointId": "e2",
+      "name": "Query user",
+      "path": "/graphql",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{key}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": {
+          "query": "query Get($id: ID!) { user(id: $id) { name } }",
+          "variables": "{\"id\": \"{{name}}\"}",
+          "operationName": "Get"
+        },
+        "captureError": null
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "mockBaseUrl": null
+    },
+    "runner": {
+      "collectionId": "c1",
+      "endpointId": "e2",
+      "name": "Query user",
+      "path": "/graphql",
+      "method": "POST",
+      "protocol": "graphql",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "pathParameterNames": [],
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "config": {
+          "token": "{{key}}"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": {
+          "query": "query Get($id: ID!) { user(id: $id) { name } }",
+          "variables": "{\"id\": \"{{name}}\"}",
+          "operationName": "Get"
+        }
+      },
+      "preRequestScript": "",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "bearerFallback": true
+    },
+    "context": {
+      "environment": {
+        "trace": "t1",
+        "q": "x y",
+        "name": "ada",
+        "key": "s3cret"
+      },
+      "settings": {
+        "verifySsl": false,
+        "requestTimeout": 0,
+        "httpVersion": "h2",
+        "followRedirects": true
+      },
+      "certificates": [
+        {
+          "host": "api.test",
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "api.test",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        }
+      ]
+    },
+    "expected": {
+      "editor": {
+        "body": {
+          "operationName": "Get",
+          "query": "query Get($id: ID!) { user(id: $id) { name } }",
+          "variables": {
+            "id": "ada"
+          }
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Authorization": "Bearer s3cret",
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "graphql",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "https://api.test/graphql",
+        "timeout": null,
+        "url": "https://api.test/graphql?q=x%20y",
+        "verifySsl": false
+      },
+      "runner": {
+        "body": {
+          "operationName": "Get",
+          "query": "query Get($id: ID!) { user(id: $id) { name } }",
+          "variables": {
+            "id": "ada"
+          }
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Authorization": "Bearer s3cret",
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "graphql",
+        "queryParams": {
+          "q": "x y"
+        },
+        "rawUrl": "{{baseUrl}}/graphql",
+        "timeout": null,
+        "url": "https://api.test/graphql?q=x%20y",
+        "verifySsl": false
+      }
+    }
+  },
+  {
+    "name": "pre-request script adds a query param",
+    "editor": {
+      "url": "https://api.test/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "pathParams": {
+        "id": "42"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{key}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null,
+        "captureError": null
+      },
+      "preRequestScript": "request.queryParams.added = '1';",
+      "testScript": "",
+      "mockBaseUrl": null
+    },
+    "runner": {
+      "collectionId": "c1",
+      "endpointId": "e1",
+      "name": "Create user",
+      "path": "/users/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {},
+      "pathParams": {
+        "id": "42"
+      },
+      "pathParameterNames": [],
+      "headers": {
+        "X-Trace": "{{trace}}"
+      },
+      "queryRows": [
+        {
+          "key": "q",
+          "value": "{{q}}",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "type": "api-key",
+        "config": {
+          "keyName": "api_key",
+          "keyValue": "{{key}}",
+          "location": "query"
+        }
+      },
+      "inheritedAuth": [],
+      "body": {
+        "mode": "json",
+        "content": "{\"name\": \"{{name}}\"}",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "request.queryParams.added = '1';",
+      "testScript": "",
+      "postResponseScript": "",
+      "mockBaseUrl": null,
+      "bearerFallback": true
+    },
+    "context": {
+      "environment": {
+        "trace": "t1",
+        "q": "x y",
+        "name": "ada",
+        "key": "s3cret"
+      },
+      "settings": {
+        "verifySsl": false,
+        "requestTimeout": 0,
+        "httpVersion": "h2",
+        "followRedirects": true
+      },
+      "certificates": [
+        {
+          "host": "api.test",
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        }
+      ],
+      "cookies": [
+        {
+          "name": "sid",
+          "value": "1",
+          "domain": "api.test",
+          "path": "/",
+          "expires": null,
+          "secure": false,
+          "hostOnly": true
+        }
+      ]
+    },
+    "expected": {
+      "editor": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "added": "1",
+          "api_key": "s3cret",
+          "q": "x y"
+        },
+        "rawUrl": "https://api.test/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y&api_key=s3cret&added=1",
+        "verifySsl": false
+      },
+      "runner": {
+        "body": {
+          "name": "ada"
+        },
+        "clientCert": {
+          "certPath": "/certs/client.pem",
+          "keyPath": "/certs/client.key"
+        },
+        "followRedirects": true,
+        "headers": {
+          "Cookie": "sid=1",
+          "X-Trace": "t1"
+        },
+        "httpVersion": "h2",
+        "method": "POST",
+        "pathParams": {
+          "id": "42"
+        },
+        "protocol": "http",
+        "queryParams": {
+          "added": "1",
+          "api_key": "s3cret",
+          "q": "x y"
+        },
+        "rawUrl": "{{baseUrl}}/users/{id}",
+        "timeout": null,
+        "url": "https://api.test/users/{id}?q=x%20y&api_key=s3cret&added=1",
+        "verifySsl": false
+      }
+    }
+  }
+]

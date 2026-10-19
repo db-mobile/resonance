@@ -672,8 +672,22 @@ export class CollectionRepository {
     /**
      * @param {string} collectionId
      * @param {string|null|undefined} [endpointId]
-     * @returns {Promise<{authConfig: (Object|null), source: ({kind: string, folderId?: string}|null)}>}
+     * @returns {Promise<Array<{authConfig: Object, source: {kind: string, folderId?: string}}>>}
      */
+    async getExecutionAuthSources(collectionId, endpointId) {
+        const collection = await this._getByIdFresh(collectionId);
+        const chain = endpointId ? folderChainForRequest(collection, endpointId) : [];
+        const parents = await Promise.all(chain.reverse().map(async folder => ({
+            source: { kind: 'folder', folderId: folder.id },
+            authConfig: await this._hydrateAuthConfig(folderAuthSecretScope(collectionId, folder.id),
+                folder.authConfig || { type: 'inherit', config: {} })
+        })));
+        parents.push({ source: { kind: 'collection' },
+            authConfig: await this._hydrateAuthConfig(collectionAuthSecretScope(collectionId),
+                collection?.authConfig || { type: 'none', config: {} }) });
+        return parents;
+    }
+
     async getInheritedAuth(collectionId, endpointId) {
         try {
             const collection = await this._getByIdFresh(collectionId);

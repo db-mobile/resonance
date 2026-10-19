@@ -9,6 +9,7 @@ import { flattenRequests, rootRequests, topLevelFolders, endpointKey } from '../
 import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
 import { fileNameFromPath } from '../utils/fileName.js';
+import { getProtocol } from '../protocols/protocolRegistry.js';
 
 /**
  * @param {Object} pinnedRequests
@@ -515,11 +516,13 @@ export class CollectionRenderer {
         endpointDiv.dataset.collectionId = collection.id;
 
         const methodSpan = el('span', 'method-pill');
-        methodSpan.dataset.method = endpoint.method.toUpperCase();
-        methodSpan.textContent = endpoint.method;
+        const protocol = getProtocol(endpoint.protocol);
+        const method = endpoint.method || protocol.methodLabel || protocol.defaultMethod;
+        methodSpan.dataset.method = method.toUpperCase();
+        methodSpan.textContent = method;
 
         const pathSpan = el('span', 'endpoint-path');
-        const displayName = endpoint.name || endpoint.path.replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
+        const displayName = endpoint.name || (endpoint.path || '').replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
 
         const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${pinned ? ' is-pinned' : ''}`);

@@ -177,6 +177,21 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
     check_version(&source, path)?;
 
     match serde_yaml_ng::from_str::<RequestDoc>(&source) {
+        // Environment documents also carry id/name/seq, so deserialization
+        // alone cannot distinguish them from a minimal request. Leave these
+        // files outside the request tree (and therefore outside request writes).
+        Ok(doc)
+            if doc.method.is_none()
+                && doc.protocol.is_none()
+                && doc.path.is_none()
+                && doc.url.is_none()
+                && doc.body.is_none()
+                && doc.grpc.is_none()
+                && doc.mqtt.is_none()
+                && (doc.extra.contains_key("color") || doc.extra.contains_key("variables")) =>
+        {
+            Ok(None)
+        }
         Ok(doc) => Ok(Some(doc)),
         Err(error) => {
             eprintln!(
@@ -725,6 +740,45 @@ mod tests {
 
         assert_eq!(read.requests().len(), 1);
         assert_eq!(read.root.requests[0].doc.id, "r1");
+    }
+
+    #[test]
+    fn environment_documents_are_not_requests_despite_having_ids_and_names() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(temp.path(), "health.yaml", &request_yaml("r1", "Health"));
+        write(
+            temp.path(),
+            "environments/default.yaml",
+            "resonanceFormat: 2\nid: env1\nname: Default\ncolor: '#123456'\nseq: 1\n",
+        );
+        write(
+            temp.path(),
+            "environments/test.yaml",
+            "resonanceFormat: 2\nid: env2\nname: Test\nvariables: []\n",
+        );
+
+        let environment_path = temp.path().join("environments/default.yaml");
+        let original = fs::read(&environment_path).unwrap();
+        let mut read = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(read.requests().len(), 1);
+        assert_eq!(read.requests()[0].doc.id, "r1");
+        super::super::write::write_collection_dir(temp.path(), &mut read).unwrap();
+        assert_eq!(fs::read(environment_path).unwrap(), original);
+    }
+
+    #[test]
+    fn request_extension_fields_do_not_make_it_an_environment() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(
+            temp.path(),
+            "health.yaml",
+            "id: r1\nname: Health\nmethod: GET\ncolor: '#123456'\nvariables: []\n",
+        );
+        let read = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(read.requests().len(), 1);
+        assert!(read.requests()[0].doc.extra.contains_key("variables"));
     }
 
     #[test]

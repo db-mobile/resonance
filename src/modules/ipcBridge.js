@@ -43,8 +43,24 @@ if (isTauri) {
                 void _meta;
             }
         },
+        execution: {
+            request: (input) => invoke('execute_request', { input }),
+            run: (input) => invoke('execute_run', { input }),
+            cancel: (executionId) => invoke('cancel_execution', { executionId }),
+            listen: async (handler) => {
+                const internals = window.__TAURI_INTERNALS__;
+                const callback = internals.transformCallback(event => handler(event.payload));
+                let eventId;
+                try {
+                    eventId = await invoke('plugin:event|listen', { event: 'execution-event', target: { kind: 'Any' }, handler: callback });
+                } catch (error) { internals.unregisterCallback(callback); throw error; }
+                return async () => {
+                    try { await invoke('plugin:event|unlisten', { event: 'execution-event', eventId }); }
+                    finally { internals.unregisterCallback(callback); }
+                };
+            }
+        },
         sendApiRequest: (requestOptions) => invoke('send_api_request', { requestOptions }),
-        cancelApiRequest: (requestId) => invoke('cancel_api_request', { requestId }),
         pickUploadFile: () => invoke('pick_upload_file'),
         saveResponseBody: (defaultFileName, base64Data) => invoke('save_response_body', { defaultFileName, base64Data }),
         websocket: {
@@ -159,9 +175,7 @@ if (isTauri) {
         },
         scripts: {
             get: (collectionId, endpointId) => invoke('script_get', { collectionId, endpointId }),
-            save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts }),
-            executePreRequest: (scriptData) => invoke('script_execute_pre_request', { scriptData }),
-            executeTest: (scriptData) => invoke('script_execute_test', { scriptData })
+            save: (collectionId, endpointId, scripts) => invoke('script_save', { collectionId, endpointId, scripts })
         },
         updater: {
             check: () => invoke('updater_check'),

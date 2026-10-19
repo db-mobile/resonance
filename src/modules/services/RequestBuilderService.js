@@ -4,13 +4,9 @@
  */
 
 import { VariableProcessor } from '../variables/VariableProcessor.js';
-import { buildMockPath } from '../collections/endpointUrl.js';
 
 /** @type {RegExp} */
 const URL_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
-
-/** @type {Readonly<Object<string, string>>} */
-const DEFAULT_PORTS = Object.freeze({ 'https:': '443', 'http:': '80' });
 
 /**
  * @param {string} url
@@ -124,53 +120,6 @@ export class RequestBuilderService {
     }
 
     /**
-     * @param {Object} opts
-     * @param {Object} opts.requestConfig
-     * @param {Object} opts.snapshot
-     * @param {string} opts.rawUrl
-     * @param {Object} opts.variables
-     * @param {VariableProcessor} opts.processor
-     * @param {{baseUrl: string, pathTemplate: string}|null} opts.mockRewrite
-     * @returns {string}
-     */
-    applyScriptParamMutations({ requestConfig, snapshot, rawUrl, variables, processor, mockRewrite }) {
-        const queryParams = this._normalizeParamMap(requestConfig.queryParams);
-        const pathParams = this._normalizeParamMap(requestConfig.pathParams);
-        requestConfig.queryParams = queryParams;
-        requestConfig.pathParams = pathParams;
-
-        const urlEdited = requestConfig.url !== snapshot.url;
-        const queryChanged = !this._paramMapsEqual(queryParams, snapshot.queryParams);
-        const pathChanged = !this._paramMapsEqual(pathParams, snapshot.pathParams);
-
-        if (!queryChanged && !pathChanged) {
-            return requestConfig.url;
-        }
-
-        let base;
-        if (pathChanged && !urlEdited) {
-            if (mockRewrite) {
-                base = `${mockRewrite.baseUrl}${buildMockPath(mockRewrite.pathTemplate, pathParams)}`;
-            } else {
-                base = ensureScheme(processor.processTemplate(rawUrl, { ...variables, ...pathParams }));
-            }
-        } else {
-            base = requestConfig.url;
-        }
-        base = base.split('?')[0];
-
-        let queryString;
-        if (queryChanged) {
-            queryString = this.buildQueryString(queryParams);
-        } else {
-            const queryIndex = requestConfig.url.indexOf('?');
-            queryString = queryIndex >= 0 ? requestConfig.url.slice(queryIndex + 1) : '';
-        }
-
-        return queryString ? `${base}?${queryString}` : base;
-    }
-
-    /**
      * @param {Object} headers
      * @param {Object} queryParams
      * @param {Object} authData
@@ -190,96 +139,6 @@ export class RequestBuilderService {
     }
 
     /**
-     * @param {Object} opts
-     * @param {Object} opts.requestConfig
-     * @param {string} opts.originalUrl
-     * @param {Object} opts.authData
-     * @returns {boolean}
-     */
-    stripCrossOriginAuth({ requestConfig, originalUrl, authData }) {
-        if (this._sameOrigin(originalUrl, requestConfig.url)) {
-            return false;
-        }
-
-        let stripped = false;
-        const authHeaders = authData?.headers || {};
-        if (requestConfig.headers) {
-            for (const [authName, authValue] of Object.entries(authHeaders)) {
-                for (const key of Object.keys(requestConfig.headers)) {
-                    if (key.toLowerCase() === authName.toLowerCase() && requestConfig.headers[key] === authValue) {
-                        delete requestConfig.headers[key];
-                        stripped = true;
-                    }
-                }
-            }
-        }
-
-        const authQuery = authData?.queryParams || {};
-        if (requestConfig.queryParams) {
-            for (const key of Object.keys(authQuery)) {
-                if (requestConfig.queryParams[key] === authQuery[key]) {
-                    delete requestConfig.queryParams[key];
-                    stripped = true;
-                }
-            }
-        }
-        // Query parameters may already have been baked into the URL before the
-        // script ran. Removing only the transport map would leave them on the wire.
-        try {
-            const url = new URL(requestConfig.url);
-            let changed = false;
-            for (const [key, value] of Object.entries(authQuery)) {
-                const values = url.searchParams.getAll(key);
-                const remaining = values.filter(item => item !== String(value));
-                if (values.length !== remaining.length) {
-                    url.searchParams.delete(key);
-                    remaining.forEach(item => url.searchParams.append(key, item));
-                    changed = true;
-                }
-            }
-            if (changed) { requestConfig.url = url.toString(); stripped = true; }
-        } catch { /* Invalid URLs are reported by the send pipeline. */ }
-
-        if (requestConfig.auth) {
-            delete requestConfig.auth;
-            stripped = true;
-        }
-        if (requestConfig.awsAuth) {
-            delete requestConfig.awsAuth;
-            stripped = true;
-        }
-        if (requestConfig.ntlm) {
-            delete requestConfig.ntlm;
-            stripped = true;
-        }
-
-        return stripped;
-    }
-
-    /**
-     * @param {string} a
-     * @param {string} b
-     * @returns {boolean}
-     */
-    _sameOrigin(a, b) {
-        try {
-            return this._originKey(a) === this._originKey(b);
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * @param {string} url
-     * @returns {string}
-     */
-    _originKey(url) {
-        const parsed = new URL(url);
-        const port = parsed.port || DEFAULT_PORTS[parsed.protocol] || '';
-        return `${parsed.protocol}//${parsed.hostname}:${port}`;
-    }
-
-    /**
      * @param {Object} queryParams
      * @returns {string}
      */
@@ -293,39 +152,6 @@ export class RequestBuilderService {
             queryPairs.push(`${encodeUnlessEncoded(key)}=${encodeUnlessEncoded(stringValue)}`);
         }
         return queryPairs.join('&');
-    }
-
-    /**
-     * @param {*} map
-     * @returns {Object}
-     */
-    _normalizeParamMap(map) {
-        if (!map || typeof map !== 'object' || Array.isArray(map)) {
-            return {};
-        }
-        const normalized = {};
-        for (const [key, value] of Object.entries(map)) {
-            if (value === null || value === undefined) {
-                continue;
-            }
-            normalized[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        }
-        return normalized;
-    }
-
-    /**
-     * @param {Object} a
-     * @param {Object} b
-     * @returns {boolean}
-     */
-    _paramMapsEqual(a, b) {
-        const aKeys = Object.keys(a);
-        if (aKeys.length !== Object.keys(b).length) {
-            return false;
-        }
-        return aKeys.every(
-            key => Object.prototype.hasOwnProperty.call(b, key) && a[key] === b[key]
-        );
     }
 
     /**

@@ -1,21 +1,17 @@
+import { CoreExecutionService, executionError } from './services/CoreExecutionService.js';
 import { getCurrentEndpoint } from './state/currentEndpoint.js';
 import { app } from './appContext.js';
 import { responseInspectionSource } from './responseInspectionSource.js';
-import { refreshScriptRequest } from './services/scriptRequestRefresh.js';
-import { appendAuthQueryRows } from './utils/keyValueRows.js';
 import { clone } from './utils/clone.js';
-import { captureManualBody, buildManualBody } from './services/manualRequestTemplates.js';
-import { resolvedScopeVariables } from './services/ScriptExecutionScope.js';
+import { captureManualBody } from './services/manualRequestTemplates.js';
 import { translate } from './utils/translate.js';
 import { urlInput, methodSelect } from './domElements.js';
 import { toast } from './ui/Toast.js';
 import { updateStatusDisplay, updateResponseTime, updateResponseSize } from './statusDisplay.js';
 import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
 import { methodCarriesBody, requestSendsBody } from './utils/bodyMethods.js';
-import { inFlightRequestFor, newRequestId, trackInFlight } from './state/inFlightRequests.js';
-import { resolveRequestSettings } from './state/settingsCache.js';
+import { inFlightRequestFor, trackInFlight } from './state/inFlightRequests.js';
 import {
-    generateEffectiveAuthData,
     getRequestPipeline,
     warnUnresolvedVariables,
     variableProcessingError,
@@ -30,7 +26,6 @@ import {
     displaySchemaValidationResult,
     renderGraphQLErrorsBadge,
     displayResponseWithLineNumbersForTab,
-    clearResponseDisplayForTab,
     clearSchemaValidationBadge,
     clearGraphQLErrorsBadge
 } from './responseView.js';
@@ -80,9 +75,6 @@ function displayGraphQLErrorsBadge(result, tabId = null) {
     renderGraphQLErrorsBadge(errors, tabId);
 }
 
-function clearResponseDisplay() {
-    return clearResponseDisplayForTab(null);
-}
 
 /**
  * @param {function(): Promise<*>} cancel
@@ -94,19 +86,17 @@ async function cancelStreaming(cancel) {
 }
 
 /** @returns {Promise<void>} */
-const manualScriptScopes = new Map();
+const manualExecutions = new Map();
 
 async function cancelHttpRequest() {
+    let requestTabId;
     try {
-        const requestTabId = await getActiveTabId();
+        requestTabId = await getActiveTabId();
 
-        const scope = manualScriptScopes.get(requestTabId);
-        if (scope) { scope.active = false; }
-        const requestId = inFlightRequestFor(requestTabId);
-        if (!requestId) {
-            return;
-        }
-        const result = await window.backendAPI.cancelApiRequest(requestId);
+        const execution = manualExecutions.get(requestTabId);
+        if (!execution) { return; }
+        await execution.cancel();
+        const result = { success: true };
 
         if (result.success) {
             await showStatusIfActive(requestTabId, 'Request cancelled');
@@ -118,7 +108,7 @@ async function cancelHttpRequest() {
         updateResponseTime(null);
         updateResponseSize(null);
     } finally {
-        setRequestInProgress(false);
+        if (await isTabCurrentlyActive(requestTabId)) { setRequestInProgress(false); }
     }
 }
 
@@ -350,143 +340,13 @@ async function runStreamingSend(protocolId, { useAuth, buildPayload, send }) {
  * @param {Object} historySensitive
  * @returns {Promise<void>}
  */
-async function recordRequestOutcome(requestConfig, outcome, scriptResult, historySensitive, scriptContext) {
-    const endpoint = scriptContext?.endpoint || getCurrentEndpoint();
-
+async function recordRequestOutcome(requestConfig, outcome, _scriptResult, historySensitive, scriptContext) {
     if (app.historyController) {
-        const activeEnvName = await app.environmentController?.service?.getActiveEnvironment()
-            .then(e => e?.name || null)
-            .catch(() => null) || null;
-        app.historyController
-            .addHistoryEntry(requestConfig, outcome, endpoint, activeEnvName, historySensitive)
-            .catch(() => { });
-    }
-
-    if (endpoint && app.scriptController && scriptContext?.scope?.active !== false) {
-        try {
-            await app.scriptController.executeTest(
-                endpoint.collectionId,
-                endpoint.endpointId,
-                requestConfig,
-                scriptResult,
-                scriptContext?.scope ? { scope: scriptContext.scope } : {}
-            );
-        } catch {}
+        await app.historyController.addHistoryEntry(requestConfig, outcome, scriptContext.endpoint,
+            scriptContext.environmentName, historySensitive);
     }
 }
 
-/**
- * @param {string} message
- * @returns {void}
- */
-function abortSend(message) {
-    toast.error(message);
-    clearResponseDisplay();
-    setRequestInProgress(false);
-}
-
-/** @returns {Promise<Object>} */
-async function prepareHttpSend(scriptContext) {
-    const { url, method, pathParams, headers, queryParams, queryRows } = clone(scriptContext.inputs);
-    const collection = scriptContext.endpoint ? await getRequestPipeline().collectionRepository.getById(scriptContext.endpoint.collectionId) : null;
-    Object.assign(headers, { ...collection?.defaultHeaders, ...headers });
-    const {scope} = scriptContext;
-    const variablesOverride = scope ? { baseUrl: collection?.baseUrl || '', ...scope.collections.get(scriptContext.endpoint?.collectionId), ...scope.environment, ...scope.localVariables } : undefined;
-    const templates = clone({ url, pathParams, headers, queryParams, queryRows });
-    const prepared = await resolveRequestPipeline({ url, pathParams, headers, queryParams, queryRows, endpoint: scriptContext.endpoint, authConfig: scriptContext.authConfig, variablesOverride,
-        onAuthRenewed: nextRaw => { scriptContext.authConfig = nextRaw; } });
-    if (!prepared.ok) {
-        return prepared;
-    }
-
-    return {
-        ...prepared,
-        templates,
-        rawUrl: url,
-        method,
-        protocol: scriptContext.inputs.protocol,
-        historySensitive: {
-            headerNames: Object.keys(prepared.authData.headers || {}),
-            queryNames: Object.keys(prepared.authData.queryParams || {})
-        }
-    };
-}
-
-/**
- * @param {{protocol: string, method: string, url: string, rawUrl: string, headers: Object, queryParams: Object, pathParams: Object, body: *, bodyMode: string, authData: Object}} parts
- * @returns {Promise<Object>}
- */
-async function buildSendConfig({ protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyMode, authData }) {
-    const settings = await resolveRequestSettings();
-    return getRequestPipeline().assembleRequestConfig({
-        protocol, method, url, rawUrl, headers, queryParams, pathParams, body, bodyType: bodyMode, settings, authData
-    });
-}
-
-/**
- * @param {Object} requestConfig
- * @param {string|null} requestTabId
- * @returns {Promise<{requestConfig: Object, snapshot: {url: string, queryParams: Object, pathParams: Object}}|null>}
- */
-async function runPreRequestScript(requestConfig, requestTabId, scriptContext) {
-    const snapshot = {
-        url: requestConfig.url,
-        queryParams: { ...requestConfig.queryParams },
-        pathParams: { ...requestConfig.pathParams }
-    };
-    try {
-        const scripted = await app.scriptController.executePreRequest(
-            scriptContext.endpoint.collectionId,
-            scriptContext.endpoint.endpointId,
-            requestConfig,
-            scriptContext.scope ? { scope: scriptContext.scope } : {}
-        );
-        if (scriptContext.scope?.active === false) { return null; }
-        return { requestConfig: scripted, snapshot };
-    } catch (error) {
-        if (scriptContext.scope?.active === false) { return null; }
-        if (error.name === 'RequestSkipped') {
-            const message = translate('runner.flow.skipped', 'Skipped by pre-request script');
-            displayResponseWithLineNumbersForTab(message, null, requestTabId);
-            clearResponsePanes(requestTabId, globalResponseElements());
-            await showStatusIfActive(requestTabId, message);
-            return null;
-        }
-        const message = `Pre-request script error: ${error.message}`;
-        displayResponseWithLineNumbersForTab(`${message}\n\nThe request was not sent.`, null, requestTabId);
-        clearResponsePanes(requestTabId, globalResponseElements());
-        await showStatusIfActive(requestTabId, message);
-        toast.error(message);
-        return null;
-    }
-}
-
-/**
- * @param {Object} requestConfig
- * @param {{snapshot: Object, rawUrl: string, variables: Object, processor: Object, mockRewrite: Object|null, authData: Object}} ctx
- * @returns {void}
- */
-function applyScriptMutations(requestConfig, ctx) {
-    if (getRequestPipeline().applyScriptMutations(requestConfig, ctx)) {
-        toast.warning('Authentication was not sent: the pre-request script changed the request host.');
-    }
-}
-
-/**
- * @param {Object} requestConfig
- * @param {{processor: Object, authData: Object}} ctx
- * @returns {Promise<void>}
- */
-async function decorateSendConfig(requestConfig, { processor, authData }) {
-    await getRequestPipeline().finalize(requestConfig);
-    warnUnresolvedVariables(processor, requestConfig, authData.unresolvedVariables || []);
-}
-
-/**
- * @param {Object} error
- * @param {string} errorMessage
- * @returns {string}
- */
 function errorResponseText(error, errorMessage) {
     if (!error.data) {
         return `Error: ${errorMessage}`;
@@ -539,155 +399,84 @@ export async function handleSendRequest() {
 
 /** @returns {Promise<void>} */
 async function sendHttpRequest() {
-    const scriptContext = { endpoint: getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null,
-        authConfig: clone(app.authManager?.getAuthConfig?.()),
+    const endpoint = getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null;
+    const controller = app.scriptController;
+    const captured = {
+        endpoint, authConfig: clone(app.authManager?.getAuthConfig?.()),
+        scripts: (!endpoint || controller?.isShowingScriptsFor(endpoint.collectionId, endpoint.endpointId))
+            ? clone(controller?.scriptManager?.getCurrentScripts?.()) : null,
         inputs: { url: urlInput?.value?.trim() || urlInput?.getAttribute('value') || '', method: isGraphQLMode() ? 'POST' : methodSelect.value,
             protocol: isGraphQLMode() ? RequestMode.GRAPHQL : RequestMode.HTTP,
             pathParams: parseKeyValuePairs(document.getElementById('path-params-list')),
             headers: parseKeyValuePairs(document.getElementById('headers-list')),
-            queryParams: parseKeyValuePairs(document.getElementById('query-params-list')),
             queryRows: parseKeyValueRows(document.getElementById('query-params-list')).filter(row => row.enabled) },
-        bodySource: captureManualBody(document.getElementById('body-mode-select')?.value || 'json', isGraphQLMode() ? graphqlBodyManager : null) };
-    const scopePromise = app.scriptController?.service?.createExecutionScope?.();
-    const tabId = await getActiveTabId();
-    const lifecycle = { active: true };
-    const previous = manualScriptScopes.get(tabId);
-    if (previous) { previous.active = false; }
-    manualScriptScopes.set(tabId, lifecycle);
-    try {
-        scriptContext.scope = await scopePromise;
-        if (scriptContext.scope) {
-            scriptContext.scope.active = lifecycle.active;
-            if (!lifecycle.active) { return; }
-            await app.scriptController.service.loadCollectionScope(scriptContext.scope, scriptContext.endpoint?.collectionId);
-            if (!lifecycle.active) { scriptContext.scope.active = false; return; }
-            manualScriptScopes.set(tabId, scriptContext.scope);
-        }
-        return await sendHttpWithScope(tabId, lifecycle, scriptContext);
-    }
-    finally {
-        const current = manualScriptScopes.get(tabId);
-        const ownsSend = current === lifecycle || current === scriptContext.scope;
-        lifecycle.active = false;
-        if (scriptContext.scope) { scriptContext.scope.active = false; }
-        if (ownsSend) {
-            manualScriptScopes.delete(tabId);
-            setRequestInProgress(false);
-        }
-    }
-}
-
-async function sendHttpWithScope(requestTabId, lifecycle, scriptContext) {
+        bodySource: captureManualBody(document.getElementById('body-mode-select')?.value || 'json', isGraphQLMode() ? graphqlBodyManager : null)
+    };
+    const core = new CoreExecutionService(getRequestPipeline(), window.backendAPI);
+    const snapshot = Promise.all([core.captureContext([endpoint?.collectionId]), core.captureManual(captured)])
+        .then(value => ({ value }), error => ({ error }));
+    const requestTabId = await getActiveTabId();
+    const previous = manualExecutions.get(requestTabId);
+    previous?.cancel().catch(() => {});
+    const execution = core.createExecution();
+    manualExecutions.set(requestTabId, execution);
+    const isCurrent = () => manualExecutions.get(requestTabId) === execution && !execution.cancelled;
+    const untrack = trackInFlight(requestTabId, execution.executionId);
     setRequestInProgress(true);
-
     const { schemaController } = app;
-    await schemaController?.editor?.__ready;
-    const schemaSnapshot = schemaController?.captureSchema();
-
-    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-
-    scheduleEndpointSave();
-
-    const prepared = await prepareHttpSend(scriptContext);
-    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-    if (!prepared.ok) {
-        updateStatusDisplay(prepared.error, null);
-        setRequestInProgress(false);
-        return;
-    }
-    const { protocol, method, rawUrl, headers, queryParams, variables, processor, authData, historySensitive } = prepared;
-
-    const { url, mockRewrite } = await getRequestPipeline().resolveMockRewrite({
-        endpoint: scriptContext.endpoint,
-        url: prepared.url,
-        queryString: prepared.queryString,
-        pathParams: prepared.pathParams
-    });
-    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-
-    const {bodyMode} = scriptContext.bodySource;
-    let body = undefined;
-    if (requestSendsBody(method, bodyMode)) {
-        const built = buildManualBody(scriptContext.bodySource, processor, variables);
-        if (built.error) {
-            abortSend(built.error);
-            return;
-        }
-        ({ body } = built);
-    }
-
-    let requestConfig = await buildSendConfig({
-        protocol, method, url, rawUrl, headers, queryParams, pathParams: prepared.pathParams, body, bodyMode, authData
-    });
-
-    if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-    const beforeScript = clone(requestConfig);
-    let untrackRequest = null;
-
+    let requestConfig = { ...captured.inputs, requestId: execution.executionId };
+    let scriptContext = { endpoint, environmentName: null };
+    let historySensitive = {};
+    let refreshedAuth;
     try {
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-
+        await schemaController?.editor?.__ready;
+        const schemaSnapshot = schemaController?.captureSchema();
+        scheduleEndpointSave();
+        const capturedSnapshot = await snapshot;
+        if (capturedSnapshot.error) { throw capturedSnapshot.error; }
+        const [context, request] = capturedSnapshot.value;
+        scriptContext = { endpoint, environmentName: context.environmentName };
+        if (!isCurrent()) { return; }
         displayResponseWithLineNumbersForTab('Sending request...', null, requestTabId);
-
         clearResponsePanes(requestTabId, globalResponseElements());
-
-        if (scriptContext.endpoint && app.scriptController) {
-            const scripted = await runPreRequestScript(requestConfig, requestTabId, scriptContext);
-            if (!scripted) {
-                return;
-            }
-            ({ requestConfig } = scripted);
-            if (scriptContext.scope?.revision) {
-                if (!scriptContext.scope.active) { return; }
-                const {scope} = scriptContext;
-                const scopedVariables = { baseUrl: variables.baseUrl, ...resolvedScopeVariables(scope, scriptContext.endpoint.collectionId) };
-                const template = clone(prepared.templates);
-                const refreshedAuth = await generateEffectiveAuthData({ variables: scopedVariables, processor,
-                    endpoint: scriptContext.endpoint, authConfig: scriptContext.authConfig, refreshOAuth: false });
-                getRequestPipeline().requestBuilder.mergeAuthData(template.headers, template.queryParams, refreshedAuth);
-                appendAuthQueryRows(template.queryRows, refreshedAuth.queryParams);
-                scriptContext.refreshedAuth = refreshedAuth;
-                const components = getRequestPipeline().requestBuilder.processRequestComponents({ ...template, variables: scopedVariables, processor });
-                const rewritten = await getRequestPipeline().resolveMockRewrite({ endpoint: scriptContext.endpoint, url: components.url, queryString: components.queryString, pathParams: components.pathParams });
-                const rebuilt = buildManualBody(scriptContext.bodySource, processor, scopedVariables);
-                if (rebuilt.error) { throw new Error(rebuilt.error); }
-                const refreshedBody = requestSendsBody(requestConfig.method, bodyMode) ? rebuilt.body : undefined;
-                const refreshed = { ...beforeScript };
-                getRequestPipeline().attachAuthTransport(refreshed, refreshedAuth);
-                requestConfig = refreshScriptRequest(beforeScript, requestConfig, { ...refreshed, url: rewritten.url,
-                    headers: template.headers, queryParams: template.queryParams, pathParams: components.pathParams, body: refreshedBody }, processor, scopedVariables);
-            }
-            applyScriptMutations(requestConfig, {
-                snapshot: scripted.snapshot, rawUrl, variables, processor, mockRewrite, authData: scriptContext.refreshedAuth || authData, originalAuthData: authData
-            });
+        const result = await core.execute('request', { request, context }, execution, event => {
+            if (event.kind === 'script') {
+                const panel = app.scriptController?.consolePanel;
+                if (event.data.phase === 'test') { panel?.showTestResults(event.data.result); }
+                else if (event.data.result.logs?.length || event.data.result.errors?.length) {
+                    panel?.show(event.data.result.logs, event.data.result.errors);
+                }
+            } else if (event.kind === 'warning') { toast.warning(executionError(event.data)); }
+            else if (event.kind === 'effect' && event.data.kind === 'auth' && event.data.source?.kind === 'request') { refreshedAuth = event.data.changes; }
+        }, isCurrent);
+        if (!isCurrent()) { return; }
+        if (refreshedAuth && await isTabCurrentlyActive(requestTabId) &&
+            app.authManager?.getAuthConfig?.()?.config?.token === captured.authConfig?.config?.token) {
+            app.authManager?.applyTokenResult?.({ success: true, accessToken: refreshedAuth.token,
+                refreshToken: refreshedAuth.refreshToken,
+                expiresIn: refreshedAuth.expiresAt ? Math.max(0, (refreshedAuth.expiresAt - Date.now()) / 1000) : null });
         }
-
-        if (scriptContext.scope?.active === false) { return; }
-        await decorateSendConfig(requestConfig, { processor, authData });
-        if (scriptContext.scope?.active === false) { return; }
-
-        requestConfig.requestId = newRequestId();
-        untrackRequest = trackInFlight(requestTabId, requestConfig.requestId);
-        const response = await window.backendAPI.sendApiRequest(requestConfig);
-        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-
-        if (response.cancelled) {
-            await showStatusIfActive(requestTabId, 'Request cancelled');
-            displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
-            clearResponsePanes(requestTabId, globalResponseElements());
-            clearGraphQLErrorsBadge(requestTabId);
-            setRequestInProgress(false);
-        } else if (response.status) {
-            await handleReceivedResponse(response, { requestConfig, requestTabId, url, historySensitive, schemaController, schemaSnapshot, scriptContext });
+        requestConfig = { ...(result.requestConfig || requestConfig), requestId: execution.executionId };
+        historySensitive = result.historySensitive || {};
+        if (result.apiResponse?.status) {
+            await handleReceivedResponse(result.apiResponse, { requestConfig, requestTabId, url: requestConfig.url,
+                historySensitive, schemaController, schemaSnapshot, scriptContext });
+            if (result.executionError?.code === 'persistenceFailed') { toast.error(result.error); }
+        } else if (result.status === 'skipped') {
+            const message = translate('runner.flow.skipped', 'Skipped by pre-request script');
+            displayResponseWithLineNumbersForTab(message, null, requestTabId);
+            await showStatusIfActive(requestTabId, message);
         } else {
-            throw response;
+            throw Object.assign(new Error(result.error || 'Request failed'), result.apiResponse || {});
         }
     } catch (error) {
-        if (!lifecycle.active || scriptContext.scope?.active === false) { return; }
-        await handleSendError(error, { requestConfig, requestTabId, historySensitive, scriptContext });
+        if (isCurrent()) { await handleSendError(error, { requestConfig, requestTabId, historySensitive, scriptContext }); }
     } finally {
-        untrackRequest?.();
+        untrack();
+        if (manualExecutions.get(requestTabId) === execution) {
+            manualExecutions.delete(requestTabId);
+            if (await isTabCurrentlyActive(requestTabId)) { setRequestInProgress(false); }
+        }
     }
 }
 
@@ -748,16 +537,13 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
         setCookies: result.setCookies
     });
 
-    if (app.cookieController && result.setCookies && result.setCookies.length > 0) {
-        app.cookieController.handleCookiesFromResponse(result.setCookies, requestConfig.url);
-    }
 
     if (await isTabCurrentlyActive(requestTabId)) {
         updateStatusDisplay(`Status: ${result.status} ${result.statusText || ''}`.trim(), result.status);
         updateResponseTime(result.ttfb);
         updateResponseSize(result.size);
+        setRequestInProgress(false);
     }
-    setRequestInProgress(false);
 
     const cookies = responseCookies(result);
 

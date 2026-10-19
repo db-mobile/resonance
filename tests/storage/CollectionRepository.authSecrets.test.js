@@ -367,6 +367,18 @@ describe('CollectionRepository auth secret redaction', () => {
                 repository._byIdCache.clear();
             });
 
+            test('execution snapshots hydrate every parent in closest-first order', async () => {
+                await repository.saveCollectionAuthConfig('c1', { type: 'bearer', config: { token: 'collection-secret' } });
+                await repository.saveFolderAuthConfig('c1', 'outer', { type: 'bearer', config: { token: 'outer-secret' } });
+                await repository.saveFolderAuthConfig('c1', 'inner', { type: 'inherit', config: {} });
+                const sources = await repository.getExecutionAuthSources('c1', 'innerRequest');
+                expect(sources.map(item => item.source)).toEqual([
+                    { kind: 'folder', folderId: 'inner' }, { kind: 'folder', folderId: 'outer' }, { kind: 'collection' }
+                ]);
+                expect(sources.map(item => item.authConfig.config.token)).toEqual([undefined, 'outer-secret', 'collection-secret']);
+                expect(savedCollection.authConfig.config.token).toBe('');
+            });
+
             test('the innermost folder that defines auth wins', async () => {
                 await repository.saveFolderAuthConfig('c1', 'outer', {
                     type: 'bearer',
