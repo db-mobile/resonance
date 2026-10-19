@@ -323,7 +323,7 @@ functions, undefined, non-finite numbers, and cyclic objects are rejected. Use
 `pm.variables.unset(name)` to remove a local override and reveal the lower scope.
 These locals also resolve `{{name}}` in requests, including authentication.
 Explicit environment/collection writes still update saved values. Collection
-writes affect only that collection, even when a runner crosses collections.
+writes affect only the collection the runner belongs to.
 
 For example, a login request's test script can save a token for later requests:
 

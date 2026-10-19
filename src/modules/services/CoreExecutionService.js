@@ -167,8 +167,11 @@ export class CoreExecutionService {
                 return captureRunnerEntry(entry, target);
             })
         );
+        const collectionId = captured.collectionId ?? captured.requests[0]?.collectionId ?? null;
         const dataFile = captured.options?.dataFile?.path
-            ? await this.backend.runner.readDataFile(captured.options.dataFile.path)
+            ? await this.backend.collections.runners
+                .readData(collectionId, captured.options.dataFile.path)
+                .then(({ name, content }) => ({ name, content }))
             : null;
         const context = await contextPromise;
         if (context.error) {

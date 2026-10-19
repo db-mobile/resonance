@@ -89,9 +89,14 @@ getrandom = "0.3"
 protox = "0.10"
 
 
+# Opens a collection directory in the platform file manager ("Show in file manager");
+# pure Rust, no network or TLS dependencies.
+open = "5"
+
 # OS keychain for secret storage (encryption at rest). Pinned OpenSSL-free to match the
 # project's rustls/ring-only TLS stack: Linux uses the D-Bus Secret Service with RustCrypto
 # (zbus, no OpenSSL); macOS/Windows use their native credential stores.
+
 [target.'cfg(target_os = "linux")'.dependencies]
 # Use the native content/surface sizes to compensate GTK client-side decorations
 # when restoring the window-state plugin's saved bounds.

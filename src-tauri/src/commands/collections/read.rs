@@ -11,10 +11,13 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::layout::{COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML};
+use super::layout::{
+    COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML, is_reserved_dir,
+};
 use super::model::{
     CollectionDoc, FORMAT_VERSION, FolderDoc, FormatProbe, RequestDoc, probe_format,
 };
+use super::runners::{RunnerEntry, read_runners};
 
 /// Which on-disk format a collection directory uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,6 +85,10 @@ pub(crate) struct LoadedCollection {
     pub open_api_spec: Option<Value>,
     pub variables: Vec<Value>,
     pub root: FolderNode,
+    /// Saved runners from `runners/`, outside the request tree.
+    pub runners: Vec<RunnerEntry>,
+    /// Runner ids re-minted on this read; the list command writes them back.
+    pub reassigned_runner_ids: Vec<(String, String)>,
 }
 
 impl LoadedCollection {
@@ -110,7 +117,7 @@ fn collect_requests<'a>(node: &'a FolderNode, out: &mut Vec<&'a RequestEntry>) {
 /// @param source - Raw document text
 /// @param path - Path used in the error message
 /// @returns Ok when the version is readable
-fn check_version(source: &str, path: &Path) -> Result<(), String> {
+pub(super) fn check_version(source: &str, path: &Path) -> Result<(), String> {
     let format = probe_format(source).map_err(|e| format!("{}: {}", path.display(), e))?;
 
     if format > FORMAT_VERSION {
@@ -177,9 +184,10 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
     check_version(&source, path)?;
 
     match serde_yaml_ng::from_str::<RequestDoc>(&source) {
-        // Environment documents also carry id/name/seq, so deserialization
-        // alone cannot distinguish them from a minimal request. Leave these
-        // files outside the request tree (and therefore outside request writes).
+        // Environment and runner documents also carry id/name/seq, so
+        // deserialization alone cannot distinguish them from a minimal
+        // request. Leave these files outside the request tree (and therefore
+        // outside request writes).
         Ok(doc)
             if doc.method.is_none()
                 && doc.protocol.is_none()
@@ -188,7 +196,9 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
                 && doc.body.is_none()
                 && doc.grpc.is_none()
                 && doc.mqtt.is_none()
-                && (doc.extra.contains_key("color") || doc.extra.contains_key("variables")) =>
+                && ["color", "variables", "requests", "options"]
+                    .iter()
+                    .any(|key| doc.extra.contains_key(*key)) =>
         {
             Ok(None)
         }
@@ -210,12 +220,16 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
 /// (neither branch saw the other) and a hand-written file may have none. The
 /// id breaks a remaining tie on name, without which the order would fall back
 /// to `fs::read_dir` and differ between machines for the same commit.
-fn sort_key(seq: i64, name: &str, id: &str) -> (i64, String, String) {
+pub(super) fn sort_key(seq: i64, name: &str, id: &str) -> (i64, String, String) {
     (seq, name.to_ascii_lowercase(), id.to_string())
 }
 
 /// Reads one directory as a folder, recursing into subdirectories.
-fn read_folder(dir: &Path) -> Result<FolderNode, String> {
+///
+/// At the collection root, a directory the layout owns (`runners/`) is not a
+/// request folder and is skipped; deeper down the same name is an ordinary
+/// folder.
+fn read_folder(dir: &Path, at_root: bool) -> Result<FolderNode, String> {
     let mut node = FolderNode::default();
 
     let folder_yaml = dir.join(FOLDER_YAML);
@@ -257,6 +271,16 @@ fn read_folder(dir: &Path) -> Result<FolderNode, String> {
         }
 
         if path.is_dir() {
+            if at_root && is_reserved_dir(&name) {
+                if path.join(FOLDER_YAML).exists() {
+                    eprintln!(
+                        "{}: a request folder named {} is hidden because that name is reserved; rename the directory",
+                        dir.display(),
+                        name
+                    );
+                }
+                continue;
+            }
             if Layout::detect(&path).is_some() {
                 return Err(format!(
                     "{} contains a nested collection at {}; open it on its own instead",
@@ -264,7 +288,7 @@ fn read_folder(dir: &Path) -> Result<FolderNode, String> {
                     path.display()
                 ));
             }
-            node.folders.push(read_folder(&path)?);
+            node.folders.push(read_folder(&path, false)?);
         } else if is_yaml_file(&path)
             && !is_layout_file(&name)
             && let Some(doc) = read_request_file(&path)?
@@ -377,7 +401,7 @@ pub(crate) fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String
         None => None,
     };
 
-    let mut root = read_folder(dir)?;
+    let mut root = read_folder(dir, true)?;
 
     let mut seen = HashSet::new();
     let reassigned = dedupe_ids(&mut root, &mut seen);
@@ -388,11 +412,21 @@ pub(crate) fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String
         );
     }
 
+    let runners = read_runners(dir)?;
+    for (old, fresh) in &runners.reassigned {
+        eprintln!(
+            "collection {}: duplicate runner id {:?} reassigned to {}",
+            meta.id, old, fresh
+        );
+    }
+
     Ok(LoadedCollection {
         meta,
         open_api_spec,
         variables,
         root,
+        runners: runners.entries,
+        reassigned_runner_ids: runners.reassigned,
     })
 }
 
@@ -779,6 +813,86 @@ mod tests {
         let read = read_collection_dir(temp.path()).unwrap();
         assert_eq!(read.requests().len(), 1);
         assert!(read.requests()[0].doc.extra.contains_key("variables"));
+    }
+
+    fn runner_yaml(id: &str, name: &str) -> String {
+        format!(
+            "resonanceFormat: 2\nid: {}\nname: {}\nrequests:\n- requestId: r1\n",
+            id, name
+        )
+    }
+
+    #[test]
+    fn the_runners_dir_is_not_read_as_a_folder() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(temp.path(), "health.yaml", &request_yaml("r1", "Health"));
+        write(
+            temp.path(),
+            "runners/smoke.yaml",
+            &runner_yaml("runner_1", "Smoke"),
+        );
+
+        let read = read_collection_dir(temp.path()).unwrap();
+        assert!(read.root.folders.is_empty());
+        assert_eq!(read.requests().len(), 1);
+        assert_eq!(read.runners.len(), 1);
+        assert_eq!(read.runners[0].doc.id, "runner_1");
+    }
+
+    #[test]
+    fn a_runners_dir_deeper_in_the_tree_is_still_a_folder() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(
+            temp.path(),
+            "pets/runners/list.yaml",
+            &request_yaml("r1", "List"),
+        );
+
+        let read = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(read.root.folders.len(), 1);
+        assert_eq!(read.root.folders[0].folders.len(), 1);
+        assert_eq!(read.requests().len(), 1);
+        assert!(read.runners.is_empty());
+    }
+
+    #[test]
+    fn a_runner_document_is_never_read_as_a_request() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(temp.path(), "health.yaml", &request_yaml("r1", "Health"));
+        write(temp.path(), "stray.yaml", &runner_yaml("runner_1", "Stray"));
+        write(
+            temp.path(),
+            "pets/options-only.yaml",
+            "resonanceFormat: 2\nid: runner_2\nname: Options\noptions:\n  stopOnError: true\n",
+        );
+
+        let read = read_collection_dir(temp.path()).unwrap();
+        let ids: Vec<_> = read.requests().iter().map(|e| e.doc.id.clone()).collect();
+        assert_eq!(ids, vec!["r1"]);
+    }
+
+    #[test]
+    fn a_hidden_request_folder_named_runners_does_not_fail_the_read() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(
+            temp.path(),
+            "runners/_folder.yaml",
+            "resonanceFormat: 2\nid: folder_runners\nname: Runners\n",
+        );
+        write(
+            temp.path(),
+            "runners/ping.yaml",
+            "resonanceFormat: 2\nid: r1\nname: Ping\nmethod: GET\npath: /ping\n",
+        );
+
+        let read = read_collection_dir(temp.path()).unwrap();
+        assert!(read.root.folders.is_empty());
+        assert!(read.requests().is_empty());
+        assert!(read.runners.is_empty());
     }
 
     #[test]

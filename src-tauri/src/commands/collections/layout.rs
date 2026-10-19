@@ -16,9 +16,24 @@ pub(crate) const COLLECTION_JSON: &str = "collection.json";
 
 const RESERVED_STEMS: &[&str] = &["collection", "variables", "openapi"];
 
+/// Directories the layout owns at the collection root. The reader never
+/// descends into one as a request folder, and the writer never names a root
+/// folder after one. `environments` joins this list when that move lands.
+pub(crate) const RUNNERS_DIR: &str = "runners";
+const RESERVED_DIRS: &[&str] = &[RUNNERS_DIR];
+
 /// Longest file stem we derive from a request name, so a long name cannot
 /// produce a path the filesystem rejects.
 const MAX_STEM_LEN: usize = 60;
+
+/// Reports whether a directory name at the collection root is one the layout
+/// owns rather than a request folder.
+///
+/// @param name - Directory name, without any path
+/// @returns True when the name is reserved
+pub(crate) fn is_reserved_dir(name: &str) -> bool {
+    RESERVED_DIRS.contains(&name)
+}
 
 /// Reports whether a stem would collide with a file the layout owns.
 ///
@@ -36,9 +51,23 @@ pub(crate) fn is_reserved_stem(stem: &str) -> bool {
 /// @param name - The request's display name
 /// @returns A slug of at most MAX_STEM_LEN characters, never empty
 pub(crate) fn request_stem(name: &str) -> String {
+    stem_with_fallback(name, "request")
+}
+
+/// Derives a runner's file stem from its display name.
+///
+/// @param name - The runner's display name
+/// @returns A slug of at most MAX_STEM_LEN characters, never empty
+pub(crate) fn runner_stem(name: &str) -> String {
+    stem_with_fallback(name, "runner")
+}
+
+/// Slugifies a display name, replacing the slugifier's own "collection"
+/// fallback with a kind-specific one unless the name really says collection.
+fn stem_with_fallback(name: &str, fallback: &str) -> String {
     let slug = slugify(name);
     let slug = if slug == "collection" && !name.to_ascii_lowercase().contains("collection") {
-        "request".to_string()
+        fallback.to_string()
     } else {
         slug
     };
@@ -148,6 +177,38 @@ pub(crate) fn find_available_dir(
     loop {
         candidate = parent.join(format!("{}-{}", base_name, counter));
         if current_dir == Some(candidate.as_path()) || !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
+/// Picks a directory for a request folder, suffixing past anything taken.
+///
+/// At the collection root a reserved name is never used as-is: a folder the
+/// user names `runners` lands in `runners-2/`, so it can never be confused
+/// with the directory the layout owns. The caller's current directory counts
+/// as free, so a suffixed folder keeps its directory on every later save.
+///
+/// @param parent - Directory the folder lives in
+/// @param stem - Desired directory name
+/// @param current - Directory the caller already owns, if any
+/// @param at_root - Whether parent is the collection root
+/// @returns A directory that is free, or already the caller's
+pub(crate) fn find_available_folder_dir(
+    parent: &Path,
+    stem: &str,
+    current: Option<&Path>,
+    at_root: bool,
+) -> PathBuf {
+    if !(at_root && is_reserved_dir(stem)) {
+        return find_available_dir(parent, stem, current);
+    }
+
+    let mut counter = 2;
+    loop {
+        let candidate = parent.join(format!("{}-{}", stem, counter));
+        if current == Some(candidate.as_path()) || !candidate.exists() {
             return candidate;
         }
         counter += 1;
@@ -416,5 +477,57 @@ mod tests {
 
         let found = find_endpoint_data_file(temp.path(), "b").unwrap();
         assert_eq!(found, Some(other));
+    }
+
+    #[test]
+    fn a_symbol_only_runner_name_falls_back_to_runner() {
+        assert_eq!(runner_stem("///"), "runner");
+        assert_eq!(runner_stem(""), "runner");
+    }
+
+    #[test]
+    fn a_runner_actually_named_collection_keeps_that_stem() {
+        assert_eq!(runner_stem("Collection"), "collection");
+        assert_eq!(runner_stem("Smoke"), "smoke");
+    }
+
+    #[test]
+    fn a_runner_stem_is_truncated_to_a_sane_length() {
+        let stem = runner_stem(&"word ".repeat(40));
+        assert!(stem.len() <= MAX_STEM_LEN);
+        assert!(!stem.ends_with('-'));
+    }
+
+    #[test]
+    fn reserved_directories_are_recognised() {
+        assert!(is_reserved_dir("runners"));
+        assert!(!is_reserved_dir("pets"));
+        assert!(!is_reserved_dir("runners-2"));
+    }
+
+    /// A folder the user names `runners` must never occupy the directory the
+    /// layout owns, even when that directory does not exist yet.
+    #[test]
+    fn a_reserved_root_directory_name_is_always_suffixed() {
+        let temp = TempDir::new().unwrap();
+        let chosen = find_available_folder_dir(temp.path(), "runners", None, true);
+        assert_eq!(chosen, temp.path().join("runners-2"));
+
+        let nested = find_available_folder_dir(temp.path(), "runners", None, false);
+        assert_eq!(nested, temp.path().join("runners"));
+    }
+
+    #[test]
+    fn a_suffixed_reserved_directory_the_caller_owns_is_kept() {
+        let temp = TempDir::new().unwrap();
+        let owned = temp.path().join("runners-2");
+        fs::create_dir(&owned).unwrap();
+        fs::create_dir(temp.path().join("runners-3")).unwrap();
+
+        let chosen = find_available_folder_dir(temp.path(), "runners", Some(owned.as_path()), true);
+        assert_eq!(chosen, owned);
+
+        let fresh = find_available_folder_dir(temp.path(), "runners", None, true);
+        assert_eq!(fresh, temp.path().join("runners-4"));
     }
 }

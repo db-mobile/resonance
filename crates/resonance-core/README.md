@@ -68,7 +68,7 @@ settle correctly without duplicating persistence. Editor state, history,
 schema validation, report exports, and saved-run bookkeeping stay in the GUI.
 
 The behavioral fixtures in `tests/fixtures/execution` at the repository root are
-shared migration evidence; see their README for provenance. The standalone CI job
+shared migration evidence; see their README for provenance. The `core` job in the CI pipeline
 builds/tests this crate and checks its dependency boundary without installing
 frontend or desktop dependencies. `scripts/check-core-resolution.py` verifies
 matching package versions and resolved normal dependency edges against the desktop

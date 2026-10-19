@@ -388,6 +388,12 @@ export class CollectionController {
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRename(collection)
             },
+            {
+                label: 'Show in File Manager',
+                translationKey: 'context_menu.show_in_file_manager',
+                iconClass: 'icon-folder',
+                onClick: () => this.handleReveal(collection)
+            },
             collection.linked
                 ? {
                     label: 'Close Collection',
@@ -974,6 +980,18 @@ export class CollectionController {
      * @param {Object} collection
      * @returns {Promise<void>}
      */
+    async handleReveal(collection) {
+        try {
+            await this.service.revealCollection(collection.id);
+        } catch (error) {
+            toast.error(translate('collection.reveal_failed', 'Could not show the collection folder: {{message}}', { message: error.message }));
+        }
+    }
+
+    /**
+     * @param {Object} collection
+     * @returns {Promise<void>}
+     */
     async handleDelete(collection) {
         const confirmed = await this.confirmDialog.show(
             translate(
@@ -994,6 +1012,7 @@ export class CollectionController {
         }
 
         try {
+            await app.runnerBookkeeping?.forgetCollection(collection.id);
             await this.service.deleteCollection(collection.id);
             await this.variableService.cleanupCollectionVariables(collection.id);
             await this.loadCollections();

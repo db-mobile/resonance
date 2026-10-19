@@ -210,3 +210,45 @@ jobs:
     
     - name: Run dependency check
       run: npx audit-ci --moderate --skip-dev
+
+  core:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Check shipped dependency resolution and version
+      run: |
+        python3 scripts/test-core-resolution.py
+        python3 scripts/check-core-resolution.py
+
+    - name: Install Rust stable
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Rust cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: crates/resonance-core -> target
+
+    - name: Check dependency boundary
+      run: |
+        cargo tree --manifest-path crates/resonance-core/Cargo.toml --locked --prefix none > core-dependencies.txt
+        if grep -Ei '^(tauri|gtk|gdk|webkit|javascriptcore|keyring|oo7|secret-service|security-framework|windows-credentials)([- ]|$)' core-dependencies.txt; then
+          echo 'The execution core must not depend on desktop libraries.'
+          exit 1
+        fi
+
+    - name: Check formatting
+      run: cargo fmt --manifest-path crates/resonance-core/Cargo.toml -- --check
+
+    - name: Run clippy
+      run: cargo clippy --manifest-path crates/resonance-core/Cargo.toml --locked --all-targets -- -D warnings
+
+    - name: Build without frontend assets or desktop dependencies
+      run: cargo build --manifest-path crates/resonance-core/Cargo.toml --locked
+
+    - name: Run core tests
+      run: cargo test --manifest-path crates/resonance-core/Cargo.toml --locked

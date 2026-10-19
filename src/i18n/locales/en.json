@@ -128,7 +128,8 @@
     "import_success": "Collection imported successfully",
     "import_error": "Failed to import collection",
     "close_title": "Close Collection",
-    "confirm_close": "Remove \"{{name}}\" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later."
+    "confirm_close": "Remove \"{{name}}\" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later.",
+    "reveal_failed": "Could not show the collection folder: {{message}}"
   },
   "endpoint": {
     "delete_title": "Delete Request",
@@ -162,7 +163,8 @@
     "rename_folder": "Rename Folder",
     "delete_folder": "Delete Folder",
     "duplicate_request": "Duplicate Request",
-    "move_request": "Move to Folder…"
+    "move_request": "Move to Folder…",
+    "show_in_file_manager": "Show in File Manager"
   },
   "docs": {
     "title": "Generate Documentation",
@@ -542,7 +544,7 @@
     "status_skipped": "Skipped",
     "status_failed": "Failed",
     "status_pending": "Pending",
-    "request_missing": "This request no longer exists in any open collection",
+    "request_missing": "This request no longer exists in its collection",
     "untitled": "Untitled Runner",
     "loaded": "Loaded runner: {{name}}",
     "created": "Runner \"{{name}}\" created",
@@ -580,10 +582,10 @@
     "running_requests_other": "Running {{count}} requests...",
     "tests_failed_one": "{{count}} test failed",
     "tests_failed_other": "{{count}} tests failed",
-    "relinked_one": "Re-linked {{count}} request to the open collections",
-    "relinked_other": "Re-linked {{count}} requests to the open collections",
-    "missing_requests_one": "{{count}} request in \"{{name}}\" no longer exists in any open collection",
-    "missing_requests_other": "{{count}} requests in \"{{name}}\" no longer exist in any open collection",
+    "relinked_one": "Re-linked {{count}} request within its collection",
+    "relinked_other": "Re-linked {{count}} requests within its collection",
+    "missing_requests_one": "{{count}} request in \"{{name}}\" no longer exists in its collection",
+    "missing_requests_other": "{{count}} requests in \"{{name}}\" no longer exist in its collection",
     "add_all": "Add all requests",
     "nothing_runnable": "There are no HTTP or GraphQL requests to run here",
     "iterations": "Iterations",
@@ -632,7 +634,17 @@
       "executionError": "Execution error",
       "jump": "Next: {{target}}",
       "end_iteration": "End iteration"
-    }
+    },
+    "collection_locked": "This runner belongs to \"{{name}}\". Start a new runner to use another collection.",
+    "in_collection": "in {{name}}",
+    "no_collection": "Add a request first so the runner belongs to a collection",
+    "data_file_not_portable": "Outside the collection folder: this path only works on this machine",
+    "migration_moved_one": "Moved {{count}} saved runner into its collection folder",
+    "migration_moved_other": "Moved {{count}} saved runners into their collection folders",
+    "migration_dropped_one": "{{count}} runner lost requests from other collections: {{names}}",
+    "migration_dropped_other": "{{count}} runners lost requests from other collections: {{names}}",
+    "migration_skipped_one": "{{count}} saved runner has no requests and was not moved",
+    "migration_skipped_other": "{{count}} saved runners have no requests and were not moved"
   },
   "mqtt": {
     "title": "MQTT",

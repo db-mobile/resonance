@@ -2,6 +2,7 @@ import { app } from '../appContext.js';
 import { ChangeEmitter } from './ChangeEmitter.js';
 import { translate } from '../utils/translate.js';
 import { CoreExecutionService, adaptResult, executionError } from './CoreExecutionService.js';
+import { loadEndpointRequestConfig } from './endpointRequestConfig.js';
 
 export class RunnerService {
     /**
@@ -32,25 +33,38 @@ export class RunnerService {
         return this._events.listeners;
     }
 
-    /** @returns {Promise<Array<Object>>} */
-    async getAllRunners() {
-        return this.repository.getAll();
+    /**
+     * @param {{fresh?: boolean}} [options]
+     * @returns {Promise<Array<Object>>}
+     */
+    async getAllRunners(options = {}) {
+        return this.repository.getAll(options);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} id
+     * @returns {Promise<Object|undefined>}
+     */
+    async getRunner(collectionId, id) {
+        return this.repository.getById(collectionId, id);
     }
 
     /**
      * @param {string} id
      * @returns {Promise<Object|undefined>}
      */
-    async getRunner(id) {
-        return this.repository.getById(id);
+    async findRunner(id) {
+        return this.repository.findById(id);
     }
 
     /**
+     * @param {string} collectionId
      * @param {Object} runnerData
      * @returns {Promise<Object>}
      */
-    async createRunner(runnerData) {
-        const runner = await this.repository.add(runnerData);
+    async createRunner(collectionId, runnerData) {
+        const runner = await this.repository.add(collectionId, runnerData);
         this.statusDisplay?.update(
             translate('runner.created', 'Runner "{{name}}" created', { name: runner.name }),
             null
@@ -59,12 +73,13 @@ export class RunnerService {
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} id
      * @param {Object} updates
      * @returns {Promise<Object|null>}
      */
-    async updateRunner(id, updates) {
-        const runner = await this.repository.update(id, updates);
+    async updateRunner(collectionId, id, updates) {
+        const runner = await this.repository.update(collectionId, id, updates);
         if (runner) {
             this.statusDisplay?.update(
                 translate('runner.saved', 'Runner "{{name}}" saved', { name: runner.name }),
@@ -75,11 +90,12 @@ export class RunnerService {
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} id
      * @returns {Promise<boolean>}
      */
-    async deleteRunner(id) {
-        const success = await this.repository.delete(id);
+    async deleteRunner(collectionId, id) {
+        const success = await this.repository.delete(collectionId, id);
         if (success) {
             this.statusDisplay?.update(translate('runner.deleted', 'Runner deleted'), null);
         }
@@ -91,31 +107,20 @@ export class RunnerService {
      * @param {string} endpointId
      * @returns {Promise<Object>}
      */
-    async getEndpointRequestConfig(collectionId, endpointId) {
-        const [pathParams, queryParams, headers, body] = await Promise.all([
-            this.collectionRepository.getPersistedPathParams(collectionId, endpointId),
-            this.collectionRepository.getPersistedQueryParams(collectionId, endpointId),
-            this.collectionRepository.getPersistedHeaders(collectionId, endpointId),
-            this.collectionRepository.getModifiedRequestBody(collectionId, endpointId)
-        ]);
-
-        return {
-            pathParams: pathParams || [],
-            queryParams: queryParams || [],
-            headers: headers || [],
-            body: body || ''
-        };
+    getEndpointRequestConfig(collectionId, endpointId) {
+        return loadEndpointRequestConfig(this.collectionRepository, collectionId, endpointId);
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} runnerId
      * @param {Function} [onProgress]
      * @returns {Promise<Object>}
      */
-    async executeRunner(runnerId, onProgress) {
+    async executeRunner(collectionId, runnerId, onProgress) {
         this._assertIdle();
 
-        const runner = await this.repository.getById(runnerId);
+        const runner = await this.repository.getById(collectionId, runnerId);
         if (!runner) {
             throw new Error(translate('runner.error_not_found', 'Runner not found'));
         }

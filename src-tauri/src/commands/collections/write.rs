@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use super::super::fs_secure::{restrict_dir, restrict_file};
 use super::layout::{
     COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML,
-    find_available_path, request_stem, slugify,
+    find_available_folder_dir, find_available_path, is_reserved_dir, request_stem, slugify,
 };
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
@@ -28,7 +28,7 @@ use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_nam
 const SEQ_STEP: i64 = 10;
 
 /// Serializes a value to YAML.
-fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
+pub(super) fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
     serde_yaml_ng::to_string(value).map_err(|e| format!("Failed to serialize YAML: {}", e))
 }
 
@@ -93,7 +93,7 @@ pub(crate) fn write_if_changed(path: &Path, contents: &str) -> Result<bool, Stri
 }
 
 /// Creates a directory if missing and tightens its permissions either way.
-fn ensure_dir(dir: &Path) -> Result<(), String> {
+pub(super) fn ensure_dir(dir: &Path) -> Result<(), String> {
     if !dir.exists() {
         fs::create_dir_all(dir)
             .map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
@@ -141,7 +141,7 @@ fn assign_missing_seq(node: &mut FolderNode) {
 ///
 /// Renaming first and writing after is deliberate: writing the new file before
 /// removing the old would leave two files claiming one request id.
-fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
+pub(super) fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
     if current == desired || !current.exists() {
         return Ok(());
     }
@@ -158,8 +158,10 @@ fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
 /// Writes one folder's requests and recurses into its subfolders.
 ///
 /// Returns every path it wrote or kept, so the caller can tell which files in
-/// the directory belong to the tree.
-fn write_folder(dir: &Path, node: &mut FolderNode) -> Result<Vec<PathBuf>, String> {
+/// the directory belong to the tree. At the collection root a subfolder whose
+/// slug is a reserved directory name is suffixed, so it can never claim the
+/// directory the layout owns.
+fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<PathBuf>, String> {
     ensure_dir(dir)?;
 
     let mut claimed: Vec<PathBuf> = Vec::new();
@@ -189,12 +191,13 @@ fn write_folder(dir: &Path, node: &mut FolderNode) -> Result<Vec<PathBuf>, Strin
         let stem = slugify(&folder_display_name(folder));
         let current = folder.source.clone();
 
-        let desired = if current.as_deref().map(|p| p.parent() == Some(dir)) == Some(true)
-            && current.as_deref().and_then(|p| p.file_name()) == Some(std::ffi::OsStr::new(&stem))
-        {
+        let keeps_current = !(at_root && is_reserved_dir(&stem))
+            && current.as_deref().map(|p| p.parent() == Some(dir)) == Some(true)
+            && current.as_deref().and_then(|p| p.file_name()) == Some(std::ffi::OsStr::new(&stem));
+        let desired = if keeps_current {
             current.clone().unwrap()
         } else {
-            find_available_dir_for(dir, &stem, current.as_deref())
+            find_available_folder_dir(dir, &stem, current.as_deref(), at_root)
         };
 
         if let Some(current_path) = &current
@@ -205,27 +208,10 @@ fn write_folder(dir: &Path, node: &mut FolderNode) -> Result<Vec<PathBuf>, Strin
         }
 
         folder.source = Some(desired.clone());
-        claimed.extend(write_folder(&desired, folder)?);
+        claimed.extend(write_folder(&desired, folder, false)?);
     }
 
     Ok(claimed)
-}
-
-/// Picks a free directory name, suffixing past anything taken.
-fn find_available_dir_for(parent: &Path, stem: &str, current: Option<&Path>) -> PathBuf {
-    let candidate = parent.join(stem);
-    if current == Some(candidate.as_path()) || !candidate.exists() {
-        return candidate;
-    }
-
-    let mut counter = 2;
-    loop {
-        let candidate = parent.join(format!("{}-{}", stem, counter));
-        if current == Some(candidate.as_path()) || !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
 }
 
 /// Removes the v1 files once a v2 tree is fully on disk.
@@ -271,7 +257,7 @@ pub(crate) fn write_collection_dir(
     ensure_dir(dir)?;
 
     assign_missing_seq(&mut collection.root);
-    write_folder(dir, &mut collection.root)?;
+    write_folder(dir, &mut collection.root, true)?;
 
     if !collection.variables.is_empty() {
         write_if_changed(&dir.join(VARIABLES_YAML), &to_yaml(&collection.variables)?)?;
@@ -358,7 +344,93 @@ mod tests {
                 requests,
                 folders: Vec::new(),
             },
+            runners: Vec::new(),
+            reassigned_runner_ids: Vec::new(),
         }
+    }
+
+    fn folder(id: &str, name: &str, requests: Vec<RequestEntry>) -> FolderNode {
+        FolderNode {
+            meta: Some(folder_meta(id, name)),
+            source: None,
+            requests,
+            folders: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_root_folder_named_runners_gets_a_suffix() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![]);
+        written
+            .root
+            .folders
+            .push(folder("f1", "Runners", vec![request("r1", "Ping")]));
+
+        write_collection_dir(temp.path(), &mut written).unwrap();
+
+        assert!(temp.path().join("runners-2/ping.yaml").exists());
+        assert!(!temp.path().join("runners").exists());
+        let read = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(read.root.folders.len(), 1);
+        assert_eq!(read.requests().len(), 1);
+    }
+
+    #[test]
+    fn a_suffixed_reserved_folder_keeps_its_directory_on_resave() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![]);
+        written
+            .root
+            .folders
+            .push(folder("f1", "Runners", vec![request("r1", "Ping")]));
+        write_collection_dir(temp.path(), &mut written).unwrap();
+
+        let mut read = read_collection_dir(temp.path()).unwrap();
+        write_collection_dir(temp.path(), &mut read).unwrap();
+
+        assert!(temp.path().join("runners-2/ping.yaml").exists());
+        assert!(!temp.path().join("runners-3").exists());
+    }
+
+    #[test]
+    fn a_nested_folder_named_runners_is_not_suffixed() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![]);
+        let mut pets = folder("f1", "Pets", vec![]);
+        pets.folders
+            .push(folder("f2", "Runners", vec![request("r1", "Ping")]));
+        written.root.folders.push(pets);
+
+        write_collection_dir(temp.path(), &mut written).unwrap();
+
+        assert!(temp.path().join("pets/runners/ping.yaml").exists());
+    }
+
+    #[test]
+    fn a_structural_write_leaves_runner_files_byte_identical() {
+        let temp = TempDir::new().unwrap();
+        let runner = temp.path().join("runners/smoke.yaml");
+        fs::create_dir_all(runner.parent().unwrap()).unwrap();
+        let contents = "resonanceFormat: 2\nid: runner_1\nname: Smoke\n# hand-written comment\n";
+        fs::write(&runner, contents).unwrap();
+
+        let mut written = collection(vec![request("r1", "Health")]);
+        write_collection_dir(temp.path(), &mut written).unwrap();
+        let mut read = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(read.runners.len(), 1);
+        read.root.requests.push(request("r2", "Ping"));
+        write_collection_dir(temp.path(), &mut read).unwrap();
+
+        assert_eq!(fs::read_to_string(&runner).unwrap(), contents);
+    }
+
+    #[test]
+    fn a_collection_without_runners_gets_no_runners_directory() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![request("r1", "Health")]);
+        write_collection_dir(temp.path(), &mut written).unwrap();
+        assert!(!temp.path().join("runners").exists());
     }
 
     #[test]

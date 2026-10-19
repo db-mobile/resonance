@@ -128,7 +128,8 @@
     "import_success": "Collezione importata con successo",
     "import_error": "Errore nell'importazione della collezione",
     "close_title": "Chiudi raccolta",
-    "confirm_close": "Rimuovere \"{{name}}\" dall'elenco?\n\nLa cartella e i suoi file restano sul disco e le credenziali salvate vengono mantenute. Potrai riaprirla più tardi."
+    "confirm_close": "Rimuovere \"{{name}}\" dall'elenco?\n\nLa cartella e i suoi file restano sul disco e le credenziali salvate vengono mantenute. Potrai riaprirla più tardi.",
+    "reveal_failed": "Impossibile mostrare la cartella della raccolta: {{message}}"
   },
   "endpoint": {
     "delete_title": "Elimina richiesta",
@@ -162,7 +163,8 @@
     "rename_folder": "Rinomina cartella",
     "delete_folder": "Elimina cartella",
     "duplicate_request": "Duplica richiesta",
-    "move_request": "Sposta in cartella…"
+    "move_request": "Sposta in cartella…",
+    "show_in_file_manager": "Mostra nel gestore file"
   },
   "docs": {
     "title": "Genera documentazione",
@@ -528,7 +530,7 @@
     "status_skipped": "Saltata",
     "status_failed": "Non riuscita",
     "status_pending": "In attesa",
-    "request_missing": "Questa richiesta non esiste più in nessuna raccolta aperta",
+    "request_missing": "Questa richiesta non esiste più nella sua raccolta",
     "untitled": "Runner senza titolo",
     "loaded": "Runner caricato: {{name}}",
     "created": "Runner \"{{name}}\" creato",
@@ -566,10 +568,10 @@
     "running_requests_other": "Esecuzione di {{count}} richieste...",
     "tests_failed_one": "{{count}} test non riuscito",
     "tests_failed_other": "{{count}} test non riusciti",
-    "relinked_one": "{{count}} richiesta ricollegata alle raccolte aperte",
-    "relinked_other": "{{count}} richieste ricollegate alle raccolte aperte",
-    "missing_requests_one": "{{count}} richiesta di \"{{name}}\" non esiste più in nessuna raccolta aperta",
-    "missing_requests_other": "{{count}} richieste di \"{{name}}\" non esistono più in nessuna raccolta aperta",
+    "relinked_one": "{{count}} richiesta ricollegata all’interno della sua raccolta",
+    "relinked_other": "{{count}} richieste ricollegate all’interno della loro raccolta",
+    "missing_requests_one": "{{count}} richiesta in «{{name}}» non esiste più nella sua raccolta",
+    "missing_requests_other": "{{count}} richieste in «{{name}}» non esistono più nella loro raccolta",
     "add_all": "Aggiungi tutte le richieste",
     "nothing_runnable": "Qui non ci sono richieste HTTP o GraphQL da eseguire",
     "iterations": "Iterazioni",
@@ -618,7 +620,17 @@
       "executionError": "Errore di esecuzione",
       "jump": "Successiva: {{target}}",
       "end_iteration": "Termina iterazione"
-    }
+    },
+    "collection_locked": "Questo runner appartiene a «{{name}}». Avvia un nuovo runner per usare un’altra raccolta.",
+    "in_collection": "in {{name}}",
+    "no_collection": "Aggiungi prima una richiesta in modo che il runner appartenga a una raccolta",
+    "data_file_not_portable": "Fuori dalla cartella della raccolta: questo percorso funziona solo su questo computer",
+    "migration_moved_one": "{{count}} runner salvato spostato nella cartella della sua raccolta",
+    "migration_moved_other": "{{count}} runner salvati spostati nelle cartelle delle loro raccolte",
+    "migration_dropped_one": "{{count}} runner ha perso richieste di altre raccolte: {{names}}",
+    "migration_dropped_other": "{{count}} runner hanno perso richieste di altre raccolte: {{names}}",
+    "migration_skipped_one": "{{count}} runner salvato non ha richieste e non è stato spostato",
+    "migration_skipped_other": "{{count}} runner salvati non hanno richieste e non sono stati spostati"
   },
   "mqtt": {
     "title": "MQTT",

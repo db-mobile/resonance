@@ -1,13 +1,15 @@
 /**
- * @fileoverview Repository for managing collection runner data persistence
+ * @fileoverview Repository for collection runners stored as files inside each collection
  * @module storage/RunnerRepository
  */
 
 import { clone } from '../utils/clone.js';
-import { generateId } from '../utils/ids.js';
+import { fromRunnerDoc, toRunnerDoc } from './runnerDoc.js';
 
 /** @type {RunnerRepository|null} */
 let sharedRepository = null;
+
+export const LAST_RUNS_KEY = 'runnerLastRuns';
 
 export class RunnerRepository {
     /**
@@ -21,154 +23,259 @@ export class RunnerRepository {
         return sharedRepository;
     }
 
-    /** @param {Object} backendAPI */
-    constructor(backendAPI) {
+    /**
+     * @param {Object} backendAPI
+     * @param {{listCollectionIds?: () => Promise<Array<string>>}} [deps]
+     */
+    constructor(backendAPI, { listCollectionIds = null } = {}) {
         this.backendAPI = backendAPI;
-        this.RUNNERS_KEY = 'collectionRunners';
-        this._cache = null;
+        this._listCollectionIds = listCollectionIds || (() => backendAPI.collections.list());
+        this._byCollection = new Map();
+        this._lastRuns = null;
         this._writeQueue = Promise.resolve();
     }
 
-    /** @returns {Promise<Array<Object>>} */
-    async getAll() {
-        return clone(await this._load());
+    /** @param {string|null} [collectionId] */
+    invalidate(collectionId = null) {
+        if (collectionId) {
+            this._byCollection.delete(collectionId);
+            return;
+        }
+        this._byCollection.clear();
+        this._lastRuns = null;
     }
 
-    /** @returns {Promise<Array<Object>>} */
-    async _load() {
-        if (this._cache !== null) {
-            return this._cache;
+    /**
+     * @param {{fresh?: boolean}} [options]
+     * @returns {Promise<Array<Object>>}
+     */
+    async getAll({ fresh = false } = {}) {
+        if (fresh) {
+            this.invalidate();
         }
-
+        let collectionIds;
         try {
-            const runners = await this.backendAPI.store.get(this.RUNNERS_KEY);
+            collectionIds = (await this._listCollectionIds()) || [];
+        } catch {
+            return [];
+        }
+        const lists = await Promise.all(collectionIds.map(id => this.getAllByCollection(id)));
+        return lists.flat();
+    }
 
-            if (!Array.isArray(runners)) {
-                await this.backendAPI.store.set(this.RUNNERS_KEY, []);
-                this._cache = [];
-                return this._cache;
-            }
+    /**
+     * @param {string} collectionId
+     * @returns {Promise<Array<Object>>}
+     */
+    async getAllByCollection(collectionId) {
+        return clone(await this._loadCollection(collectionId));
+    }
 
-            this._cache = runners;
+    /**
+     * @param {string} collectionId
+     * @returns {Promise<Array<Object>>}
+     */
+    async _loadCollection(collectionId) {
+        if (this._byCollection.has(collectionId)) {
+            return this._byCollection.get(collectionId);
+        }
+        try {
+            const [docs, lastRuns] = await Promise.all([
+                this.backendAPI.collections.runners.list(collectionId),
+                this._loadLastRuns()
+            ]);
+            const runners = (docs || []).map(doc => fromRunnerDoc(collectionId, doc, lastRuns[doc.id] ?? null));
+            this._byCollection.set(collectionId, runners);
             return runners;
-        } catch (error) {
+        } catch {
             return [];
         }
     }
 
-    /**
-     * @param {Array<Object>} runners
-     * @returns {Promise<void>}
-     */
-    async save(runners) {
-        try {
-            await this.backendAPI.store.set(this.RUNNERS_KEY, runners);
-            this._cache = clone(runners);
-        } catch (error) {
-            throw new Error(`Failed to save runners: ${error.message}`, { cause: error });
+    /** @returns {Promise<Object<string, number>>} */
+    async _loadLastRuns() {
+        if (this._lastRuns === null) {
+            try {
+                const stored = await this.backendAPI.store.get(LAST_RUNS_KEY);
+                this._lastRuns = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+            } catch {
+                return {};
+            }
         }
+        return this._lastRuns;
     }
 
     /**
-     * @param {function(Array<Object>): Promise<*>} mutate
+     * @param {function(): Promise<*>} work
      * @returns {Promise<*>}
      */
-    _write(mutate) {
-        const run = this._writeQueue.then(async () => mutate(clone(await this._load())));
+    _queued(work) {
+        const run = this._writeQueue.then(work);
         this._writeQueue = run.catch(() => {});
         return run;
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} id
+     * @returns {Promise<Object|undefined>}
+     */
+    async getById(collectionId, id) {
+        const runners = await this.getAllByCollection(collectionId);
+        return runners.find(runner => runner.id === id);
     }
 
     /**
      * @param {string} id
      * @returns {Promise<Object|undefined>}
      */
-    async getById(id) {
+    async findById(id) {
         const runners = await this.getAll();
         return runners.find(runner => runner.id === id);
     }
 
     /**
-     * @param {Object} runner
-     * @param {string} runner.name
-     * @param {Array<Object>} runner.requests
+     * @param {string} collectionId
+     * @param {Object} runnerData
      * @returns {Promise<Object>}
      */
-    async add(runner) {
-        return this._write(async (runners) => {
-            const newRunner = {
-                id: this._generateId(),
-                name: runner.name || 'Untitled Runner',
-                requests: runner.requests || [],
-                overridesVersion: runner.overridesVersion ?? null,
-                options: {
-                    stopOnError: true,
-                    delayMs: 0,
-                    ...runner.options
-                },
-                createdAt: Date.now(),
-                lastModifiedAt: Date.now(),
-                lastRunAt: null
-            };
-
-            runners.push(newRunner);
-            await this.save(runners);
-            return clone(newRunner);
-        });
+    async add(collectionId, runnerData) {
+        return this._save(collectionId, toRunnerDoc({ ...runnerData, id: '' }));
     }
 
     /**
+     * @param {string} collectionId
+     * @param {Object} runner
+     * @returns {Promise<Object>}
+     */
+    async put(collectionId, runner) {
+        return this._save(collectionId, toRunnerDoc(runner));
+    }
+
+    /**
+     * @param {string} collectionId
      * @param {string} id
      * @param {Object} updates
      * @returns {Promise<Object|null>}
      */
-    async update(id, updates) {
-        return this._write(async (runners) => {
-            const index = runners.findIndex(runner => runner.id === id);
+    async update(collectionId, id, updates) {
+        const current = await this.getById(collectionId, id);
+        if (!current) {
+            return null;
+        }
+        return this._save(collectionId, toRunnerDoc({ ...current, ...clone(updates), id }));
+    }
 
-            if (index === -1) {
-                return null;
+    /**
+     * @param {string} collectionId
+     * @param {Object} doc
+     * @returns {Promise<Object>}
+     */
+    _save(collectionId, doc) {
+        return this._queued(async () => {
+            let stored;
+            try {
+                stored = await this.backendAPI.collections.runners.save(collectionId, doc);
+            } catch (error) {
+                throw new Error(`Failed to save runner: ${error?.message || String(error)}`, { cause: error });
             }
-
-            runners[index] = {
-                ...runners[index],
-                ...clone(updates),
-                lastModifiedAt: Date.now()
-            };
-
-            await this.save(runners);
-            return clone(runners[index]);
+            const lastRuns = await this._loadLastRuns();
+            const runner = fromRunnerDoc(collectionId, stored, lastRuns[stored.id] ?? null);
+            const runners = await this._loadCollection(collectionId);
+            const index = runners.findIndex(existing => existing.id === runner.id);
+            if (index === -1) {
+                runners.push(runner);
+            } else {
+                runners[index] = runner;
+            }
+            this._byCollection.set(collectionId, runners);
+            return clone(runner);
         });
     }
 
     /**
+     * @param {string} collectionId
      * @param {string} id
      * @returns {Promise<boolean>}
      */
-    async delete(id) {
-        return this._write(async (runners) => {
-            const updatedRunners = runners.filter(runner => runner.id !== id);
-
-            if (updatedRunners.length === runners.length) {
-                return false;
+    async delete(collectionId, id) {
+        const removed = await this._queued(async () => {
+            const result = await this.backendAPI.collections.runners.delete(collectionId, id);
+            if (this._byCollection.has(collectionId)) {
+                this._byCollection.set(collectionId, this._byCollection.get(collectionId).filter(runner => runner.id !== id));
             }
-
-            await this.save(updatedRunners);
-            return true;
+            return Boolean(result);
         });
+        await this.removeLastRuns([id]);
+        return removed;
     }
 
     /**
      * @param {string} id
-     * @returns {Promise<Object|null>}
+     * @returns {Promise<void>}
      */
-    async updateLastRun(id) {
-        return this.update(id, { lastRunAt: Date.now() });
+    updateLastRun(id) {
+        return this.mergeLastRuns({ [id]: Date.now() });
     }
 
-    /** @returns {string} */
-    _generateId() {
-        return generateId('runner');
+    /**
+     * @param {string} id
+     * @returns {Promise<number|null>}
+     */
+    async getLastRunAt(id) {
+        return (await this._loadLastRuns())[id] ?? null;
+    }
+
+    /**
+     * @param {Object<string, number>} entries
+     * @returns {Promise<void>}
+     */
+    mergeLastRuns(entries) {
+        return this._queued(async () => {
+            const lastRuns = clone(await this._loadLastRuns());
+            let changed = false;
+            for (const [id, timestamp] of Object.entries(entries || {})) {
+                if (typeof timestamp === 'number' && (lastRuns[id] ?? 0) < timestamp) {
+                    lastRuns[id] = timestamp;
+                    changed = true;
+                }
+            }
+            if (!changed) {
+                return;
+            }
+            await this.backendAPI.store.set(LAST_RUNS_KEY, lastRuns);
+            this._lastRuns = lastRuns;
+            this._applyLastRuns(lastRuns);
+        });
+    }
+
+    /**
+     * @param {Array<string>} ids
+     * @returns {Promise<void>}
+     */
+    removeLastRuns(ids) {
+        return this._queued(async () => {
+            const lastRuns = clone(await this._loadLastRuns());
+            const present = (ids || []).filter(id => id in lastRuns);
+            if (present.length === 0) {
+                return;
+            }
+            for (const id of present) {
+                delete lastRuns[id];
+            }
+            await this.backendAPI.store.set(LAST_RUNS_KEY, lastRuns);
+            this._lastRuns = lastRuns;
+            this._applyLastRuns(lastRuns);
+        });
+    }
+
+    /** @param {Object<string, number>} lastRuns */
+    _applyLastRuns(lastRuns) {
+        for (const runners of this._byCollection.values()) {
+            for (const runner of runners) {
+                runner.lastRunAt = lastRuns[runner.id] ?? null;
+            }
+        }
     }
 }
 
@@ -190,13 +297,15 @@ export class RunnerRepository {
 /**
  * @typedef {Object} Runner
  * @property {string} id
+ * @property {string} collectionId
  * @property {string} name
+ * @property {number} seq
  * @property {Array<RunnerRequest>} requests
- * @property {number|null} overridesVersion
  * @property {Object} options
  * @property {boolean} options.stopOnError
  * @property {number} options.delayMs
- * @property {number} createdAt
- * @property {number} lastModifiedAt
+ * @property {number} options.iterations
+ * @property {number} [options.maxExecutionsPerIteration]
+ * @property {{path: string, name: string}|null} options.dataFile
  * @property {number|null} lastRunAt
  */

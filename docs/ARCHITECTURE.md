@@ -109,9 +109,35 @@ this migration does not implement CLI or committed-file loading.
 
 The desktop and core remain separate Cargo packages to preserve the desktop and
 Flathub build paths. `scripts/check-core-resolution.py` enforces matching versions
-and resolved dependency edges in both lockfiles. The standalone CI job runs this
+and resolved dependency edges in both lockfiles. The `core` job in the CI pipeline runs this
 check and builds/tests the core without frontend or desktop system dependencies.
 Update both lockfiles together; `src-tauri/Cargo.lock` remains the packaging source.
+
+## Collection runners
+
+Saved runners live inside their collection as `runners/<slug>.yaml`, one file per
+runner (`collections/runners.rs` reads and writes them; `collections/model.rs`
+holds `RunnerDoc`). A runner belongs to the collection whose directory holds it
+and references requests by id; `name`, `method` and `path` are hints for
+re-linking after a merge re-ids a request. `runners/` is a reserved directory:
+the reader skips it at the collection root, a request folder slugging to
+`runners` is written as `runners-2/`, and the whole-tree writer never touches
+it. The commands `collection_runners_list/save/delete` and
+`collection_runner_data_read` are the only writers; a data file is stored
+relative to the collection directory when it sits inside it and is resolved
+there on read, never outside.
+
+`RunnerRepository` caches runners per collection and maps the file shape to the
+in-memory runner (`storage/runnerDoc.js`), re-attaching `collectionId` and
+`endpointId` so execution capture is unchanged. Desktop-local state stays in
+the store: `runnerLastRuns` (last-run timestamps), `runnerRunHistory` and the
+`lastRunnerId` setting. `runner.feature.js` wires the shared repositories and
+`RunnerBookkeeping`, which runs the resumable migration from the legacy
+`collectionRunners` store key on every collections load (markers in
+`runnersMigratedCollections`, backup in `collectionRunnersLegacyBackup`) and
+clears local state when a collection is deleted. The runner tab binds to the
+collection of its first queued request; the palette then offers only that
+collection and the saved-runner dropdown groups runners by collection.
 
 ## Key Technologies
 

@@ -254,6 +254,18 @@ export class CollectionRepository {
     }
 
     /**
+     * @param {string} id
+     * @returns {Promise<void>}
+     */
+    async reveal(id) {
+        try {
+            await this.backendAPI.collections.reveal(id);
+        } catch (error) {
+            throw wrapFailure('show collection folder', error);
+        }
+    }
+
+    /**
      * @param {string} path
      * @returns {Promise<Object>}
      */

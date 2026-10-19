@@ -556,7 +556,7 @@ const MAX_RUNNER_DATA_FILE_BYTES: u64 = 10 * 1024 * 1024;
 
 /// Read a collection-runner data file. Only `.csv` and `.json` are accepted
 /// because the path is stored with the runner and re-read on later runs.
-fn read_runner_data(path: &Path) -> Result<Value, String> {
+pub(crate) fn read_runner_data(path: &Path) -> Result<Value, String> {
     let extension = path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -591,11 +591,6 @@ pub async fn pick_runner_data_file(app: AppHandle) -> Result<Option<Value>, Stri
         return Ok(None);
     };
     read_runner_data(&file_path).map(Some)
-}
-
-#[tauri::command]
-pub async fn read_runner_data_file(path: String) -> Result<Value, String> {
-    read_runner_data(Path::new(&path))
 }
 
 #[cfg(test)]

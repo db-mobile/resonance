@@ -87,4 +87,16 @@ export class RunnerHistoryRepository {
             delete history[runnerId];
         });
     }
+
+    /**
+     * @param {Array<string>} runnerIds
+     * @returns {Promise<void>}
+     */
+    removeMany(runnerIds) {
+        return this._write((history) => {
+            for (const runnerId of runnerIds || []) {
+                delete history[runnerId];
+            }
+        });
+    }
 }

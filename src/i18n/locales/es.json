@@ -128,7 +128,8 @@
     "import_success": "Colección importada con éxito",
     "import_error": "Error al importar la colección",
     "close_title": "Cerrar colección",
-    "confirm_close": "¿Quitar \"{{name}}\" de la lista?\n\nLa carpeta y sus archivos permanecen en el disco, y las credenciales guardadas se conservan. Puedes volver a abrirla más tarde."
+    "confirm_close": "¿Quitar \"{{name}}\" de la lista?\n\nLa carpeta y sus archivos permanecen en el disco, y las credenciales guardadas se conservan. Puedes volver a abrirla más tarde.",
+    "reveal_failed": "No se pudo mostrar la carpeta de la colección: {{message}}"
   },
   "endpoint": {
     "delete_title": "Eliminar solicitud",
@@ -162,7 +163,8 @@
     "rename_folder": "Renombrar carpeta",
     "delete_folder": "Eliminar carpeta",
     "duplicate_request": "Duplicar solicitud",
-    "move_request": "Mover a carpeta…"
+    "move_request": "Mover a carpeta…",
+    "show_in_file_manager": "Mostrar en el gestor de archivos"
   },
   "docs": {
     "title": "Generar documentación",
@@ -528,7 +530,7 @@
     "status_skipped": "Omitida",
     "status_failed": "Fallida",
     "status_pending": "Pendiente",
-    "request_missing": "Esta solicitud ya no existe en ninguna colección abierta",
+    "request_missing": "Esta solicitud ya no existe en su colección",
     "untitled": "Runner sin título",
     "loaded": "Runner cargado: {{name}}",
     "created": "Runner \"{{name}}\" creado",
@@ -566,10 +568,10 @@
     "running_requests_other": "Ejecutando {{count}} solicitudes...",
     "tests_failed_one": "{{count}} prueba fallida",
     "tests_failed_other": "{{count}} pruebas fallidas",
-    "relinked_one": "Se volvió a vincular {{count}} solicitud a las colecciones abiertas",
-    "relinked_other": "Se volvieron a vincular {{count}} solicitudes a las colecciones abiertas",
-    "missing_requests_one": "{{count}} solicitud de \"{{name}}\" ya no existe en ninguna colección abierta",
-    "missing_requests_other": "{{count}} solicitudes de \"{{name}}\" ya no existen en ninguna colección abierta",
+    "relinked_one": "Se volvió a vincular {{count}} solicitud dentro de su colección",
+    "relinked_other": "Se volvieron a vincular {{count}} solicitudes dentro de su colección",
+    "missing_requests_one": "{{count}} solicitud en «{{name}}» ya no existe en su colección",
+    "missing_requests_other": "{{count}} solicitudes en «{{name}}» ya no existen en su colección",
     "add_all": "Añadir todas las solicitudes",
     "nothing_runnable": "Aquí no hay solicitudes HTTP ni GraphQL que ejecutar",
     "iterations": "Iteraciones",
@@ -618,7 +620,17 @@
       "executionError": "Error de ejecución",
       "jump": "Siguiente: {{target}}",
       "end_iteration": "Finalizar iteración"
-    }
+    },
+    "collection_locked": "Este runner pertenece a «{{name}}». Inicia un runner nuevo para usar otra colección.",
+    "in_collection": "en {{name}}",
+    "no_collection": "Añade primero una solicitud para que el runner pertenezca a una colección",
+    "data_file_not_portable": "Fuera de la carpeta de la colección: esta ruta solo funciona en este equipo",
+    "migration_moved_one": "Se movió {{count}} runner guardado a la carpeta de su colección",
+    "migration_moved_other": "Se movieron {{count}} runners guardados a las carpetas de sus colecciones",
+    "migration_dropped_one": "{{count}} runner perdió solicitudes de otras colecciones: {{names}}",
+    "migration_dropped_other": "{{count}} runners perdieron solicitudes de otras colecciones: {{names}}",
+    "migration_skipped_one": "{{count}} runner guardado no tiene solicitudes y no se movió",
+    "migration_skipped_other": "{{count}} runners guardados no tienen solicitudes y no se movieron"
   },
   "mqtt": {
     "title": "MQTT",

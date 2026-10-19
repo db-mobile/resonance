@@ -284,6 +284,46 @@ mod tests {
     }
 
     #[test]
+    fn adding_a_runner_file_invalidates_the_entry() {
+        let temp = TempDir::new().unwrap();
+        seed(temp.path());
+        let cache = CollectionCache::default();
+
+        let before = read_collection_dir_cached(&cache, temp.path()).unwrap();
+        assert!(before.runners.is_empty());
+        fs::create_dir(temp.path().join("runners")).unwrap();
+        touch(
+            &temp.path().join("runners/smoke.yaml"),
+            "resonanceFormat: 2\nid: runner_1\nname: Smoke\n",
+        );
+
+        let after = read_collection_dir_cached(&cache, temp.path()).unwrap();
+        assert_eq!(after.runners.len(), 1);
+    }
+
+    #[test]
+    fn editing_a_runner_file_invalidates_the_entry() {
+        let temp = TempDir::new().unwrap();
+        seed(temp.path());
+        fs::create_dir(temp.path().join("runners")).unwrap();
+        fs::write(
+            temp.path().join("runners/smoke.yaml"),
+            "resonanceFormat: 2\nid: runner_1\nname: Smoke\n",
+        )
+        .unwrap();
+        let cache = CollectionCache::default();
+
+        read_collection_dir_cached(&cache, temp.path()).unwrap();
+        touch(
+            &temp.path().join("runners/smoke.yaml"),
+            "resonanceFormat: 2\nid: runner_1\nname: Nightly\n",
+        );
+
+        let after = read_collection_dir_cached(&cache, temp.path()).unwrap();
+        assert_eq!(after.runners[0].doc.name, "Nightly");
+    }
+
+    #[test]
     fn a_dot_directory_does_not_affect_the_fingerprint() {
         let temp = TempDir::new().unwrap();
         seed(temp.path());

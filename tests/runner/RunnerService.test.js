@@ -20,7 +20,9 @@ describe('RunnerService', () => {
     beforeEach(() => {
         mockRepository = {
             getAll: jest.fn(),
+            getAllByCollection: jest.fn(),
             getById: jest.fn(),
+            findById: jest.fn(),
             add: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
@@ -98,16 +100,16 @@ describe('RunnerService', () => {
             const runner = { id: 'runner_1', name: 'Test Runner' };
             mockRepository.getById.mockResolvedValue(runner);
 
-            const result = await service.getRunner('runner_1');
+            const result = await service.getRunner('c1', 'runner_1');
 
             expect(result).toEqual(runner);
-            expect(mockRepository.getById).toHaveBeenCalledWith('runner_1');
+            expect(mockRepository.getById).toHaveBeenCalledWith('c1', 'runner_1');
         });
 
         test('should return undefined for non-existent runner', async () => {
             mockRepository.getById.mockResolvedValue(undefined);
 
-            const result = await service.getRunner('non_existent');
+            const result = await service.getRunner('c1', 'non_existent');
 
             expect(result).toBeUndefined();
         });
@@ -119,10 +121,10 @@ describe('RunnerService', () => {
             const createdRunner = { id: 'runner_1', ...runnerData };
             mockRepository.add.mockResolvedValue(createdRunner);
 
-            const result = await service.createRunner(runnerData);
+            const result = await service.createRunner('c1', runnerData);
 
             expect(result).toEqual(createdRunner);
-            expect(mockRepository.add).toHaveBeenCalledWith(runnerData);
+            expect(mockRepository.add).toHaveBeenCalledWith('c1', runnerData);
             expect(mockStatusDisplay.update).toHaveBeenCalledWith('Runner "New Runner" created', null);
         });
     });
@@ -133,17 +135,17 @@ describe('RunnerService', () => {
             const updatedRunner = { id: 'runner_1', name: 'Updated Runner' };
             mockRepository.update.mockResolvedValue(updatedRunner);
 
-            const result = await service.updateRunner('runner_1', updates);
+            const result = await service.updateRunner('c1', 'runner_1', updates);
 
             expect(result).toEqual(updatedRunner);
-            expect(mockRepository.update).toHaveBeenCalledWith('runner_1', updates);
+            expect(mockRepository.update).toHaveBeenCalledWith('c1', 'runner_1', updates);
             expect(mockStatusDisplay.update).toHaveBeenCalledWith('Runner "Updated Runner" saved', null);
         });
 
         test('should return null for non-existent runner', async () => {
             mockRepository.update.mockResolvedValue(null);
 
-            const result = await service.updateRunner('non_existent', { name: 'Test' });
+            const result = await service.updateRunner('c1', 'non_existent', { name: 'Test' });
 
             expect(result).toBeNull();
             expect(mockStatusDisplay.update).not.toHaveBeenCalled();
@@ -154,17 +156,17 @@ describe('RunnerService', () => {
         test('should delete runner and update status', async () => {
             mockRepository.delete.mockResolvedValue(true);
 
-            const result = await service.deleteRunner('runner_1');
+            const result = await service.deleteRunner('c1', 'runner_1');
 
             expect(result).toBe(true);
-            expect(mockRepository.delete).toHaveBeenCalledWith('runner_1');
+            expect(mockRepository.delete).toHaveBeenCalledWith('c1', 'runner_1');
             expect(mockStatusDisplay.update).toHaveBeenCalledWith('Runner deleted', null);
         });
 
         test('should return false for non-existent runner', async () => {
             mockRepository.delete.mockResolvedValue(false);
 
-            const result = await service.deleteRunner('non_existent');
+            const result = await service.deleteRunner('c1', 'non_existent');
 
             expect(result).toBe(false);
             expect(mockStatusDisplay.update).not.toHaveBeenCalled();
@@ -175,13 +177,13 @@ describe('RunnerService', () => {
         test('should throw error if runner is already executing', async () => {
             service.isRunning = true;
 
-            await expect(service.executeRunner('runner_1')).rejects.toThrow('A runner is already executing');
+            await expect(service.executeRunner('c1', 'runner_1')).rejects.toThrow('A runner is already executing');
         });
 
         test('should throw error if runner not found', async () => {
             mockRepository.getById.mockResolvedValue(undefined);
 
-            await expect(service.executeRunner('non_existent')).rejects.toThrow('Runner not found');
+            await expect(service.executeRunner('c1', 'non_existent')).rejects.toThrow('Runner not found');
         });
 
         test('should throw error if runner has no requests', async () => {
@@ -191,7 +193,7 @@ describe('RunnerService', () => {
                 requests: []
             });
 
-            await expect(service.executeRunner('runner_1')).rejects.toThrow('Runner has no requests to execute');
+            await expect(service.executeRunner('c1', 'runner_1')).rejects.toThrow('Runner has no requests to execute');
         });
     });
 
@@ -303,7 +305,7 @@ describe('RunnerService', () => {
 
 describe('Rust runner adapter lifecycle', () => {
     function setup() {
-        const repository = { getById: jest.fn(async () => ({ name: 'Saved', requests: [{ endpointId: 'e' }] })), updateLastRun: jest.fn() };
+        const repository = { getById: jest.fn(async () => ({ name: 'Saved', collectionId: 'c1', requests: [{ endpointId: 'e' }] })), updateLastRun: jest.fn() };
         const service = new RunnerService(repository, {}, null, { pipeline: {} });
         const snapshot = { requests: [{ name: 'Frozen' }], context: { environmentId: 'pinned' }, options: {} };
         service.core.captureRun = jest.fn(async () => snapshot);
@@ -319,7 +321,8 @@ describe('Rust runner adapter lifecycle', () => {
     test('saved runs use captured inputs, report planned totals, and stamp last-run', async () => {
         const { service, repository, snapshot, events } = setup();
         const progress = jest.fn();
-        const result = await service.executeRunner('saved-id', progress);
+        const result = await service.executeRunner('c1', 'saved-id', progress);
+        expect(repository.getById).toHaveBeenCalledWith('c1', 'saved-id');
         expect(service.core.execute).toHaveBeenCalledWith('run', { ...snapshot, runnerId: 'saved-id', runnerName: 'Saved' }, expect.any(Object), expect.any(Function));
         expect(progress).toHaveBeenCalledWith(0, 4, expect.objectContaining({ status: 'success' }));
         expect(repository.updateLastRun).toHaveBeenCalledWith('saved-id');
@@ -338,7 +341,7 @@ describe('Rust runner adapter lifecycle', () => {
         if (phase === 'capture') { service.core.captureRun.mockRejectedValue(new Error('capture failed')); }
         if (phase === 'ipc') { service.core.execute.mockRejectedValue(new Error('ipc failed')); }
         if (phase === 'bookkeeping') { repository.updateLastRun.mockRejectedValue(new Error('bookkeeping failed')); }
-        const result = await service.executeRunner('saved-id');
+        const result = await service.executeRunner('c1', 'saved-id');
         expect(result.error).toContain('failed'); expect(service.isRunning).toBe(false);
         expect(events.filter(e => e.kind === 'run-completed')).toHaveLength(1);
     });

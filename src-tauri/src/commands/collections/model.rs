@@ -42,6 +42,14 @@ fn is_zero(value: &i64) -> bool {
     *value == 0
 }
 
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
+}
+
+fn default_true() -> bool {
+    true
+}
+
 /// `collection.yaml` — the collection's own metadata. Holds no request tree;
 /// the directory structure is the tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,6 +268,140 @@ impl RequestDoc {
             extra: Map::new(),
         }
     }
+}
+
+/// `runners/<slug>.yaml` — one saved collection runner. The directory implies
+/// the collection, so entries carry only the request id; name, method and
+/// path are hints for re-linking after a merge re-ids a request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunnerDoc {
+    #[serde(rename = "resonanceFormat", default = "default_format")]
+    pub format: u32,
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub seq: i64,
+    #[serde(default)]
+    pub options: RunnerOptions,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requests: Vec<RunnerRequest>,
+    #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
+    pub extra: Map<String, Value>,
+}
+
+#[cfg(test)]
+impl RunnerDoc {
+    /// Builds the minimum viable runner document.
+    /// @param id - Stable runner id, referenced by run history and the last-run setting
+    /// @param name - Display name, also the basis for the file name
+    /// @returns A runner document with default options and no requests
+    pub fn new(id: String, name: String) -> Self {
+        Self {
+            format: FORMAT_VERSION,
+            id,
+            name,
+            seq: 0,
+            options: RunnerOptions::default(),
+            requests: Vec::new(),
+            extra: Map::new(),
+        }
+    }
+}
+
+/// One queue entry. Overrides are stored only when the user changed them;
+/// an explicit empty list means "clear the request's defaults", so empty
+/// lists and empty bodies are kept rather than skipped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunnerRequest {
+    /// Accepted from the desktop for validation only; never written.
+    #[serde(default, skip_serializing)]
+    pub collection_id: Option<String>,
+    #[serde(rename = "requestId", alias = "endpointId")]
+    pub request_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "RunnerOverrides::is_empty")]
+    pub overrides: RunnerOverrides,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_response_script: Option<String>,
+    #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
+    pub extra: Map<String, Value>,
+}
+
+/// Per-entry edits layered over the saved request. Rows are opaque so
+/// duplicate keys, row order and unknown row fields survive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunnerOverrides {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_params: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_params: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headers: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
+    pub extra: Map<String, Value>,
+}
+
+impl RunnerOverrides {
+    pub fn is_empty(&self) -> bool {
+        self.path_params.is_none()
+            && self.query_params.is_none()
+            && self.headers.is_none()
+            && self.body.is_none()
+            && self.extra.is_empty()
+    }
+}
+
+/// Run settings. `stopOnError` is always written: the desktop defaults it to
+/// true and the execution core to false, so a headless reader must not guess.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunnerOptions {
+    #[serde(default = "default_true")]
+    pub stop_on_error: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub delay_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub iterations: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_executions_per_iteration: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_file: Option<RunnerDataFile>,
+    #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
+    pub extra: Map<String, Value>,
+}
+
+impl Default for RunnerOptions {
+    fn default() -> Self {
+        Self {
+            stop_on_error: true,
+            delay_ms: 0,
+            iterations: None,
+            max_executions_per_iteration: None,
+            data_file: None,
+            extra: Map::new(),
+        }
+    }
+}
+
+/// The CSV or JSON rows a runner iterates over. `path` is relative to the
+/// collection directory when the file sits inside it. No catch-all map: a
+/// derived row count must never be committed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RunnerDataFile {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
 }
 
 #[cfg(test)]
@@ -638,5 +780,196 @@ spec:
 "#;
 
         assert_eq!(to_yaml(&doc), expected);
+    }
+
+    fn runner_with_everything() -> RunnerDoc {
+        let mut doc = RunnerDoc::new("runner_1".into(), "Smoke".into());
+        doc.seq = 10;
+        doc.options = RunnerOptions {
+            stop_on_error: false,
+            delay_ms: 250,
+            iterations: Some(3),
+            max_executions_per_iteration: Some(100),
+            data_file: Some(RunnerDataFile {
+                path: "data/users.csv".into(),
+                name: "users.csv".into(),
+            }),
+            extra: Map::new(),
+        };
+        doc.requests.push(RunnerRequest {
+            collection_id: None,
+            request_id: "req_a".into(),
+            name: "Create Pet".into(),
+            method: Some("POST".into()),
+            path: Some("/pets".into()),
+            overrides: RunnerOverrides {
+                path_params: None,
+                query_params: Some(vec![]),
+                headers: Some(vec![json!({"key": "X-Trace", "value": "1"})]),
+                body: Some("{\"name\": \"Rex\"}\n".into()),
+                extra: Map::new(),
+            },
+            post_response_script: Some("resonance.setNextRequest('List Pets');\n".into()),
+            extra: Map::new(),
+        });
+        doc
+    }
+
+    #[test]
+    fn a_fully_populated_runner_round_trips() {
+        let doc = runner_with_everything();
+        let yaml = to_yaml(&doc);
+        let parsed: RunnerDoc = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(to_yaml(&parsed), yaml);
+        assert_eq!(parsed.requests[0].overrides.query_params, Some(vec![]));
+        assert_eq!(parsed.options.data_file.unwrap().path, "data/users.csv");
+    }
+
+    #[test]
+    fn a_minimal_runner_writes_only_identity_and_its_stop_rule() {
+        let doc = RunnerDoc::new("runner_1".into(), "Smoke".into());
+        assert_eq!(
+            to_yaml(&doc),
+            "resonanceFormat: 2\nid: runner_1\nname: Smoke\noptions:\n  stopOnError: true\n"
+        );
+    }
+
+    #[test]
+    fn the_runner_format_version_is_the_first_key() {
+        let yaml = to_yaml(&runner_with_everything());
+        assert!(yaml.starts_with("resonanceFormat: 2\n"), "{}", yaml);
+    }
+
+    /// An empty override list is an instruction, not an absence: the user
+    /// removed every default row. Writing nothing would restore the defaults.
+    #[test]
+    fn an_empty_override_list_is_kept_because_it_means_clear() {
+        let mut doc = RunnerDoc::new("runner_1".into(), "R".into());
+        doc.requests.push(RunnerRequest {
+            collection_id: None,
+            request_id: "req_a".into(),
+            name: String::new(),
+            method: None,
+            path: None,
+            overrides: RunnerOverrides {
+                headers: Some(vec![]),
+                body: Some(String::new()),
+                ..RunnerOverrides::default()
+            },
+            post_response_script: None,
+            extra: Map::new(),
+        });
+
+        let yaml = to_yaml(&doc);
+        assert!(yaml.contains("headers: []"), "{}", yaml);
+        assert!(yaml.contains("body: ''"), "{}", yaml);
+        let parsed: RunnerDoc = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert_eq!(parsed.requests[0].overrides.headers, Some(vec![]));
+        assert_eq!(parsed.requests[0].overrides.body, Some(String::new()));
+    }
+
+    #[test]
+    fn an_absent_override_is_not_written() {
+        let mut doc = RunnerDoc::new("runner_1".into(), "R".into());
+        doc.requests.push(RunnerRequest {
+            collection_id: None,
+            request_id: "req_a".into(),
+            name: String::new(),
+            method: None,
+            path: None,
+            overrides: RunnerOverrides::default(),
+            post_response_script: None,
+            extra: Map::new(),
+        });
+
+        let yaml = to_yaml(&doc);
+        assert_eq!(
+            yaml,
+            "resonanceFormat: 2\nid: runner_1\nname: R\noptions:\n  stopOnError: true\nrequests:\n- requestId: req_a\n"
+        );
+    }
+
+    #[test]
+    fn a_multiline_post_response_script_is_written_as_a_block_scalar() {
+        let yaml = to_yaml(&runner_with_everything());
+        assert!(
+            yaml.contains("postResponseScript: |\n    resonance.setNextRequest('List Pets');\n"),
+            "{}",
+            yaml
+        );
+    }
+
+    #[test]
+    fn a_runner_entry_never_writes_its_collection_id() {
+        let mut doc = runner_with_everything();
+        doc.requests[0].collection_id = Some("c1".into());
+        assert!(!to_yaml(&doc).contains("collectionId"));
+    }
+
+    #[test]
+    fn a_legacy_endpoint_id_key_is_accepted_on_read() {
+        let yaml = "resonanceFormat: 2\nid: runner_1\nname: R\nrequests:\n- endpointId: req_a\n  collectionId: c1\n";
+        let parsed: RunnerDoc = serde_yaml_ng::from_str(yaml).unwrap();
+        assert_eq!(parsed.requests[0].request_id, "req_a");
+        assert_eq!(parsed.requests[0].collection_id.as_deref(), Some("c1"));
+        assert!(to_yaml(&parsed).contains("requestId: req_a"));
+    }
+
+    #[test]
+    fn an_unknown_runner_field_survives_a_round_trip() {
+        let yaml = "resonanceFormat: 2\nid: runner_1\nname: R\nfutureField: kept\noptions:\n  stopOnError: true\n  retries: 3\nrequests:\n- requestId: req_a\n  tag: smoke\n  overrides:\n    cookies: []\n";
+        let parsed: RunnerDoc = serde_yaml_ng::from_str(yaml).unwrap();
+        let written = to_yaml(&parsed);
+        for key in [
+            "futureField: kept",
+            "retries: 3",
+            "tag: smoke",
+            "cookies: []",
+        ] {
+            assert!(written.contains(key), "missing {} in\n{}", key, written);
+        }
+    }
+
+    #[test]
+    fn a_missing_options_block_means_the_defaults() {
+        let parsed: RunnerDoc =
+            serde_yaml_ng::from_str("resonanceFormat: 2\nid: runner_1\nname: R\n").unwrap();
+        assert!(parsed.options.stop_on_error);
+        assert_eq!(parsed.options.delay_ms, 0);
+        assert!(parsed.requests.is_empty());
+    }
+
+    /// The golden file: what a runner looks like on disk.
+    #[test]
+    fn a_realistic_runner_matches_the_documented_layout() {
+        let expected = r#"resonanceFormat: 2
+id: runner_1
+name: Smoke
+seq: 10
+options:
+  stopOnError: false
+  delayMs: 250
+  iterations: 3
+  maxExecutionsPerIteration: 100
+  dataFile:
+    path: data/users.csv
+    name: users.csv
+requests:
+- requestId: req_a
+  name: Create Pet
+  method: POST
+  path: /pets
+  overrides:
+    queryParams: []
+    headers:
+    - key: X-Trace
+      value: '1'
+    body: |
+      {"name": "Rex"}
+  postResponseScript: |
+    resonance.setNextRequest('List Pets');
+"#;
+
+        assert_eq!(to_yaml(&runner_with_everything()), expected);
     }
 }

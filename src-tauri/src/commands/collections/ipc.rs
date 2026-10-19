@@ -601,6 +601,8 @@ mod tests {
             open_api_spec: None,
             variables: Vec::new(),
             root,
+            runners: Vec::new(),
+            reassigned_runner_ids: Vec::new(),
         }
     }
 
@@ -972,6 +974,8 @@ mod save_path {
                 requests: vec![RequestEntry::new(doc)],
                 ..Default::default()
             },
+            runners: Vec::new(),
+            reassigned_runner_ids: Vec::new(),
         }
     }
 

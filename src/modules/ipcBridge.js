@@ -98,6 +98,7 @@ if (isTauri) {
             save: (collection, newRequestIds = null) => invoke('collection_save', { collection, newRequestIds }),
             delete: (collectionId) => invoke('collection_delete', { collectionId }),
             close: (collectionId) => invoke('collection_close', { collectionId }),
+            reveal: (collectionId) => invoke('collection_reveal', { collectionId }),
             openExisting: (path) => invoke('collections_open_existing', { path }),
             relocate: (collectionId, path) => invoke('collection_relocate', { collectionId, path }),
             gitBranches: () => invoke('collections_git_branches'),
@@ -112,6 +113,12 @@ if (isTauri) {
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
             importCollectionFile: (filePath = null, storageParentPath = null) => invoke('import_collection_file', { filePath, storageParentPath }),
             importPostmanEnvironment: () => invoke('import_postman_environment'),
+            runners: {
+                list: (collectionId) => invoke('collection_runners_list', { collectionId }),
+                save: (collectionId, runner) => invoke('collection_runners_save', { collectionId, runner }),
+                delete: (collectionId, runnerId) => invoke('collection_runners_delete', { collectionId, runnerId }),
+                readData: (collectionId, path) => invoke('collection_runner_data_read', { collectionId, path })
+            },
             exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
             exportPostman: (collectionId) => invoke('export_postman', { collectionId })
         },
@@ -121,8 +128,7 @@ if (isTauri) {
         runner: {
             saveReport: (defaultFileName, content, filterName, extensions) =>
                 invoke('save_text_export', { defaultFileName, content, filterName, extensions }),
-            pickDataFile: () => invoke('pick_runner_data_file'),
-            readDataFile: (path) => invoke('read_runner_data_file', { path })
+            pickDataFile: () => invoke('pick_runner_data_file')
         },
         cookies: {
             importCookieFile: () => invoke('import_cookie_file')

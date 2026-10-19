@@ -800,3 +800,38 @@
 
 .runner-run-notice.is-error { color: var(--error-color); }
 .runner-run-notice[aria-busy="true"] { opacity: var(--dim-opacity); }
+
+.runner-collection-chip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.runner-collection-item.is-locked {
+  opacity: var(--dim-opacity);
+}
+
+.runner-collection-item.is-locked .runner-endpoint-item {
+  pointer-events: none;
+}
+
+.runner-collection-item.is-locked .runner-endpoint-add-btn {
+  cursor: not-allowed;
+}
+
+.runner-dropdown-group-label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  opacity: var(--dim-opacity);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runner-data-chip.is-not-portable .runner-data-file-btn {
+  text-decoration: underline dotted;
+}

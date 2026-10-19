@@ -360,6 +360,8 @@ pub(crate) fn v1_to_v2(
         open_api_spec: collection.open_api_spec.clone().filter(|v| !v.is_null()),
         variables: Vec::new(),
         root,
+        runners: Vec::new(),
+        reassigned_runner_ids: Vec::new(),
     }
 }
 

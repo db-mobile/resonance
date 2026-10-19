@@ -10,7 +10,6 @@ import { RequestEditorModal } from './runner/RequestEditorModal.js';
 import { CollectionPalette } from './runner/CollectionPalette.js';
 import { RequestQueue } from './runner/RequestQueue.js';
 import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
-import { OVERRIDES_VERSION } from '../utils/requestOverrides.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { startDragSession } from './dragSession.js';
 import { pushEscapeHandler } from './modalEscape.js';
@@ -26,14 +25,20 @@ export class RunnerPanel {
                 this.queue.appendRequests(endpoints.map(endpoint => ({ collection, endpoint })))
         });
         this.queue = new RequestQueue({
-            onCountChange: () => this._updateRequestCount(),
+            onCountChange: () => {
+                this._updateRequestCount();
+                this._syncCollectionLock();
+            },
             onEditRequest: (index) => this._openScriptModal(index)
         });
 
         this.menu = new RunnerSelectorMenu({
             onLoadRunners: () => this.onLoadRunners?.(),
-            onSelect: (runnerId) => this.onRunnerSelect?.(runnerId)
+            onSelect: (runnerId, collectionId) => this.onRunnerSelect?.(runnerId, collectionId)
         });
+
+        this.boundCollectionId = null;
+        this._collections = [];
 
         this.resultsView = new RunnerResultsPanel(container);
         this.resultsView.onExport = (format, summary) => this.onExport?.(format, summary);
@@ -63,8 +68,26 @@ export class RunnerPanel {
         this.menu.currentRunnerId = runnerId;
     }
 
+    /** @type {string|null} */
+    get collectionId() {
+        return this.boundCollectionId ?? this.queue.collectionId;
+    }
+
+    _syncCollectionLock() {
+        const id = this.collectionId;
+        const name = this._collections.find(collection => collection.id === id)?.name || id || '';
+        this.palette.setLockedCollection(id, name);
+        if (this.dom.collectionChip) {
+            this.dom.collectionChip.textContent = id
+                ? translate('runner.in_collection', 'in {{name}}', { name })
+                : '';
+            this.dom.collectionChip.classList.toggle('is-hidden', !id);
+        }
+    }
+
     /** @param {Array<Object>} collections */
     render(collections) {
+        this._collections = collections || [];
         try {
             const fragment = templateLoader.cloneSync(
                 './src/templates/runner/runnerPanel.html',
@@ -79,6 +102,7 @@ export class RunnerPanel {
             this.menu.mount(this.container);
             this.palette.render(this.dom.collectionTree, collections);
             this.queue.mount(this.dom.requestsList);
+            this._syncCollectionLock();
         } catch (error) {
             console.error('[RunnerPanel] Error rendering:', error);
         }
@@ -90,14 +114,17 @@ export class RunnerPanel {
 
     /** @param {Array<Object>} collections */
     updateCollections(collections) {
+        this._collections = collections || [];
         if (this.dom.collectionTree) {
             this.palette.render(this.dom.collectionTree, collections);
         }
+        this._syncCollectionLock();
     }
 
     _cacheElements() {
         this.dom = {
             nameInput: this.container.querySelector('[data-role="runner-name"]'),
+            collectionChip: this.container.querySelector('[data-role="runner-collection"]'),
             collectionTree: this.container.querySelector('[data-role="collection-tree"]'),
             requestsList: this.container.querySelector('[data-role="requests-list"]'),
             requestCount: this.container.querySelector('[data-role="request-count"]'),
@@ -140,7 +167,7 @@ export class RunnerPanel {
         this.container.querySelector('[data-action="pick-data-file"]')?.addEventListener('click', async () => {
             const picked = await this.onPickDataFile?.();
             if (picked) {
-                this.setDataFile({ path: picked.path, name: picked.name }, { rowCount: picked.rowCount });
+                this.setDataFile({ path: picked.path, name: picked.name }, { rowCount: picked.rowCount, portable: picked.portable });
             }
         });
 
@@ -224,6 +251,7 @@ export class RunnerPanel {
 
     startNewRunner() {
         this.currentRunnerId = null;
+        this.boundCollectionId = null;
         this.queue.reset();
         this.setDataFile(null);
         if (this.dom.iterationsInput) {
@@ -278,14 +306,14 @@ export class RunnerPanel {
     getRunnerData() {
         return {
             name: this.dom.nameInput?.value.trim() || '',
+            collectionId: this.collectionId,
             requests: [...this.queue.getRequests()],
-            overridesVersion: OVERRIDES_VERSION,
             options: {
                 stopOnError: this.dom.stopOnErrorCheckbox?.checked ?? true,
                 delayMs: parseInt(this.dom.delayInput?.value, 10) || 0,
                 iterations: parseInt(this.dom.iterationsInput?.value, 10) || 1,
                 maxExecutionsPerIteration: this.dom.maxExecutionsInput ? Number(this.dom.maxExecutionsInput.value) : undefined,
-                dataFile: this.dataFile ? { ...this.dataFile } : null
+                dataFile: this.dataFile ? { path: this.dataFile.path, name: this.dataFile.name } : null
             }
         };
     }
@@ -304,6 +332,7 @@ export class RunnerPanel {
      * @param {Set<number>} [missing]
      */
     loadRunner(runner, missing = new Set()) {
+        this.boundCollectionId = runner.collectionId || null;
         if (this.dom.nameInput) {
             this.dom.nameInput.value = runner.name || '';
         }
@@ -325,15 +354,17 @@ export class RunnerPanel {
         this.setDataFile(runner.options?.dataFile || null);
 
         this.queue.setRequests(runner.requests, missing);
+        this._syncCollectionLock();
     }
 
     /**
      * @param {{path: string, name: string}|null} dataFile
-     * @param {{rowCount?: number, error?: string}} [status]
+     * @param {{rowCount?: number, error?: string, portable?: boolean}} [status]
      */
-    setDataFile(dataFile, { rowCount, error } = {}) {
-        this.dataFile = dataFile;
+    setDataFile(dataFile, { rowCount, error, portable } = {}) {
+        this.dataFile = dataFile ? { path: dataFile.path, name: dataFile.name } : null;
         const hasFile = Boolean(dataFile);
+        const notPortable = hasFile && portable === false;
 
         if (this.dom.dataFileLabel) {
             this.dom.dataFileLabel.removeAttribute('data-i18n');
@@ -347,8 +378,10 @@ export class RunnerPanel {
                     }, { name: dataFile.name });
         }
         this.dom.dataChip?.classList.toggle('is-error', Boolean(error));
+        this.dom.dataChip?.classList.toggle('is-not-portable', notPortable);
         if (this.dom.dataChip) {
-            this.dom.dataChip.title = error || '';
+            this.dom.dataChip.title = error
+                || (notPortable ? translate('runner.data_file_not_portable', 'Outside the collection folder: this path only works on this machine') : '');
         }
         this.dom.dataClearButton?.classList.toggle('is-hidden', !hasFile);
 

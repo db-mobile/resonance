@@ -36,6 +36,11 @@ export class RequestQueue {
         return this.requests.length;
     }
 
+    /** @returns {string|null} */
+    get collectionId() {
+        return this.requests[0]?.collectionId ?? null;
+    }
+
     /** @returns {Array<Object>} */
     getRequests() {
         return this.requests;
@@ -85,10 +90,12 @@ export class RequestQueue {
 
     /** @param {Array<{collection: Object, endpoint: Object}>} entries */
     appendRequests(entries) {
-        if (entries.length === 0) {
+        const bound = this.collectionId;
+        const accepted = entries.filter(({ collection }) => !bound || collection.id === bound);
+        if (accepted.length === 0) {
             return;
         }
-        this.requests.push(...entries.map(({ collection, endpoint }) => RequestQueue.buildRequest(collection, endpoint)));
+        this.requests.push(...accepted.map(({ collection, endpoint }) => RequestQueue.buildRequest(collection, endpoint)));
         this._render();
         this._emitChange();
     }
@@ -137,7 +144,7 @@ export class RequestQueue {
         }
         if (this.missing.has(request)) {
             el.classList.add('is-missing');
-            el.title = translate('runner.request_missing', 'This request no longer exists in any open collection');
+            el.title = translate('runner.request_missing', 'This request no longer exists in its collection');
         }
 
         const methodEl = el.querySelector('[data-role="method"]');

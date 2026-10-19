@@ -66,3 +66,25 @@ describe('RunnerHistoryRepository', () => {
         expect((await repository.list('r1'))[0].summary.passed).toBe(1);
     });
 });
+
+describe('RunnerHistoryRepository.removeMany', () => {
+    test('drops several runners in one write', async () => {
+        let stored;
+        const backendAPI = {
+            store: {
+                get: jest.fn(async () => stored),
+                set: jest.fn(async (key, value) => { stored = value; })
+            }
+        };
+        const repository = new RunnerHistoryRepository(backendAPI);
+        await repository.record('r1', { startedAt: 1 });
+        await repository.record('r2', { startedAt: 2 });
+        await repository.record('r3', { startedAt: 3 });
+        backendAPI.store.set.mockClear();
+
+        await repository.removeMany(['r1', 'r3']);
+
+        expect(backendAPI.store.set).toHaveBeenCalledTimes(1);
+        expect(Object.keys(stored)).toEqual(['r2']);
+    });
+});

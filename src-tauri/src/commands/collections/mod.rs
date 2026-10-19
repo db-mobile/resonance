@@ -19,6 +19,7 @@ mod legacy;
 mod link;
 mod model;
 mod read;
+mod runners;
 mod secrets;
 mod startup;
 mod write;
@@ -590,8 +591,22 @@ fn write_v2_collection_seeded(
             .clone()
             .filter(|v| !v.is_null())
             .or_else(|| existing.as_ref().and_then(|e| e.open_api_spec.clone())),
-        variables: variables.unwrap_or_else(|| existing.map(|e| e.variables).unwrap_or_default()),
+        variables: variables.unwrap_or_else(|| {
+            existing
+                .as_ref()
+                .map(|e| e.variables.clone())
+                .unwrap_or_default()
+        }),
         root,
+        // Runner files are not part of a structural save; carrying the loaded
+        // ones over keeps the refreshed cache entry truthful about them.
+        runners: existing
+            .as_ref()
+            .map(|e| e.runners.clone())
+            .unwrap_or_default(),
+        reassigned_runner_ids: existing
+            .map(|e| e.reassigned_runner_ids)
+            .unwrap_or_default(),
     };
 
     write::write_collection_dir(dir, &mut loaded)?;
@@ -1536,6 +1551,132 @@ pub async fn collection_save_variables(
     Ok(())
 }
 
+const LEGACY_RUNNER_LAYOUT: &str = "This collection is still in the legacy format. Make any change to it first so it is converted, then save the runner again.";
+
+/// Lists a collection's runners, persisting any id the reader had to re-mint.
+///
+/// Without the write-back a merge-duplicated id would get a different fresh id
+/// on every read, and nothing stored against it could ever resolve.
+fn list_runners_at(dir: &Path) -> Result<Vec<model::RunnerDoc>, String> {
+    if Layout::detect(dir) != Some(Layout::V2) {
+        return Ok(Vec::new());
+    }
+    let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
+    if !loaded.reassigned_runner_ids.is_empty() {
+        let fresh: HashSet<String> = loaded
+            .reassigned_runner_ids
+            .iter()
+            .map(|(_, fresh)| fresh.clone())
+            .collect();
+        for entry in loaded
+            .runners
+            .iter_mut()
+            .filter(|entry| fresh.contains(&entry.doc.id))
+        {
+            runners::write_runner_entry(dir, entry)?;
+        }
+        loaded.reassigned_runner_ids.clear();
+        collection_cache().refresh(dir, &loaded);
+    }
+    Ok(loaded
+        .runners
+        .iter()
+        .map(|entry| entry.doc.clone())
+        .collect())
+}
+
+fn save_runner_at(
+    dir: &Path,
+    collection_id: &str,
+    runner: model::RunnerDoc,
+) -> Result<model::RunnerDoc, String> {
+    if Layout::detect(dir) != Some(Layout::V2) {
+        return Err(LEGACY_RUNNER_LAYOUT.to_string());
+    }
+    let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
+    let stored = runners::upsert_runner(dir, &mut loaded.runners, runner, collection_id)?;
+    collection_cache().refresh(dir, &loaded);
+    Ok(stored)
+}
+
+fn delete_runner_at(dir: &Path, runner_id: &str) -> Result<bool, String> {
+    if Layout::detect(dir) != Some(Layout::V2) {
+        return Err(LEGACY_RUNNER_LAYOUT.to_string());
+    }
+    let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
+    let removed = runners::delete_runner(dir, &mut loaded.runners, runner_id)?;
+    collection_cache().refresh(dir, &loaded);
+    Ok(removed)
+}
+
+/// Reads a runner's data file. `path` in the result echoes the stored
+/// reference so the caller can keep it verbatim; `resolvedPath` is where the
+/// bytes came from.
+fn read_runner_data_at(dir: &Path, path: &str) -> Result<Value, String> {
+    let resolved = runners::resolve_data_file(dir, path)?;
+    let mut value = super::import_export::read_runner_data(&resolved)?;
+    if let Some(object) = value.as_object_mut() {
+        let absolute = object.get("path").cloned().unwrap_or(Value::Null);
+        object.insert("resolvedPath".to_string(), absolute);
+        object.insert("path".to_string(), Value::String(path.to_string()));
+    }
+    Ok(value)
+}
+
+/// Opens the collection directory in the platform file manager, so the user
+/// can find the files they are expected to commit.
+#[tauri::command]
+pub async fn collection_reveal(app: AppHandle, collection_id: String) -> Result<(), String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    if !paths.dir.is_dir() {
+        return Err(format!(
+            "Collection folder {} does not exist",
+            paths.dir.display()
+        ));
+    }
+    open::that_detached(&paths.dir)
+        .map_err(|e| format!("Could not open {}: {}", paths.dir.display(), e))
+}
+
+#[tauri::command]
+pub async fn collection_runners_list(
+    app: AppHandle,
+    collection_id: String,
+) -> Result<Vec<model::RunnerDoc>, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    list_runners_at(&paths.dir)
+}
+
+#[tauri::command]
+pub async fn collection_runners_save(
+    app: AppHandle,
+    collection_id: String,
+    runner: model::RunnerDoc,
+) -> Result<model::RunnerDoc, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    save_runner_at(&paths.dir, &collection_id, runner)
+}
+
+#[tauri::command]
+pub async fn collection_runners_delete(
+    app: AppHandle,
+    collection_id: String,
+    runner_id: String,
+) -> Result<bool, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    delete_runner_at(&paths.dir, &runner_id)
+}
+
+#[tauri::command]
+pub async fn collection_runner_data_read(
+    app: AppHandle,
+    collection_id: String,
+    path: String,
+) -> Result<Value, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    read_runner_data_at(&paths.dir, &path)
+}
+
 #[tauri::command]
 pub async fn collections_get_path(app: AppHandle) -> Result<String, String> {
     let path = get_default_collections_dir(&app)?;
@@ -2284,5 +2425,162 @@ mod delete_folder {
 
         assert!(dir.join("README.md").exists());
         assert!(!dir.join(layout::FOLDER_YAML).exists());
+    }
+}
+
+#[cfg(test)]
+mod runner_commands {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn v2_collection(dir: &Path) {
+        fs::write(
+            dir.join("collection.yaml"),
+            "resonanceFormat: 2\nid: c1\nname: Petstore\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("health.yaml"),
+            "resonanceFormat: 2\nid: r1\nname: Health\nmethod: GET\npath: /health\n",
+        )
+        .unwrap();
+    }
+
+    fn runner_yaml(id: &str, name: &str) -> String {
+        format!(
+            "resonanceFormat: 2\nid: {}\nname: {}\nrequests:\n- requestId: r1\n",
+            id, name
+        )
+    }
+
+    fn write_runner(dir: &Path, file: &str, contents: &str) {
+        let path = dir.join("runners").join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, contents).unwrap();
+    }
+
+    #[test]
+    fn listing_heals_a_merge_duplicated_runner_id_on_disk() {
+        let temp = TempDir::new().unwrap();
+        v2_collection(temp.path());
+        write_runner(temp.path(), "a.yaml", &runner_yaml("runner_1", "A"));
+        write_runner(temp.path(), "b.yaml", &runner_yaml("runner_1", "B"));
+
+        let first = list_runners_at(temp.path()).unwrap();
+        let second = list_runners_at(temp.path()).unwrap();
+
+        let ids = |docs: &[model::RunnerDoc]| docs.iter().map(|d| d.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&first), ids(&second));
+        assert_ne!(first[0].id, first[1].id);
+        let on_disk = fs::read_to_string(temp.path().join("runners/b.yaml")).unwrap();
+        assert!(
+            on_disk.contains(&format!("id: {}", first[1].id)),
+            "{}",
+            on_disk
+        );
+    }
+
+    #[test]
+    fn saving_a_runner_into_a_legacy_collection_is_refused() {
+        let temp = TempDir::new().unwrap();
+        fs::write(
+            temp.path().join("collection.json"),
+            "{\"id\":\"c1\",\"name\":\"P\"}",
+        )
+        .unwrap();
+
+        let error = save_runner_at(
+            temp.path(),
+            "c1",
+            model::RunnerDoc::new(String::new(), "Smoke".into()),
+        )
+        .unwrap_err();
+        assert!(error.contains("legacy format"), "{}", error);
+        assert!(list_runners_at(temp.path()).unwrap().is_empty());
+        assert!(!temp.path().join("runners").exists());
+    }
+
+    #[test]
+    fn a_saved_runner_is_listed_and_deleted_through_the_cache() {
+        let temp = TempDir::new().unwrap();
+        v2_collection(temp.path());
+
+        let stored = save_runner_at(
+            temp.path(),
+            "c1",
+            model::RunnerDoc::new(String::new(), "Smoke".into()),
+        )
+        .unwrap();
+        assert!(stored.id.starts_with("runner_"));
+        assert_eq!(list_runners_at(temp.path()).unwrap().len(), 1);
+
+        assert!(delete_runner_at(temp.path(), &stored.id).unwrap());
+        assert!(list_runners_at(temp.path()).unwrap().is_empty());
+        assert!(!temp.path().join("runners").exists());
+    }
+
+    #[test]
+    fn a_structural_save_keeps_the_runners_in_the_cache_warm() {
+        let temp = TempDir::new().unwrap();
+        v2_collection(temp.path());
+        save_runner_at(
+            temp.path(),
+            "c1",
+            model::RunnerDoc::new(String::new(), "Smoke".into()),
+        )
+        .unwrap();
+
+        let incoming = Collection {
+            id: "c1".into(),
+            name: "Petstore".into(),
+            base_url: String::new(),
+            endpoints: vec![
+                serde_json::json!({"id": "r1", "name": "Health", "method": "GET", "path": "/health"}),
+            ],
+            folders: Vec::new(),
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            git_branch: None,
+        };
+        write_v2_collection_seeded(temp.path(), &incoming, None, &HashMap::new(), None).unwrap();
+
+        let cached = read_collection_dir_cached(collection_cache(), temp.path()).unwrap();
+        assert_eq!(cached.runners.len(), 1);
+        assert_eq!(list_runners_at(temp.path()).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn reading_a_data_file_resolves_relative_to_the_collection() {
+        let temp = TempDir::new().unwrap();
+        v2_collection(temp.path());
+        fs::create_dir(temp.path().join("data")).unwrap();
+        fs::write(temp.path().join("data/users.csv"), "\u{feff}id\n1\n").unwrap();
+
+        let value = read_runner_data_at(temp.path(), "data/users.csv").unwrap();
+        assert_eq!(value["path"], "data/users.csv");
+        assert_eq!(value["name"], "users.csv");
+        assert_eq!(value["content"], "id\n1\n");
+        assert!(
+            value["resolvedPath"]
+                .as_str()
+                .unwrap()
+                .ends_with("users.csv")
+        );
+    }
+
+    #[test]
+    fn reading_a_data_file_refuses_a_path_outside_the_collection() {
+        let temp = TempDir::new().unwrap();
+        let collection = temp.path().join("petstore");
+        fs::create_dir(&collection).unwrap();
+        v2_collection(&collection);
+        fs::write(temp.path().join("users.csv"), "id\n1\n").unwrap();
+
+        let error = read_runner_data_at(&collection, "../users.csv").unwrap_err();
+        assert!(error.contains("inside the collection"), "{}", error);
     }
 }

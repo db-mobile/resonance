@@ -17,8 +17,49 @@ export class CollectionPalette {
      */
     constructor({ onAddEndpoint, onAddAll } = {}) {
         this.container = null;
-        this._onAddEndpoint = onAddEndpoint || null;
-        this._onAddAll = onAddAll || null;
+        this._locked = null;
+        this._onAddEndpoint = (collection, endpoint) => {
+            if (!this._isLocked(collection.id)) {
+                onAddEndpoint?.(collection, endpoint);
+            }
+        };
+        this._onAddAll = (collection, endpoints) => {
+            if (!this._isLocked(collection.id)) {
+                onAddAll?.(collection, endpoints);
+            }
+        };
+    }
+
+    /**
+     * @param {string|null} collectionId
+     * @param {string} [collectionName]
+     */
+    setLockedCollection(collectionId, collectionName = '') {
+        this._locked = collectionId ? { id: collectionId, name: collectionName } : null;
+        this._applyLock();
+    }
+
+    /**
+     * @param {string} collectionId
+     * @returns {boolean}
+     */
+    _isLocked(collectionId) {
+        return Boolean(this._locked && this._locked.id !== collectionId);
+    }
+
+    _applyLock() {
+        if (!this.container) {return;}
+        const hint = this._locked
+            ? translate('runner.collection_locked', 'This runner belongs to "{{name}}". Start a new runner to use another collection.', { name: this._locked.name })
+            : '';
+        this.container.querySelectorAll('.runner-collection-item').forEach(item => {
+            const locked = this._isLocked(item.dataset.collectionId);
+            item.classList.toggle('is-locked', locked);
+            item.title = locked ? hint : '';
+            item.querySelectorAll('[data-action="add"], [data-action="add-all"]').forEach(button => {
+                button.disabled = locked;
+            });
+        });
     }
 
     /**
@@ -47,6 +88,7 @@ export class CollectionPalette {
 
             this.container.appendChild(this._createCollectionElement(collection));
         });
+        this._applyLock();
     }
 
     /**

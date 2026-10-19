@@ -4,7 +4,7 @@ import { endpointKey } from '../../src/modules/collections/collectionTree.js';
 const ROUTED = [
     'handleNewRequest', 'handleNewFolder', 'handleRunRequests', 'handleVariables', 'handleCollectionAuth',
     'handleExportOpenApiJson', 'handleExportOpenApiYaml', 'handleExportPostman', 'handleGenerateDocumentation',
-    'handleRename', 'handleClose', 'handleDelete', 'handleTogglePinned', 'handleRenameRequest', 'handleDuplicateRequest',
+    'handleRename', 'handleReveal', 'handleClose', 'handleDelete', 'handleTogglePinned', 'handleRenameRequest', 'handleDuplicateRequest',
     'handleMoveRequest', 'handleDeleteRequest', 'handleRenameFolder', 'handleFolderAuth', 'handleDeleteFolder',
     'handleNewCollection', 'handleNewRequestInEmptySpace'
 ];
@@ -40,7 +40,7 @@ describe('collection context menu', () => {
         expect(keysOf(controller)).toEqual([
             'context_menu.new_request', 'context_menu.new_folder', 'context_menu.run_collection', 'context_menu.manage_variables',
             'context_menu.edit_auth', 'context_menu.export_openapi_json', 'context_menu.export_openapi_yaml', 'context_menu.export_postman',
-            'context_menu.generate_docs', 'context_menu.rename_collection', 'context_menu.delete_collection'
+            'context_menu.generate_docs', 'context_menu.rename_collection', 'context_menu.show_in_file_manager', 'context_menu.delete_collection'
         ]);
 
         click(controller, 'context_menu.new_request');
@@ -53,6 +53,8 @@ describe('collection context menu', () => {
         expect(controller.handleCollectionAuth).toHaveBeenCalledWith(collection);
         click(controller, 'context_menu.export_postman');
         expect(controller.handleExportPostman).toHaveBeenCalledWith(collection);
+        click(controller, 'context_menu.show_in_file_manager');
+        expect(controller.handleReveal).toHaveBeenCalledWith(collection);
         click(controller, 'context_menu.delete_collection');
         expect(controller.handleDelete).toHaveBeenCalledWith(collection);
     });
