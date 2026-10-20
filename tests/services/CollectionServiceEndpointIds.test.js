@@ -27,14 +27,15 @@ describe('CollectionService.generateEndpointId', () => {
         expect(service.generateEndpointId(collection)).not.toBe('req_folder');
     });
 
-    test('counts requests in a nested items tree', () => {
+    test('counts requests in a nested folder', () => {
         const collection = {
             id: 'c1',
-            items: [
+            endpoints: [],
+            folders: [
                 {
-                    type: 'folder',
                     id: 'f1',
-                    items: [{ type: 'request', id: 'req_nested' }]
+                    endpoints: [],
+                    folders: [{ id: 'f2', endpoints: [{ id: 'req_nested' }] }]
                 }
             ]
         };

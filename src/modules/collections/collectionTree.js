@@ -1,18 +1,7 @@
 /**
- * @fileoverview Shape-agnostic traversal and editing of a collection's request
+ * @fileoverview Traversal and editing of a collection's endpoints and nested folders
  * @module collections/collectionTree
  */
-
-const FOLDER = 'folder';
-const REQUEST = 'request';
-
-/**
- * @param {Object|null|undefined} collection
- * @returns {boolean}
- */
-function usesItemsTree(collection) {
-    return Array.isArray(collection?.items);
-}
 
 /**
  * @param {Array|null|undefined} folders
@@ -37,7 +26,7 @@ function foldedRequestIds(folders, ids = new Set()) {
  * @param {Set<string>} seen
  * @yields {{request: Object, chain: Object[]}}
  */
-function* walkLegacyFolders(folders, chain, seen) {
+function* walkFolderRequests(folders, chain, seen) {
     for (const folder of folders ?? []) {
         if (!folder) {
             continue;
@@ -50,44 +39,7 @@ function* walkLegacyFolders(folders, chain, seen) {
             seen.add(endpoint.id);
             yield { request: endpoint, chain: nested };
         }
-        yield* walkLegacyFolders(folder.folders, nested, seen);
-    }
-}
-
-/**
- * @param {Object} collection
- * @yields {{request: Object, chain: Object[]}}
- */
-function* walkLegacy(collection) {
-    const foldered = foldedRequestIds(collection.folders);
-    const seen = new Set();
-
-    for (const endpoint of collection.endpoints ?? []) {
-        if (!endpoint || foldered.has(endpoint.id) || seen.has(endpoint.id)) {
-            continue;
-        }
-        seen.add(endpoint.id);
-        yield { request: endpoint, chain: [] };
-    }
-
-    yield* walkLegacyFolders(collection.folders, [], seen);
-}
-
-/**
- * @param {Array|null|undefined} items
- * @param {Object[]} chain
- * @yields {{request: Object, chain: Object[]}}
- */
-function* walkItems(items, chain = []) {
-    for (const item of items ?? []) {
-        if (!item) {
-            continue;
-        }
-        if (item.type === FOLDER) {
-            yield* walkItems(item.items, [...chain, item]);
-        } else {
-            yield { request: item, chain };
-        }
+        yield* walkFolderRequests(folder.folders, nested, seen);
     }
 }
 
@@ -99,11 +51,18 @@ function* walkRequests(collection) {
     if (!collection) {
         return;
     }
-    if (usesItemsTree(collection)) {
-        yield* walkItems(collection.items);
-    } else {
-        yield* walkLegacy(collection);
+    const foldered = foldedRequestIds(collection.folders);
+    const seen = new Set();
+
+    for (const endpoint of collection.endpoints ?? []) {
+        if (!endpoint || foldered.has(endpoint.id) || seen.has(endpoint.id)) {
+            continue;
+        }
+        seen.add(endpoint.id);
+        yield { request: endpoint, chain: [] };
     }
+
+    yield* walkFolderRequests(collection.folders, [], seen);
 }
 
 /**
@@ -114,37 +73,20 @@ export function* walkFolders(collection) {
     if (!collection) {
         return;
     }
-    if (!usesItemsTree(collection)) {
-        yield* walkLegacyFolderTree(collection.folders);
-        return;
-    }
-    yield* walkFolderItems(collection.items);
+    yield* walkFolderTree(collection.folders);
 }
 
 /**
  * @param {Array|null|undefined} folders
  * @yields {Object}
  */
-function* walkLegacyFolderTree(folders) {
+function* walkFolderTree(folders) {
     for (const folder of folders ?? []) {
         if (!folder) {
             continue;
         }
         yield folder;
-        yield* walkLegacyFolderTree(folder.folders);
-    }
-}
-
-/**
- * @param {Array|null|undefined} items
- * @yields {Object}
- */
-function* walkFolderItems(items) {
-    for (const item of items ?? []) {
-        if (item?.type === FOLDER) {
-            yield item;
-            yield* walkFolderItems(item.items);
-        }
+        yield* walkFolderTree(folder.folders);
     }
 }
 
@@ -182,13 +124,7 @@ export function rootRequests(collection) {
  * @returns {Object[]}
  */
 export function topLevelFolders(collection) {
-    if (!collection) {
-        return [];
-    }
-    if (!usesItemsTree(collection)) {
-        return (collection.folders ?? []).filter(Boolean);
-    }
-    return collection.items.filter(item => item?.type === FOLDER);
+    return (collection?.folders ?? []).filter(Boolean);
 }
 
 /**
@@ -250,21 +186,6 @@ function patchList(list, requestId, patch) {
 }
 
 /**
- * @param {Array|null|undefined} items
- * @param {string} requestId
- * @param {Object} patch
- * @returns {Array}
- */
-function patchItems(items, requestId, patch) {
-    return (items ?? []).map(item => {
-        if (item?.type === FOLDER) {
-            return { ...item, items: patchItems(item.items, requestId, patch) };
-        }
-        return item?.id === requestId ? { ...item, ...patch } : item;
-    });
-}
-
-/**
  * @param {Object} collection
  * @param {string} requestId
  * @param {Object} patch
@@ -275,14 +196,10 @@ export function updateRequest(collection, requestId, patch) {
         return null;
     }
 
-    if (usesItemsTree(collection)) {
-        return { ...collection, items: patchItems(collection.items, requestId, patch) };
-    }
-
     return {
         ...collection,
         endpoints: patchList(collection.endpoints, requestId, patch),
-        folders: patchLegacyFolderRequests(collection.folders, requestId, patch)
+        folders: patchFolderRequests(collection.folders, requestId, patch)
     };
 }
 
@@ -292,31 +209,13 @@ export function updateRequest(collection, requestId, patch) {
  * @param {Object} patch
  * @returns {Array}
  */
-function patchLegacyFolderRequests(folders, requestId, patch) {
+function patchFolderRequests(folders, requestId, patch) {
     return (folders ?? []).map(folder => {
         const next = { ...folder, endpoints: patchList(folder?.endpoints, requestId, patch) };
         if (Array.isArray(folder?.folders)) {
-            next.folders = patchLegacyFolderRequests(folder.folders, requestId, patch);
+            next.folders = patchFolderRequests(folder.folders, requestId, patch);
         }
         return next;
-    });
-}
-
-/**
- * @param {Array|null|undefined} items
- * @param {string} folderId
- * @param {function(Object): Object} transform
- * @returns {Array}
- */
-function mapFolderItem(items, folderId, transform) {
-    return (items ?? []).map(item => {
-        if (item?.type !== FOLDER) {
-            return item;
-        }
-        if (item.id === folderId) {
-            return transform(item);
-        }
-        return { ...item, items: mapFolderItem(item.items, folderId, transform) };
     });
 }
 
@@ -326,26 +225,16 @@ function mapFolderItem(items, folderId, transform) {
  * @param {function(Object): Object} transform
  * @returns {Array}
  */
-function mapLegacyFolder(folders, folderId, transform) {
+function mapFolder(folders, folderId, transform) {
     return (folders ?? []).map(folder => {
         if (folder?.id === folderId) {
             return transform(folder);
         }
         if (Array.isArray(folder?.folders)) {
-            return { ...folder, folders: mapLegacyFolder(folder.folders, folderId, transform) };
+            return { ...folder, folders: mapFolder(folder.folders, folderId, transform) };
         }
         return folder;
     });
-}
-
-/**
- * @param {Array|null|undefined} items
- * @param {string} folderId
- * @param {Object} patch
- * @returns {Array}
- */
-function patchFolderItems(items, folderId, patch) {
-    return mapFolderItem(items, folderId, item => ({ ...item, ...patch }));
 }
 
 /**
@@ -359,41 +248,10 @@ export function updateFolder(collection, folderId, patch) {
         return null;
     }
 
-    if (usesItemsTree(collection)) {
-        return { ...collection, items: patchFolderItems(collection.items, folderId, patch) };
-    }
-
     return {
         ...collection,
-        folders: patchLegacyFolders(collection.folders, folderId, patch)
+        folders: mapFolder(collection.folders, folderId, folder => ({ ...folder, ...patch }))
     };
-}
-
-/**
- * @param {Array|null|undefined} folders
- * @param {string} folderId
- * @param {Object} patch
- * @returns {Array}
- */
-function patchLegacyFolders(folders, folderId, patch) {
-    return mapLegacyFolder(folders, folderId, folder => ({ ...folder, ...patch }));
-}
-
-/**
- * @param {Array|null|undefined} items
- * @param {string} requestId
- * @returns {Array}
- */
-function removeFromItems(items, requestId) {
-    const result = [];
-    for (const item of items ?? []) {
-        if (item?.type === FOLDER) {
-            result.push({ ...item, items: removeFromItems(item.items, requestId) });
-        } else if (item?.id !== requestId) {
-            result.push(item);
-        }
-    }
-    return result;
 }
 
 /**
@@ -406,14 +264,10 @@ export function removeRequest(collection, requestId) {
         return null;
     }
 
-    if (usesItemsTree(collection)) {
-        return { ...collection, items: removeFromItems(collection.items, requestId) };
-    }
-
     return {
         ...collection,
         endpoints: (collection.endpoints ?? []).filter(endpoint => endpoint?.id !== requestId),
-        folders: removeFromLegacyFolders(collection.folders, requestId)
+        folders: removeFromFolders(collection.folders, requestId)
     };
 }
 
@@ -422,14 +276,14 @@ export function removeRequest(collection, requestId) {
  * @param {string} requestId
  * @returns {Array}
  */
-function removeFromLegacyFolders(folders, requestId) {
+function removeFromFolders(folders, requestId) {
     return (folders ?? []).map(folder => {
         const next = {
             ...folder,
             endpoints: (folder?.endpoints ?? []).filter(endpoint => endpoint?.id !== requestId)
         };
         if (Array.isArray(folder?.folders)) {
-            next.folders = removeFromLegacyFolders(folder.folders, requestId);
+            next.folders = removeFromFolders(folder.folders, requestId);
         }
         return next;
     });
@@ -446,14 +300,6 @@ export function insertRequest(collection, folderId, request) {
         throw new Error(`Folder with id ${folderId} not found in collection`);
     }
 
-    if (usesItemsTree(collection)) {
-        const node = request.type ? request : { ...request, type: REQUEST };
-        if (!folderId) {
-            return { ...collection, items: [...collection.items, node] };
-        }
-        return { ...collection, items: insertIntoFolderItems(collection.items, folderId, node) };
-    }
-
     const endpoints = [...(collection.endpoints ?? []), request];
     if (!folderId) {
         return { ...collection, endpoints };
@@ -462,31 +308,11 @@ export function insertRequest(collection, folderId, request) {
     return {
         ...collection,
         endpoints,
-        folders: insertIntoLegacyFolders(collection.folders, folderId, request)
+        folders: mapFolder(collection.folders, folderId, folder => ({
+            ...folder,
+            endpoints: [...(folder.endpoints ?? []), request]
+        }))
     };
-}
-
-/**
- * @param {Array|null|undefined} folders
- * @param {string} folderId
- * @param {Object} request
- * @returns {Array}
- */
-function insertIntoLegacyFolders(folders, folderId, request) {
-    return mapLegacyFolder(folders, folderId, folder => ({
-        ...folder,
-        endpoints: [...(folder.endpoints ?? []), request]
-    }));
-}
-
-/**
- * @param {Array|null|undefined} items
- * @param {string} folderId
- * @param {Object} node
- * @returns {Array}
- */
-function insertIntoFolderItems(items, folderId, node) {
-    return mapFolderItem(items, folderId, item => ({ ...item, items: [...(item.items ?? []), node] }));
 }
 
 /**
@@ -500,32 +326,17 @@ export function insertFolder(collection, parentFolderId, folder) {
         throw new Error(`Folder with id ${parentFolderId} not found in collection`);
     }
 
-    if (usesItemsTree(collection)) {
-        const node = { type: FOLDER, items: [], ...folder };
-        if (!parentFolderId) {
-            return { ...collection, items: [...collection.items, node] };
-        }
-        return { ...collection, items: insertIntoFolderItems(collection.items, parentFolderId, node) };
-    }
-
     const node = { endpoints: [], ...folder };
     if (!parentFolderId) {
         return { ...collection, folders: [...(collection.folders ?? []), node] };
     }
-    return { ...collection, folders: insertSubfolder(collection.folders, parentFolderId, node) };
-}
-
-/**
- * @param {Array|null|undefined} folders
- * @param {string} parentFolderId
- * @param {Object} node
- * @returns {Array}
- */
-function insertSubfolder(folders, parentFolderId, node) {
-    return mapLegacyFolder(folders, parentFolderId, folder => ({
-        ...folder,
-        folders: [...(folder.folders ?? []), node]
-    }));
+    return {
+        ...collection,
+        folders: mapFolder(collection.folders, parentFolderId, parent => ({
+            ...parent,
+            folders: [...(parent.folders ?? []), node]
+        }))
+    };
 }
 
 /**
@@ -551,28 +362,16 @@ export function moveRequest(collection, requestId, targetFolderId) {
  */
 export function folderOutline(collection) {
     const out = [];
-    const visitLegacy = (folders, depth) => {
+    const visit = (folders, depth) => {
         for (const folder of folders ?? []) {
             if (!folder) {
                 continue;
             }
             out.push({ id: folder.id, name: folder.name, depth });
-            visitLegacy(folder.folders, depth + 1);
+            visit(folder.folders, depth + 1);
         }
     };
-    const visitItems = (items, depth) => {
-        for (const item of items ?? []) {
-            if (item?.type === FOLDER) {
-                out.push({ id: item.id, name: item.name, depth });
-                visitItems(item.items, depth + 1);
-            }
-        }
-    };
-    if (usesItemsTree(collection)) {
-        visitItems(collection.items, 0);
-    } else {
-        visitLegacy(collection?.folders, 0);
-    }
+    visit(collection?.folders, 0);
     return out;
 }
 

@@ -237,11 +237,6 @@ pub(crate) fn resolve_collection_dir(
     }
 
     let default_dir = get_default_collections_dir(app)?;
-    let legacy_dir = default_dir.join(collection_id);
-    if is_collection_dir(&legacy_dir) {
-        return Ok(Some(legacy_dir));
-    }
-
     if !default_dir.exists() {
         return Ok(None);
     }

@@ -68,8 +68,6 @@ pub struct Cookie {
 #[serde(rename_all = "camelCase", default)]
 pub struct ExecutionSettings {
     pub request_timeout: Option<u64>,
-    /// Legacy alias used when requestTimeout is absent.
-    pub timeout: Option<u64>,
     pub http_version: Option<String>,
     pub verify_ssl: Option<bool>,
     pub follow_redirects: Option<bool>,

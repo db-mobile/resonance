@@ -11,9 +11,9 @@ import {
     insertRequest
 } from '../../src/modules/collections/collectionTree.js';
 
-const legacyCollection = () => ({
+const flatCollection = () => ({
     id: 'c1',
-    name: 'Legacy',
+    name: 'Flat',
     endpoints: [
         { id: 'r1', name: 'Health' },
         { id: 'r2', name: 'List Pets' },
@@ -31,22 +31,24 @@ const legacyCollection = () => ({
     ]
 });
 
-const itemsCollection = () => ({
+const nestedCollection = () => ({
     id: 'c1',
-    name: 'Tree',
-    items: [
-        { type: 'request', id: 'r1', name: 'Health' },
+    name: 'Nested',
+    endpoints: [
+        { id: 'r1', name: 'Health' },
+        { id: 'r2', name: 'List Pets' },
+        { id: 'r3', name: 'Create Pet' }
+    ],
+    folders: [
         {
-            type: 'folder',
             id: 'f1',
             name: 'pets',
-            items: [
-                { type: 'request', id: 'r2', name: 'List Pets' },
+            endpoints: [{ id: 'r2', name: 'List Pets' }],
+            folders: [
                 {
-                    type: 'folder',
                     id: 'f2',
                     name: 'admin',
-                    items: [{ type: 'request', id: 'r3', name: 'Create Pet' }]
+                    endpoints: [{ id: 'r3', name: 'Create Pet' }]
                 }
             ]
         }
@@ -54,38 +56,38 @@ const itemsCollection = () => ({
 });
 
 describe('flattenRequests', () => {
-    test('legacy: yields each request exactly once despite duplication', () => {
-        const ids = flattenRequests(legacyCollection()).map(request => request.id);
+    test('yields each request exactly once despite duplication', () => {
+        const ids = flattenRequests(flatCollection()).map(request => request.id);
         expect(ids).toEqual(['r1', 'r2', 'r3']);
     });
 
-    test('legacy: root-level requests are included alongside foldered ones', () => {
-        const ids = flattenRequests(legacyCollection()).map(request => request.id);
+    test('root-level requests are included alongside foldered ones', () => {
+        const ids = flattenRequests(flatCollection()).map(request => request.id);
         expect(ids).toContain('r1');
     });
 
-    test('legacy: a collection with only folders yields the foldered requests', () => {
+    test('a collection with only folders yields the foldered requests', () => {
         const collection = { endpoints: [], folders: [{ id: 'f1', endpoints: [{ id: 'r9' }] }] };
         expect(flattenRequests(collection).map(request => request.id)).toEqual(['r9']);
     });
 
-    test('legacy: a collection with only a flat list yields it unchanged', () => {
+    test('a collection with only a flat list yields it unchanged', () => {
         const collection = { endpoints: [{ id: 'r1' }, { id: 'r2' }] };
         expect(flattenRequests(collection).map(request => request.id)).toEqual(['r1', 'r2']);
     });
 
-    test('legacy: duplicate ids inside the flat list are collapsed', () => {
+    test('duplicate ids inside the flat list are collapsed', () => {
         const collection = { endpoints: [{ id: 'r1' }, { id: 'r1' }] };
         expect(flattenRequests(collection)).toHaveLength(1);
     });
 
-    test('items: walks depth-first through nested folders', () => {
-        const ids = flattenRequests(itemsCollection()).map(request => request.id);
+    test('walks depth-first through nested folders', () => {
+        const ids = flattenRequests(nestedCollection()).map(request => request.id);
         expect(ids).toEqual(['r1', 'r2', 'r3']);
     });
 
     test('returns requests by reference, not copies', () => {
-        const collection = legacyCollection();
+        const collection = flatCollection();
         expect(flattenRequests(collection)[0]).toBe(collection.endpoints[0]);
     });
 
@@ -98,32 +100,32 @@ describe('flattenRequests', () => {
 });
 
 describe('requestsInFolder', () => {
-    test('returns a legacy folder\'s requests in display order', () => {
-        expect(requestsInFolder(legacyCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
+    test('returns a folder\'s requests in display order', () => {
+        expect(requestsInFolder(flatCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
     });
 
-    test('includes nested folders of an items tree', () => {
-        expect(requestsInFolder(itemsCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
-        expect(requestsInFolder(itemsCollection(), 'f2').map(r => r.id)).toEqual(['r3']);
+    test('includes the requests of nested folders', () => {
+        expect(requestsInFolder(nestedCollection(), 'f1').map(r => r.id)).toEqual(['r2', 'r3']);
+        expect(requestsInFolder(nestedCollection(), 'f2').map(r => r.id)).toEqual(['r3']);
     });
 
     test('returns nothing for an unknown folder', () => {
-        expect(requestsInFolder(itemsCollection(), 'nope')).toEqual([]);
+        expect(requestsInFolder(nestedCollection(), 'nope')).toEqual([]);
     });
 });
 
 describe('rootRequests', () => {
-    test('legacy: returns only the requests no folder claims', () => {
-        expect(rootRequests(legacyCollection()).map(request => request.id)).toEqual(['r1']);
+    test('returns only the requests no folder claims', () => {
+        expect(rootRequests(flatCollection()).map(request => request.id)).toEqual(['r1']);
     });
 
-    test('legacy: a folderless collection reports its whole flat list', () => {
+    test('a folderless collection reports its whole flat list', () => {
         const collection = { endpoints: [{ id: 'r1' }, { id: 'r2' }], folders: [] };
         expect(rootRequests(collection).map(request => request.id)).toEqual(['r1', 'r2']);
     });
 
-    test('items: returns only the top-level request nodes', () => {
-        expect(rootRequests(itemsCollection()).map(request => request.id)).toEqual(['r1']);
+    test('requests claimed by a nested folder are not root requests', () => {
+        expect(rootRequests(nestedCollection()).map(request => request.id)).toEqual(['r1']);
     });
 
     test('tolerates a null collection', () => {
@@ -132,12 +134,12 @@ describe('rootRequests', () => {
 });
 
 describe('topLevelFolders', () => {
-    test('legacy: returns the folders array', () => {
-        expect(topLevelFolders(legacyCollection()).map(folder => folder.id)).toEqual(['f1']);
+    test('returns the folders array', () => {
+        expect(topLevelFolders(flatCollection()).map(folder => folder.id)).toEqual(['f1']);
     });
 
-    test('items: returns only top-level folders, not nested ones', () => {
-        expect(topLevelFolders(itemsCollection()).map(folder => folder.id)).toEqual(['f1']);
+    test('returns only top-level folders, not nested ones', () => {
+        expect(topLevelFolders(nestedCollection()).map(folder => folder.id)).toEqual(['f1']);
     });
 
     test('tolerates a null collection and a missing folders array', () => {
@@ -148,103 +150,104 @@ describe('topLevelFolders', () => {
 
 describe('findRequest', () => {
     test.each([
-        ['legacy', legacyCollection],
-        ['items', itemsCollection]
+        ['flat', flatCollection],
+        ['nested', nestedCollection]
     ])('%s: finds a root-level request', (_label, build) => {
         expect(findRequest(build(), 'r1').name).toBe('Health');
     });
 
     test.each([
-        ['legacy', legacyCollection],
-        ['items', itemsCollection]
+        ['flat', flatCollection],
+        ['nested', nestedCollection]
     ])('%s: finds a foldered request', (_label, build) => {
         expect(findRequest(build(), 'r2').name).toBe('List Pets');
     });
 
-    test('items: finds a request three levels deep', () => {
-        expect(findRequest(itemsCollection(), 'r3').name).toBe('Create Pet');
+    test('finds a request two folders deep', () => {
+        expect(findRequest(nestedCollection(), 'r3').name).toBe('Create Pet');
     });
 
     test('returns null when absent', () => {
-        expect(findRequest(legacyCollection(), 'nope')).toBeNull();
+        expect(findRequest(flatCollection(), 'nope')).toBeNull();
         expect(findRequest(null, 'r1')).toBeNull();
     });
 });
 
 describe('findFolder', () => {
-    test('legacy: finds a top-level folder', () => {
-        expect(findFolder(legacyCollection(), 'f1').name).toBe('pets');
+    test('finds a top-level folder', () => {
+        expect(findFolder(flatCollection(), 'f1').name).toBe('pets');
     });
 
-    test('items: finds a nested folder', () => {
-        expect(findFolder(itemsCollection(), 'f2').name).toBe('admin');
+    test('finds a nested folder', () => {
+        expect(findFolder(nestedCollection(), 'f2').name).toBe('admin');
     });
 
     test('returns null when absent', () => {
-        expect(findFolder(itemsCollection(), 'nope')).toBeNull();
+        expect(findFolder(nestedCollection(), 'nope')).toBeNull();
         expect(findFolder({}, 'f1')).toBeNull();
     });
 });
 
 describe('folderChainForRequest', () => {
-    test('legacy: a root-level request has an empty chain', () => {
-        expect(folderChainForRequest(legacyCollection(), 'r1')).toEqual([]);
+    test('a root-level request has an empty chain', () => {
+        expect(folderChainForRequest(flatCollection(), 'r1')).toEqual([]);
     });
 
-    test('legacy: a foldered request reports its one folder', () => {
-        const chain = folderChainForRequest(legacyCollection(), 'r2');
+    test('a foldered request reports its one folder', () => {
+        const chain = folderChainForRequest(flatCollection(), 'r2');
         expect(chain.map(folder => folder.id)).toEqual(['f1']);
     });
 
-    test('items: reports the chain outermost first', () => {
-        const chain = folderChainForRequest(itemsCollection(), 'r3');
+    test('reports the chain outermost first', () => {
+        const chain = folderChainForRequest(nestedCollection(), 'r3');
         expect(chain.map(folder => folder.id)).toEqual(['f1', 'f2']);
     });
 
     test('returns an empty chain for an unknown request', () => {
-        expect(folderChainForRequest(itemsCollection(), 'nope')).toEqual([]);
+        expect(folderChainForRequest(nestedCollection(), 'nope')).toEqual([]);
     });
 });
 
 describe('updateRequest', () => {
-    test('legacy: patches both the flat copy and the folder copy', () => {
-        const updated = updateRequest(legacyCollection(), 'r2', { name: 'Renamed' });
+    test('patches both the flat copy and the folder copy', () => {
+        const updated = updateRequest(flatCollection(), 'r2', { name: 'Renamed' });
 
         expect(updated.endpoints.find(request => request.id === 'r2').name).toBe('Renamed');
         expect(updated.folders[0].endpoints.find(request => request.id === 'r2').name).toBe('Renamed');
     });
 
-    test('items: patches the single node', () => {
-        const updated = updateRequest(itemsCollection(), 'r3', { name: 'Renamed' });
+    test('patches a request inside a nested folder', () => {
+        const updated = updateRequest(nestedCollection(), 'r3', { name: 'Renamed' });
         expect(findRequest(updated, 'r3').name).toBe('Renamed');
+        expect(findFolder(updated, 'f2').endpoints[0].name).toBe('Renamed');
     });
 
     test('does not mutate the input collection', () => {
-        const collection = legacyCollection();
+        const collection = flatCollection();
         updateRequest(collection, 'r2', { name: 'Renamed' });
         expect(collection.endpoints.find(request => request.id === 'r2').name).toBe('List Pets');
     });
 
     test('leaves sibling requests untouched', () => {
-        const updated = updateRequest(itemsCollection(), 'r2', { name: 'Renamed' });
+        const updated = updateRequest(nestedCollection(), 'r2', { name: 'Renamed' });
         expect(findRequest(updated, 'r1').name).toBe('Health');
         expect(findRequest(updated, 'r3').name).toBe('Create Pet');
     });
 
     test('returns null for an unknown request', () => {
-        expect(updateRequest(legacyCollection(), 'nope', { name: 'x' })).toBeNull();
+        expect(updateRequest(flatCollection(), 'nope', { name: 'x' })).toBeNull();
     });
 });
 
 describe('removeRequest', () => {
-    test('legacy: removes both copies', () => {
-        const updated = removeRequest(legacyCollection(), 'r2');
+    test('removes both copies', () => {
+        const updated = removeRequest(flatCollection(), 'r2');
 
         expect(updated.endpoints.map(request => request.id)).toEqual(['r1', 'r3']);
         expect(updated.folders[0].endpoints.map(request => request.id)).toEqual(['r3']);
     });
 
-    test('legacy: leaves an emptied folder in place', () => {
+    test('leaves an emptied folder in place', () => {
         const collection = { endpoints: [{ id: 'r1' }], folders: [{ id: 'f1', endpoints: [{ id: 'r1' }] }] };
         const updated = removeRequest(collection, 'r1');
 
@@ -252,56 +255,52 @@ describe('removeRequest', () => {
         expect(updated.folders[0].endpoints).toEqual([]);
     });
 
-    test('items: removes a nested request', () => {
-        const updated = removeRequest(itemsCollection(), 'r3');
+    test('removes a request from a nested folder', () => {
+        const updated = removeRequest(nestedCollection(), 'r3');
 
         expect(flattenRequests(updated).map(request => request.id)).toEqual(['r1', 'r2']);
-        expect(findFolder(updated, 'f2').items).toEqual([]);
+        expect(findFolder(updated, 'f2').endpoints).toEqual([]);
     });
 
     test('does not mutate the input collection', () => {
-        const collection = legacyCollection();
+        const collection = flatCollection();
         removeRequest(collection, 'r2');
         expect(collection.endpoints).toHaveLength(3);
     });
 
     test('returns null for an unknown request', () => {
-        expect(removeRequest(itemsCollection(), 'nope')).toBeNull();
+        expect(removeRequest(nestedCollection(), 'nope')).toBeNull();
     });
 });
 
 describe('insertRequest', () => {
-    test('legacy: a root insert appends to the flat list only', () => {
-        const updated = insertRequest(legacyCollection(), null, { id: 'r4', name: 'New' });
+    test('a root insert appends to the flat list only', () => {
+        const updated = insertRequest(flatCollection(), null, { id: 'r4', name: 'New' });
 
         expect(updated.endpoints.map(request => request.id)).toEqual(['r1', 'r2', 'r3', 'r4']);
         expect(updated.folders[0].endpoints.map(request => request.id)).toEqual(['r2', 'r3']);
     });
 
-    test('legacy: a folder insert appends to both the flat list and the folder', () => {
-        const updated = insertRequest(legacyCollection(), 'f1', { id: 'r4', name: 'New' });
+    test('a folder insert appends to both the flat list and the folder', () => {
+        const updated = insertRequest(flatCollection(), 'f1', { id: 'r4', name: 'New' });
 
         expect(updated.endpoints.map(request => request.id)).toContain('r4');
         expect(updated.folders[0].endpoints.map(request => request.id)).toEqual(['r2', 'r3', 'r4']);
     });
 
-    test('items: a root insert tags the node as a request', () => {
-        const updated = insertRequest(itemsCollection(), null, { id: 'r4', name: 'New' });
-        expect(updated.items.at(-1)).toEqual({ type: 'request', id: 'r4', name: 'New' });
-    });
-
-    test('items: inserts into a nested folder', () => {
-        const updated = insertRequest(itemsCollection(), 'f2', { id: 'r4', name: 'New' });
-        expect(findFolder(updated, 'f2').items.map(item => item.id)).toEqual(['r3', 'r4']);
+    test('inserts into a nested folder', () => {
+        const updated = insertRequest(nestedCollection(), 'f2', { id: 'r4', name: 'New' });
+        expect(findFolder(updated, 'f2').endpoints.map(request => request.id)).toEqual(['r3', 'r4']);
+        expect(findFolder(updated, 'f1').endpoints.map(request => request.id)).toEqual(['r2']);
     });
 
     test('does not mutate the input collection', () => {
-        const collection = itemsCollection();
+        const collection = nestedCollection();
         insertRequest(collection, 'f2', { id: 'r4' });
         expect(flattenRequests(collection)).toHaveLength(3);
     });
 
     test('throws for an unknown folder', () => {
-        expect(() => insertRequest(legacyCollection(), 'nope', { id: 'r4' })).toThrow(/nope/);
+        expect(() => insertRequest(flatCollection(), 'nope', { id: 'r4' })).toThrow(/nope/);
     });
 });

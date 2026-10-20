@@ -317,7 +317,7 @@ pub struct RunnerRequest {
     /// Accepted from the desktop for validation only; never written.
     #[serde(default, skip_serializing)]
     pub collection_id: Option<String>,
-    #[serde(rename = "requestId", alias = "endpointId")]
+    #[serde(rename = "requestId")]
     pub request_id: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -903,15 +903,6 @@ spec:
         let mut doc = runner_with_everything();
         doc.requests[0].collection_id = Some("c1".into());
         assert!(!to_yaml(&doc).contains("collectionId"));
-    }
-
-    #[test]
-    fn a_legacy_endpoint_id_key_is_accepted_on_read() {
-        let yaml = "resonanceFormat: 2\nid: runner_1\nname: R\nrequests:\n- endpointId: req_a\n  collectionId: c1\n";
-        let parsed: RunnerDoc = serde_yaml_ng::from_str(yaml).unwrap();
-        assert_eq!(parsed.requests[0].request_id, "req_a");
-        assert_eq!(parsed.requests[0].collection_id.as_deref(), Some("c1"));
-        assert!(to_yaml(&parsed).contains("requestId: req_a"));
     }
 
     #[test]

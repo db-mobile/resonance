@@ -486,8 +486,7 @@ pub struct RequestOptions {
 ///
 /// Text rows carry `value`; file rows (`type: "file"`, formdata only) carry
 /// `file_path` and an optional per-part `content_type`. Disabled rows are
-/// filtered out by the frontend and never reach the backend. The legacy flat
-/// `{key: value}` object shape is still accepted by the body-building code.
+/// filtered out by the frontend and never reach the backend.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FormPart {
@@ -562,18 +561,11 @@ fn form_rows_to_pairs(rows: &[serde_json::Value]) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Key/value pairs of a URL-encoded body: the current row-array shape or the
-/// legacy flat object from older persisted data.
+/// Key/value pairs of a URL-encoded body in the row-array shape.
 fn urlencoded_pairs(body: &serde_json::Value) -> Vec<(String, String)> {
-    if let Some(rows) = body.as_array() {
-        form_rows_to_pairs(rows)
-    } else if let Some(obj) = body.as_object() {
-        obj.iter()
-            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-            .collect()
-    } else {
-        Vec::new()
-    }
+    body.as_array()
+        .map(|rows| form_rows_to_pairs(rows))
+        .unwrap_or_default()
 }
 
 /// `application/x-www-form-urlencoded` serialization, byte-identical to what
@@ -992,7 +984,7 @@ pub async fn send_api_request(
         match body_type.as_str() {
             "urlencoded" => {
                 if let Some(body) = &request_options.body
-                    && (body.is_array() || body.is_object())
+                    && body.is_array()
                 {
                     rb = rb
                         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -1000,17 +992,12 @@ pub async fn send_api_request(
                 }
             }
             "formdata" => {
-                if let Some(body) = &request_options.body {
-                    if let Some(rows) = body.as_array() {
-                        rb = rb.multipart(build_multipart_form(rows)?);
-                    } else if let Some(obj) = body.as_object() {
-                        // Legacy flat-object shape from older persisted data
-                        let mut form = reqwest::multipart::Form::new();
-                        for (k, v) in obj {
-                            form = form.text(k.clone(), v.as_str().unwrap_or("").to_string());
-                        }
-                        rb = rb.multipart(form);
-                    }
+                if let Some(rows) = request_options
+                    .body
+                    .as_ref()
+                    .and_then(|body| body.as_array())
+                {
+                    rb = rb.multipart(build_multipart_form(rows)?);
                 }
             }
             "binary" => {
@@ -1888,12 +1875,6 @@ mod tests {
         assert_eq!(
             wire_body_bytes("urlencoded", Some(&rows), None).unwrap(),
             b"a=1+2&a=x%26y&b="
-        );
-
-        let legacy = serde_json::json!({ "k": "v" });
-        assert_eq!(
-            wire_body_bytes("urlencoded", Some(&legacy), None).unwrap(),
-            b"k=v"
         );
 
         let json = serde_json::json!({ "n": 1 });
