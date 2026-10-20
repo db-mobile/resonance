@@ -80,29 +80,33 @@ fn build_context(
 fn prepare(args: &RunArgs, loaded: &LoadedCollection) -> Result<Prepared, CliError> {
     let (context, secrets_unfilled, environment_name) = build_context(args, loaded)?;
     let execution_id = format!("cli-{}", std::process::id());
-    let mut input = match &args.runner {
+    let (mut input, saved_filter) = match &args.runner {
         Some(selector) => {
             let runner = find_runner(loaded, selector)?;
             let mut input = run_input(loaded, runner, context, execution_id)?;
             input.options = options::run_options(args, Some(&input.options));
-            input
+            (input, Some(runner.options.tags.clone()))
         }
         None => {
             let entries = select::resolve(loaded, &args.selectors)?;
-            if entries.is_empty() {
-                return Err(CliError::Config(
-                    "the collection has no requests to run".into(),
-                ));
-            }
-            plain_run_input(
+            let input = plain_run_input(
                 loaded,
                 &entries,
                 options::run_options(args, None),
                 context,
                 execution_id,
-            )
+            );
+            (input, None)
         }
     };
+    if let Some(filter) = args.tag_filter().or(saved_filter) {
+        filter.apply(&mut input);
+    }
+    if input.requests.is_empty() {
+        return Err(CliError::Config(
+            "the collection has no requests to run".into(),
+        ));
+    }
     if let Some(path) = &args.data {
         input.data_file = Some(options::data_file(path)?);
     }

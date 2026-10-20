@@ -20,6 +20,8 @@ pub struct RequestTemplate {
     pub protocol: String,
     pub url: String,
     pub path: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     pub base_url: String,
     pub headers: Map<String, Value>,
     pub default_headers: Map<String, Value>,

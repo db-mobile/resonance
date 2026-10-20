@@ -269,3 +269,109 @@ async fn quiet_prints_only_failures_and_the_summary() {
     assert!(out.contains("✗ GET /status/500"), "{out}");
     assert!(out.contains("Passed 3  Failed 1"), "{out}");
 }
+
+fn tagged_petstore() -> Collection {
+    let collection = Collection::new("Petstore");
+    let tagged = |file: &str, id: &str, name: &str, seq: i64, path: &str, tags: &str| {
+        collection.write(
+            file,
+            &format!(
+                "resonanceFormat: 2\nid: {id}\nname: {name}\nseq: {seq}\nmethod: GET\npath: {path}\ntags: [{tags}]\n"
+            ),
+        );
+    };
+    tagged("health.yaml", "r_health", "Health", 10, "/health", "smoke");
+    tagged(
+        "pets/list.yaml",
+        "r_list",
+        "List pets",
+        20,
+        "/pets",
+        "Pets, smoke",
+    );
+    tagged(
+        "pets/slow.yaml",
+        "r_slow",
+        "Slow pets",
+        30,
+        "/pets/all",
+        "pets, slow",
+    );
+    collection.request(
+        "pets/create.yaml",
+        "r_create",
+        "Create pet",
+        10,
+        "/status/201",
+        201,
+    );
+    collection
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tags_filter_selected_requests() {
+    let server = Server::start().await;
+    let collection = tagged_petstore();
+
+    let smoke = run(&collection, &server, &["--tags", "SMOKE"]);
+    let out = smoke.stdout();
+    assert_eq!(smoke.code(), 0, "{out}\n{}", smoke.stderr());
+    assert!(out.contains("Running 2 requests"), "{out}");
+    assert!(
+        out.contains("GET /health 200") && out.contains("GET /pets 200"),
+        "{out}"
+    );
+
+    let folder = run(
+        &collection,
+        &server,
+        &["pets", "--exclude-tags", "slow,smoke"],
+    );
+    let out = folder.stdout();
+    assert!(out.contains("Running 1 request\n"), "{out}");
+    assert!(out.contains("GET /status/201 201"), "{out}");
+
+    let both = run(
+        &collection,
+        &server,
+        &["--tags", "pets", "--exclude-tags", "slow"],
+    );
+    let out = both.stdout();
+    assert!(out.contains("Running 1 request\n"), "{out}");
+    assert!(out.contains("GET /pets 200"), "{out}");
+
+    let none = run(&collection, &server, &["--tags", "nightly"]);
+    assert_eq!(none.code(), 2, "{}", none.stdout());
+    assert!(
+        none.stderr().contains("no requests to run"),
+        "{}",
+        none.stderr()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tags_filter_a_runner_queue_and_flags_replace_its_saved_filter() {
+    let server = Server::start().await;
+    let collection = tagged_petstore();
+    collection.write(
+        "runners/smoke.yaml",
+        "resonanceFormat: 2\nid: run_1\nname: Smoke\noptions:\n  stopOnError: false\n  tags:\n    exclude:\n    - slow\nrequests:\n  - requestId: r_slow\n  - requestId: r_health\n  - requestId: r_list\n  - requestId: r_create\n    postResponseScript: |\n      resonance.setNextRequest('Slow pets');\n",
+    );
+
+    let saved = run(&collection, &server, &["--runner", "smoke"]);
+    let out = saved.stdout();
+    assert!(out.contains("Running 3 requests"), "{out}");
+    assert!(!out.contains("/pets/all"), "{out}");
+    assert!(out.contains("✗ GET /status/201"), "{out}");
+    assert_eq!(saved.code(), 1, "{out}");
+
+    let flags = run(
+        &collection,
+        &server,
+        &["--runner", "smoke", "--tags", "slow"],
+    );
+    let out = flags.stdout();
+    assert_eq!(flags.code(), 0, "{out}\n{}", flags.stderr());
+    assert!(out.contains("Running 1 request\n"), "{out}");
+    assert!(out.contains("GET /pets/all 200"), "{out}");
+}

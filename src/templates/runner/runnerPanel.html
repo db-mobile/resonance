@@ -81,6 +81,23 @@
                                aria-label="Delay in milliseconds">
                         <span>ms</span>
                     </div>
+                    <div class="runner-chip runner-tags-chip">
+                        <span class="runner-chip-label" data-i18n="runner.tags">Tags</span>
+                        <input type="text"
+                               class="runner-tags-input"
+                               data-option="tags-include"
+                               placeholder="include a, b"
+                               aria-label="Only run requests with any of these tags"
+                               data-i18n-placeholder="runner.tags_include_placeholder"
+                               data-i18n-aria="runner.tags_include_aria">
+                        <input type="text"
+                               class="runner-tags-input"
+                               data-option="tags-exclude"
+                               placeholder="exclude c"
+                               aria-label="Skip requests with any of these tags"
+                               data-i18n-placeholder="runner.tags_exclude_placeholder"
+                               data-i18n-aria="runner.tags_exclude_aria">
+                    </div>
                     <div class="runner-chip runner-data-chip" data-role="data-chip">
                         <span class="runner-chip-label" data-i18n="runner.data_file">Data</span>
                         <button type="button"

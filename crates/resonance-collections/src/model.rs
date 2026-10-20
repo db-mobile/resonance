@@ -6,6 +6,7 @@
 //! written by a newer build survives a round trip through an older one instead
 //! of being silently dropped on the next save.
 
+use resonance_core::tags::TagFilter;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -216,6 +217,8 @@ pub struct RequestDoc {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// The absolute URL, for protocols whose endpoint is a URL rather than a
     /// path under the collection's base.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -256,6 +259,7 @@ impl RequestDoc {
             http_method: None,
             path: None,
             description: None,
+            tags: Vec::new(),
             url: None,
             auth: None,
             params: Params::default(),
@@ -375,6 +379,9 @@ pub struct RunnerOptions {
     pub max_executions_per_iteration: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_file: Option<RunnerDataFile>,
+    /// Applied against each request's live tags when the runner starts.
+    #[serde(default, skip_serializing_if = "TagFilter::is_empty")]
+    pub tags: TagFilter,
     #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
     pub extra: Map<String, Value>,
 }
@@ -387,6 +394,7 @@ impl Default for RunnerOptions {
             iterations: None,
             max_executions_per_iteration: None,
             data_file: None,
+            tags: TagFilter::default(),
             extra: Map::new(),
         }
     }
@@ -419,6 +427,7 @@ mod tests {
         doc.method = Some("POST".into());
         doc.path = Some("/pets".into());
         doc.description = Some("Adds a pet".into());
+        doc.tags = vec!["smoke".into(), "Pets".into()];
         doc.url = Some("https://api.example.com/pets".into());
         doc.auth = Some(json!({"type": "bearer", "config": {"token": ""}}));
         doc.params.query = vec![json!({"key": "limit", "value": "20"})];
@@ -793,6 +802,7 @@ spec:
                 path: "data/users.csv".into(),
                 name: "users.csv".into(),
             }),
+            tags: TagFilter::new(["smoke"], ["slow"]),
             extra: Map::new(),
         };
         doc.requests.push(RunnerRequest {
@@ -944,6 +954,11 @@ options:
   dataFile:
     path: data/users.csv
     name: users.csv
+  tags:
+    include:
+    - smoke
+    exclude:
+    - slow
 requests:
 - requestId: req_a
   name: Create Pet

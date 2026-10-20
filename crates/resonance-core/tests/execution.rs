@@ -140,3 +140,28 @@ async fn strict_variables_sees_values_set_by_earlier_scripts() {
             .is_none_or(|e| e.code != "unresolvedVariables")
     );
 }
+
+#[tokio::test]
+async fn runner_scripts_read_the_request_tags() {
+    let input: RunInput = serde_json::from_value(json!({
+        "executionId":"tags","runnerName":"Run","runnerId":null,"dataFile":null,"context":{"environmentId":"e"},
+        "options":{"stopOnError":false},
+        "requests":[
+            {"name":"Tagged","url":"http://127.0.0.1:1/a","tags":["smoke","Pets"],"preRequestScript":"pm.environment.set('tagged', JSON.stringify(request.tags)); pm.execution.skipRequest();"},
+            {"name":"Plain","url":"http://127.0.0.1:1/b","preRequestScript":"pm.environment.set('plain', JSON.stringify(request.tags)); pm.execution.skipRequest();"}
+        ]
+    }))
+    .unwrap();
+    let mut effects = vec![];
+    execute_run(input, Cancellation::default(), |event| {
+        if event.kind == "effect" {
+            effects.push(event.data);
+        }
+    })
+    .await;
+    assert_eq!(
+        effects[0]["environment"]["tagged"],
+        json!("[\"smoke\",\"Pets\"]")
+    );
+    assert_eq!(effects[1]["environment"]["plain"], json!("[]"));
+}

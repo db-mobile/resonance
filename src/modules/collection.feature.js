@@ -18,6 +18,7 @@ import { ContextMenu } from './ui/ContextMenu.js';
 import { RenameDialog } from './ui/RenameDialog.js';
 import { ConfirmDialog } from './ui/ConfirmDialog.js';
 import { MoveRequestDialog } from './ui/MoveRequestDialog.js';
+import { EditTagsDialog } from './ui/EditTagsDialog.js';
 import { VariableManager } from './ui/VariableManager.js';
 import { CurlImportDialog } from './ui/CurlImportDialog.js';
 import { CollectionDialogs } from './ui/CollectionDialogs.js';
@@ -96,6 +97,7 @@ export const collectionFeature = {
             renameDialog: new RenameDialog(),
             confirmDialog: new ConfirmDialog(),
             moveRequestDialog: new MoveRequestDialog(),
+            editTagsDialog: new EditTagsDialog(),
             variableManager: new VariableManager(),
             collectionAuthDialog: new CollectionAuthDialog(),
             formReader,

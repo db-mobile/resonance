@@ -9,6 +9,7 @@
 //! touching no filesystem and needing no AppHandle, which is what keeps its
 //! tests cheap.
 
+use resonance_core::tags::normalize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -303,6 +304,11 @@ pub fn endpoint_to_request(endpoint: &Value, data: Option<&EndpointData>, seq: i
     doc.http_method = string_field(endpoint, "httpMethod");
     doc.path = string_field(endpoint, "path");
     doc.description = string_field(endpoint, "description");
+    doc.tags = endpoint
+        .get("tags")
+        .and_then(Value::as_array)
+        .map(|tags| normalize(tags.iter().filter_map(Value::as_str)))
+        .unwrap_or_default();
 
     doc.spec = Spec {
         parameters: prune_parameter_buckets(object_field(endpoint, "parameters")),

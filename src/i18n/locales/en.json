@@ -137,7 +137,9 @@
     "rename_title": "Rename Request",
     "rename_label": "Request Name:",
     "copy_name": "{{name}} (copy)",
-    "duplicate_error": "Could not duplicate the request: {{message}}"
+    "duplicate_error": "Could not duplicate the request: {{message}}",
+    "tags_title": "Edit Tags",
+    "tags_label": "Tags (comma-separated):"
   },
   "context_menu": {
     "new_collection": "New Collection",
@@ -164,7 +166,8 @@
     "delete_folder": "Delete Folder",
     "duplicate_request": "Duplicate Request",
     "move_request": "Move to Folder…",
-    "show_in_file_manager": "Show in File Manager"
+    "show_in_file_manager": "Show in File Manager",
+    "edit_tags": "Edit Tags…"
   },
   "docs": {
     "title": "Generate Documentation",
@@ -644,7 +647,13 @@
     "migration_dropped_one": "{{count}} runner lost requests from other collections: {{names}}",
     "migration_dropped_other": "{{count}} runners lost requests from other collections: {{names}}",
     "migration_skipped_one": "{{count}} saved runner has no requests and was not moved",
-    "migration_skipped_other": "{{count}} saved runners have no requests and were not moved"
+    "migration_skipped_other": "{{count}} saved runners have no requests and were not moved",
+    "tags": "Tags",
+    "tags_include_placeholder": "include a, b",
+    "tags_exclude_placeholder": "exclude c",
+    "tags_include_aria": "Only run requests with any of these tags",
+    "tags_exclude_aria": "Skip requests with any of these tags",
+    "error_no_tagged_requests": "No queued request matches the tag filter"
   },
   "mqtt": {
     "title": "MQTT",

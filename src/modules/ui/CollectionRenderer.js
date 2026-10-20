@@ -10,6 +10,9 @@ import { el } from '../htmlUtils.js';
 import { translate } from '../utils/translate.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
+import { normalizeTags } from '../utils/requestTags.js';
+
+const MAX_VISIBLE_TAGS = 2;
 
 /**
  * @param {Object} pinnedRequests
@@ -341,6 +344,22 @@ export class CollectionRenderer {
     }
 
     /**
+     * @param {Array<string>} tags
+     * @returns {HTMLSpanElement}
+     */
+    createTagChips(tags) {
+        const container = el('span', 'endpoint-tags');
+        container.title = tags.join(', ');
+        for (const tag of tags.slice(0, MAX_VISIBLE_TAGS)) {
+            container.appendChild(el('span', 'badge neutral endpoint-tag', tag));
+        }
+        if (tags.length > MAX_VISIBLE_TAGS) {
+            container.appendChild(el('span', 'badge neutral endpoint-tag endpoint-tag-more', `+${tags.length - MAX_VISIBLE_TAGS}`));
+        }
+        return container;
+    }
+
+    /**
      * @param {string} branch
      * @returns {HTMLSpanElement}
      */
@@ -524,6 +543,7 @@ export class CollectionRenderer {
         const pathSpan = el('span', 'endpoint-path');
         const displayName = endpoint.name || (endpoint.path || '').replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
+        const tags = normalizeTags(endpoint.tags);
 
         const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${pinned ? ' is-pinned' : ''}`);
         pinBtn.title = pinned ? 'Unpin request' : 'Pin request';
@@ -534,6 +554,9 @@ export class CollectionRenderer {
 
         endpointDiv.appendChild(methodSpan);
         endpointDiv.appendChild(pathSpan);
+        if (tags.length > 0) {
+            endpointDiv.appendChild(this.createTagChips(tags));
+        }
         endpointDiv.appendChild(pinBtn);
 
         if (eventHandlers.onEndpointClick) {

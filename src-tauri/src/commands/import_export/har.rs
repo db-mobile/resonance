@@ -188,6 +188,7 @@ fn build_endpoint(
         method: method.to_string(),
         path: raw_url.to_string(),
         description: None,
+        tags: Vec::new(),
         parameters: extract_parameters(request),
         request_body: extract_body(request.get("postData")),
         responses: None,

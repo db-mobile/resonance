@@ -24,6 +24,7 @@ import {
     deriveHttpMethod
 } from '../protocols/protocolRegistry.js';
 import { generateId } from '../utils/ids.js';
+import { normalizeTags } from '../utils/requestTags.js';
 import { writeNewEndpointSidecars } from '../collections/endpointSidecars.js';
 
 export class CollectionService {
@@ -480,6 +481,27 @@ export class CollectionService {
 
             this.statusDisplay.update(`Request renamed to "${newName}"`, null);
             return updatedEndpoint;
+        });
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Array<string>} tags
+     * @returns {Promise<Object>}
+     */
+    async setRequestTags(collectionId, endpointId, tags) {
+        return this._reporting('Error updating request tags', async () => {
+            const collection = await this._requireFresh(collectionId);
+
+            const updated = updateRequest(collection, endpointId, { tags: normalizeTags(tags) });
+            if (!updated) {
+                throw new Error(`Endpoint with id ${endpointId} not found in collection`);
+            }
+
+            await this.repository.saveOne(updated);
+
+            return findRequest(updated, endpointId);
         });
     }
 

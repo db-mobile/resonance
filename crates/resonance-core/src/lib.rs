@@ -10,6 +10,7 @@ pub mod redaction;
 pub mod report;
 pub mod results;
 pub mod scripts;
+pub mod tags;
 pub mod timing;
 pub mod tls;
 pub mod variables;

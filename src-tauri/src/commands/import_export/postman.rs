@@ -299,6 +299,7 @@ fn parse_postman_request(
             .get("description")
             .and_then(|d| d.as_str())
             .map(|s| s.to_string()),
+        tags: Vec::new(),
         parameters,
         request_body,
         responses: None,

@@ -137,7 +137,9 @@
     "rename_title": "Rinomina richiesta",
     "rename_label": "Nome della richiesta:",
     "copy_name": "{{name}} (copia)",
-    "duplicate_error": "Impossibile duplicare la richiesta: {{message}}"
+    "duplicate_error": "Impossibile duplicare la richiesta: {{message}}",
+    "tags_title": "Modifica tag",
+    "tags_label": "Tag (separati da virgola):"
   },
   "context_menu": {
     "new_collection": "Nuova collezione",
@@ -164,7 +166,8 @@
     "delete_folder": "Elimina cartella",
     "duplicate_request": "Duplica richiesta",
     "move_request": "Sposta in cartella…",
-    "show_in_file_manager": "Mostra nel gestore file"
+    "show_in_file_manager": "Mostra nel gestore file",
+    "edit_tags": "Modifica tag…"
   },
   "docs": {
     "title": "Genera documentazione",
@@ -630,7 +633,13 @@
     "migration_dropped_one": "{{count}} runner ha perso richieste di altre raccolte: {{names}}",
     "migration_dropped_other": "{{count}} runner hanno perso richieste di altre raccolte: {{names}}",
     "migration_skipped_one": "{{count}} runner salvato non ha richieste e non è stato spostato",
-    "migration_skipped_other": "{{count}} runner salvati non hanno richieste e non sono stati spostati"
+    "migration_skipped_other": "{{count}} runner salvati non hanno richieste e non sono stati spostati",
+    "tags": "Tag",
+    "tags_include_placeholder": "includi a, b",
+    "tags_exclude_placeholder": "escludi c",
+    "tags_include_aria": "Esegui solo le richieste con uno di questi tag",
+    "tags_exclude_aria": "Salta le richieste con uno di questi tag",
+    "error_no_tagged_requests": "Nessuna richiesta in coda corrisponde al filtro dei tag"
   },
   "mqtt": {
     "title": "MQTT",

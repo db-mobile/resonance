@@ -1,0 +1,18 @@
+<template id="tpl-edit-tags-dialog">
+    <div class="u-flex u-flex-col u-gap-4">
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-role="title"></h2>
+            <button type="button" id="edit-tags-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
+        <div class="dialog-body">
+            <div class="u-flex u-flex-col u-gap-2">
+                <label for="edit-tags-input" class="form-label" data-role="label"></label>
+                <input type="text" id="edit-tags-input" class="input-base field-input" placeholder="smoke, pets" autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button id="edit-tags-cancel-btn" class="btn btn-outline" data-role="cancel" data-i18n="common.cancel">Cancel</button>
+            <button id="edit-tags-confirm-btn" class="btn btn-primary" data-role="confirm"></button>
+        </div>
+    </div>
+</template>

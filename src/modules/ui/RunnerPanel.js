@@ -11,6 +11,7 @@ import { CollectionPalette } from './runner/CollectionPalette.js';
 import { RequestQueue } from './runner/RequestQueue.js';
 import { RunnerSelectorMenu } from './runner/RunnerSelectorMenu.js';
 import { translate, translateCount } from '../utils/translate.js';
+import { parseTagInput, formatTagInput } from '../utils/requestTags.js';
 import { startDragSession } from './dragSession.js';
 import { pushEscapeHandler } from './modalEscape.js';
 
@@ -132,6 +133,8 @@ export class RunnerPanel {
             delayInput: this.container.querySelector('[data-option="delay"]'),
             iterationsInput: this.container.querySelector('[data-option="iterations"]'),
             maxExecutionsInput: this.container.querySelector('[data-option="max-executions"]'),
+            tagsIncludeInput: this.container.querySelector('[data-option="tags-include"]'),
+            tagsExcludeInput: this.container.querySelector('[data-option="tags-exclude"]'),
             dataChip: this.container.querySelector('[data-role="data-chip"]'),
             dataFileLabel: this.container.querySelector('[data-role="data-file-label"]'),
             dataClearButton: this.container.querySelector('[data-action="clear-data-file"]'),
@@ -254,6 +257,7 @@ export class RunnerPanel {
         this.boundCollectionId = null;
         this.queue.reset();
         this.setDataFile(null);
+        this._setTagFilter(null);
         if (this.dom.iterationsInput) {
             this.dom.iterationsInput.value = 1;
             if (this.dom.maxExecutionsInput) { this.dom.maxExecutionsInput.value = 1000; }
@@ -313,9 +317,26 @@ export class RunnerPanel {
                 delayMs: parseInt(this.dom.delayInput?.value, 10) || 0,
                 iterations: parseInt(this.dom.iterationsInput?.value, 10) || 1,
                 maxExecutionsPerIteration: this.dom.maxExecutionsInput ? Number(this.dom.maxExecutionsInput.value) : undefined,
-                dataFile: this.dataFile ? { path: this.dataFile.path, name: this.dataFile.name } : null
+                dataFile: this.dataFile ? { path: this.dataFile.path, name: this.dataFile.name } : null,
+                tags: {
+                    include: parseTagInput(this.dom.tagsIncludeInput?.value),
+                    exclude: parseTagInput(this.dom.tagsExcludeInput?.value)
+                }
             }
         };
+    }
+
+    /**
+     * @param {{include?: Array<string>, exclude?: Array<string>}|null} filter
+     * @returns {void}
+     */
+    _setTagFilter(filter) {
+        if (this.dom.tagsIncludeInput) {
+            this.dom.tagsIncludeInput.value = formatTagInput(filter?.include);
+        }
+        if (this.dom.tagsExcludeInput) {
+            this.dom.tagsExcludeInput.value = formatTagInput(filter?.exclude);
+        }
     }
 
     /** @param {{name: string, requests: Array<{collection: Object, endpoint: Object}>}} preset */
@@ -352,6 +373,7 @@ export class RunnerPanel {
             this.dom.maxExecutionsInput.max = Math.max(100000, runner.requests?.length || 0);
         }
         this.setDataFile(runner.options?.dataFile || null);
+        this._setTagFilter(runner.options?.tags || null);
 
         this.queue.setRequests(runner.requests, missing);
         this._syncCollectionLock();

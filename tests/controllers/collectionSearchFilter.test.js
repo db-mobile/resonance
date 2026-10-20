@@ -7,8 +7,8 @@ describe('CollectionController.filterCollections', () => {
         id: 'c1',
         name: 'Petstore',
         endpoints: [
-            { id: 'root1', name: 'Health Check', method: 'GET', path: '/health' },
-            { id: 'outer1', name: 'List Pets', method: 'GET', path: '/pets' },
+            { id: 'root1', name: 'Health Check', method: 'GET', path: '/health', tags: ['Smoke'] },
+            { id: 'outer1', name: 'List Pets', method: 'GET', path: '/pets', tags: ['smoke', 'pets'] },
             { id: 'inner1', name: 'Create Admin', method: 'POST', path: '/admin' }
         ],
         folders: [
@@ -41,6 +41,18 @@ describe('CollectionController.filterCollections', () => {
 
         expect(result.endpoints.map(e => e.id)).toEqual(['root1']);
         expect(result.__searchExpand).toBe(true);
+    });
+
+    test('a tag matches like any other field and the tag: prefix matches tags only', () => {
+        const [byText] = controller.filterCollections([collection()], 'smoke');
+        expect(byText.endpoints.map(e => e.id)).toEqual(['root1', 'outer1']);
+
+        const [byPrefix] = controller.filterCollections([collection()], 'tag:pets');
+        expect(byPrefix.endpoints.map(e => e.id)).toEqual(['outer1']);
+        expect(byPrefix.folders).toEqual([]);
+
+        expect(controller.filterCollections([collection()], 'tag:health')).toEqual([]);
+        expect(controller.filterCollections([collection()], 'tag:')).toEqual([]);
     });
 
     test('a request inside a nested folder is found', () => {

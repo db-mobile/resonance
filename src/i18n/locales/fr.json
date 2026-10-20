@@ -137,7 +137,9 @@
     "rename_title": "Renommer la requête",
     "rename_label": "Nom de la requête :",
     "copy_name": "{{name}} (copie)",
-    "duplicate_error": "Impossible de dupliquer la requête : {{message}}"
+    "duplicate_error": "Impossible de dupliquer la requête : {{message}}",
+    "tags_title": "Modifier les tags",
+    "tags_label": "Tags (séparés par des virgules) :"
   },
   "context_menu": {
     "new_collection": "Nouvelle collection",
@@ -164,7 +166,8 @@
     "delete_folder": "Supprimer le dossier",
     "duplicate_request": "Dupliquer la requête",
     "move_request": "Déplacer vers un dossier…",
-    "show_in_file_manager": "Afficher dans le gestionnaire de fichiers"
+    "show_in_file_manager": "Afficher dans le gestionnaire de fichiers",
+    "edit_tags": "Modifier les tags…"
   },
   "docs": {
     "title": "Générer la documentation",
@@ -630,7 +633,13 @@
     "migration_dropped_one": "{{count}} runner a perdu des requêtes d’autres collections : {{names}}",
     "migration_dropped_other": "{{count}} runners ont perdu des requêtes d’autres collections : {{names}}",
     "migration_skipped_one": "{{count}} runner enregistré n’a aucune requête et n’a pas été déplacé",
-    "migration_skipped_other": "{{count}} runners enregistrés n’ont aucune requête et n’ont pas été déplacés"
+    "migration_skipped_other": "{{count}} runners enregistrés n’ont aucune requête et n’ont pas été déplacés",
+    "tags": "Tags",
+    "tags_include_placeholder": "inclure a, b",
+    "tags_exclude_placeholder": "exclure c",
+    "tags_include_aria": "N’exécuter que les requêtes portant l’un de ces tags",
+    "tags_exclude_aria": "Ignorer les requêtes portant l’un de ces tags",
+    "error_no_tagged_requests": "Aucune requête de la file ne correspond au filtre de tags"
   },
   "mqtt": {
     "title": "MQTT",

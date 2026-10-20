@@ -91,6 +91,23 @@
   white-space: nowrap;
 }
 
+.endpoint-tags {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.endpoint-tag {
+  padding: 0 var(--space-2);
+  font-weight: 500;
+  opacity: var(--dim-opacity);
+  white-space: nowrap;
+}
+
+.endpoint-item:hover .endpoint-tag {
+  opacity: 1;
+}
+
 .collection-endpoints,
 .folder-endpoints,
 .pinned-section-endpoints {

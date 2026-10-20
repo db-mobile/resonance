@@ -13,6 +13,7 @@ import { ChangeEmitter } from '../services/ChangeEmitter.js';
 import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline, endpointKey } from '../collections/collectionTree.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
+import { normalizeTags } from '../utils/requestTags.js';
 
 export class CollectionController {
     /**
@@ -30,6 +31,7 @@ export class CollectionController {
      * @param {Object} deps.renameDialog
      * @param {Object} deps.confirmDialog
      * @param {Object} deps.moveRequestDialog
+     * @param {Object} deps.editTagsDialog
      * @param {Object} deps.variableManager
      * @param {Object} deps.collectionAuthDialog
      * @param {import('../requestFormReader.js').RequestFormReader} deps.formReader
@@ -49,6 +51,7 @@ export class CollectionController {
         renameDialog,
         confirmDialog,
         moveRequestDialog,
+        editTagsDialog,
         variableManager,
         collectionAuthDialog,
         formReader,
@@ -67,6 +70,7 @@ export class CollectionController {
         this.renameDialog = renameDialog;
         this.confirmDialog = confirmDialog;
         this.moveRequestDialog = moveRequestDialog;
+        this.editTagsDialog = editTagsDialog;
         this.variableManager = variableManager;
         this.collectionAuthDialog = collectionAuthDialog;
         this.formReader = formReader;
@@ -299,12 +303,18 @@ export class CollectionController {
     }
 
     endpointMatchesQuery(endpoint, query) {
+        const tags = normalizeTags(endpoint.tags);
+        if (query.startsWith('tag:')) {
+            const wanted = query.slice(4).trim();
+            return wanted !== '' && tags.some(tag => tag.toLowerCase() === wanted);
+        }
         return [
             endpoint.name,
             endpoint.path,
             endpoint.method,
             endpoint.summary,
-            endpoint.description
+            endpoint.description,
+            ...tags
         ].some(value => this.matchesSearchQuery(value, query));
     }
 
@@ -434,6 +444,12 @@ export class CollectionController {
                 translationKey: 'context_menu.rename_request',
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRenameRequest(collection, endpoint)
+            },
+            {
+                label: 'Edit Tags…',
+                translationKey: 'context_menu.edit_tags',
+                iconClass: ContextMenu.createRenameIcon(),
+                onClick: () => this.handleEditTags(collection, endpoint)
             },
             {
                 label: 'Duplicate Request',
@@ -1077,6 +1093,27 @@ export class CollectionController {
             await this.loadCollectionsWithExpansionState();
 
             await app.workspaceTabController?.renameTabsForEndpoint(collection.id, endpoint.id, newName);
+        } catch {}
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {Promise<void>}
+     */
+    async handleEditTags(collection, endpoint) {
+        try {
+            const current = normalizeTags(endpoint.tags);
+            const tags = await this.editTagsDialog.show(current, {
+                title: translate('endpoint.tags_title', 'Edit Tags'),
+                label: translate('endpoint.tags_label', 'Tags (comma-separated):'),
+                confirmText: translate('common.save', 'Save')
+            });
+            if (!tags || tags.join('\u0000') === current.join('\u0000')) {
+                return;
+            }
+            await this.service.setRequestTags(collection.id, endpoint.id, tags);
+            await this.loadCollectionsWithExpansionState();
         } catch {}
     }
 

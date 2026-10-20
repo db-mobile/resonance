@@ -223,6 +223,7 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
             ]
             .into_iter()
             .map(|key| (key.to_string(), request[key].clone()))
+            .chain(std::iter::once(("tags".to_string(), json!(template.tags))))
             .collect(),
             response,
             environment: strings(&self.context.environment),

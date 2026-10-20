@@ -5,6 +5,7 @@
 //! property of this one response, not of the files: on disk each request
 //! exists exactly once.
 
+use resonance_core::tags::normalize;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
@@ -118,6 +119,9 @@ pub fn request_to_endpoint(
         "description",
         doc.description.clone().map(Value::from),
     );
+    if !doc.tags.is_empty() {
+        endpoint.insert("tags".into(), json!(doc.tags));
+    }
 
     insert_some(&mut endpoint, "parameters", doc.spec.parameters.clone());
     insert_some(&mut endpoint, "requestBody", doc.spec.request_body.clone());
@@ -332,6 +336,9 @@ fn overlay_metadata(doc: &mut RequestDoc, endpoint: &Value) {
     doc.http_method = ipc_string(endpoint, "httpMethod").or(doc.http_method.take());
     doc.path = ipc_string(endpoint, "path").or(doc.path.take());
     doc.description = ipc_string(endpoint, "description").or(doc.description.take());
+    if let Some(Value::Array(tags)) = endpoint.get("tags") {
+        doc.tags = normalize(tags.iter().filter_map(Value::as_str));
+    }
 
     if let Some(parameters) = endpoint.get("parameters").filter(|v| !v.is_null()) {
         doc.spec.parameters = Some(parameters.clone());
@@ -845,6 +852,23 @@ mod tests {
         assert_eq!(ipc.name, "Petstore");
         assert_eq!(ipc.base_url, "https://api.example.com");
         assert_eq!(ipc.storage_path.as_deref(), Some("/tmp/petstore"));
+    }
+
+    #[test]
+    fn tags_are_projected_overlaid_and_cleared_by_an_empty_list() {
+        let mut doc = RequestDoc::new("r1".into(), "X".into());
+        doc.tags = vec!["smoke".into()];
+        let endpoint = request_to_endpoint(&doc, None, &[]);
+        assert_eq!(endpoint["tags"], json!(["smoke"]));
+
+        overlay_metadata(&mut doc, &json!({"tags": ["a", " A ", "", "b"]}));
+        assert_eq!(doc.tags, vec!["a".to_string(), "b".to_string()]);
+
+        overlay_metadata(&mut doc, &json!({"name": "Renamed"}));
+        assert_eq!(doc.tags, vec!["a".to_string(), "b".to_string()]);
+
+        overlay_metadata(&mut doc, &json!({"tags": []}));
+        assert!(doc.tags.is_empty());
     }
 
     #[test]
@@ -1452,11 +1476,13 @@ mod save_path {
         let mut doc = RequestDoc::new("r1".into(), "Named".into());
         doc.seq = 70;
         doc.method = Some("POST".into());
+        doc.tags = vec!["smoke".into()];
 
         apply_endpoint_data(&mut doc, &EndpointData::default());
 
         assert_eq!(doc.name, "Named");
         assert_eq!(doc.seq, 70);
         assert_eq!(doc.method.as_deref(), Some("POST"));
+        assert_eq!(doc.tags, vec!["smoke".to_string()]);
     }
 }
