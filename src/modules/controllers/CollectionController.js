@@ -15,6 +15,8 @@ import { isRunnable } from '../utils/runnableRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
 import { normalizeTags } from '../utils/requestTags.js';
 
+const GIT_STATUS_SAVE_DEBOUNCE_MS = 1000;
+
 export class CollectionController {
     /**
      * @param {Object} deps
@@ -93,6 +95,10 @@ export class CollectionController {
 
         this.gitRefreshInFlight = false;
         this.refreshGitBranches = this.refreshGitBranches.bind(this);
+        this.gitStatus = {};
+        this.gitStatusInFlight = false;
+        this.refreshGitStatus = this.refreshGitStatus.bind(this);
+        this._debouncedGitStatusRefresh = debounce(this.refreshGitStatus, GIT_STATUS_SAVE_DEBOUNCE_MS);
 
         this.initializeCollectionsSearch();
         this.initializeGitBranchRefresh();
@@ -101,6 +107,7 @@ export class CollectionController {
     /** @returns {void} */
     initializeGitBranchRefresh() {
         window.addEventListener('focus', this.refreshGitBranches);
+        window.addEventListener('focus', this.refreshGitStatus);
     }
 
     /** @returns {Promise<void>} */
@@ -120,10 +127,28 @@ export class CollectionController {
                 return;
             }
             this.renderer.updateGitBadges(branches);
+            this.renderer.updateGitStatus(this.gitStatus);
         } catch (error) {
             return;
         } finally {
             this.gitRefreshInFlight = false;
+        }
+    }
+
+    /** @returns {Promise<void>} */
+    async refreshGitStatus() {
+        if (this.gitStatusInFlight) {
+            return;
+        }
+        this.gitStatusInFlight = true;
+
+        try {
+            this.gitStatus = await this.repository.gitStatus();
+            this.renderer.updateGitStatus(this.gitStatus);
+        } catch (error) {
+            return;
+        } finally {
+            this.gitStatusInFlight = false;
         }
     }
 
@@ -179,6 +204,7 @@ export class CollectionController {
             await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections, preserveExpansionState);
             this._collectionEvents.emit(this.allCollections);
+            void this.refreshGitStatus();
             return this.allCollections;
         } catch (error) {
             return [];
@@ -218,6 +244,7 @@ export class CollectionController {
             onRemove: (error) => this.handleRemoveMissingCollection(error),
             onRetry: () => this.loadCollectionsWithExpansionState()
         });
+        this.renderer.updateGitStatus(this.gitStatus);
     }
 
     initializeCollectionsSearch() {
@@ -1174,6 +1201,7 @@ export class CollectionController {
      */
     async saveRequestBodyModification(collectionId, endpointId) {
         await this.requestPersistenceService.saveRequestBodyModification(collectionId, endpointId);
+        this._debouncedGitStatusRefresh();
     }
 
     /**
@@ -1183,6 +1211,7 @@ export class CollectionController {
      */
     async saveAllRequestModifications(collectionId, endpointId) {
         await this.requestPersistenceService.saveAllRequestModifications(collectionId, endpointId);
+        this._debouncedGitStatusRefresh();
     }
 
     /**

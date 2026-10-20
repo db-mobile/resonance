@@ -123,8 +123,11 @@ desktop and the CLI: the v2 YAML model, reader/writer, runner files, secrets
 scopes and git helpers moved there unchanged, plus a loader API (`load_collection`,
 request addressing by path/folder/id/name, `variables.yaml` and environment-export
 parsing) and `capture.rs`, a one-to-one port of the desktop's `captureRunnerEntry`
-that turns loaded requests into core `RequestTemplate`s. `src-tauri` keeps the
-Tauri commands and re-exports the crate's modules.
+that turns loaded requests into core `RequestTemplate`s. The git helpers in
+`git/` derive the branch badge and the worktree-vs-index change markers by
+reading `.git` files directly: no git library, no subprocess, and only the
+index is compared, so staged-but-uncommitted files read as clean. `src-tauri`
+keeps the Tauri commands and re-exports the crate's modules.
 
 `crates/resonance-cli` builds the `resonance` binary. `run` loads a collection,
 resolves selectors or a runner, layers variables (collection < `--env-file` <

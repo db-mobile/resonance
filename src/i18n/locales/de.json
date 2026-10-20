@@ -15,6 +15,12 @@
     "history": "Verlauf",
     "import": "Importieren",
     "pinned": "Angeheftet",
+    "git": {
+      "changes_one": "1 nicht committete Änderung",
+      "changes_other": "{{count}} nicht committete Änderungen",
+      "modified": "Geändert, nicht committet",
+      "added": "Neu, nicht committet"
+    },
     "empty": {
       "title": "Willkommen bei Resonance",
       "subtitle": "Erstellen oder importieren Sie eine Sammlung, um zu beginnen",

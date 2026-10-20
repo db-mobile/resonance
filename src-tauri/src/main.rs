@@ -15,8 +15,8 @@ use commands::{
         collection_runner_data_read, collection_runners_delete, collection_runners_list,
         collection_runners_save, collection_save, collection_save_endpoint_data,
         collection_save_variables, collections_get_all, collections_get_path,
-        collections_git_branches, collections_list, collections_load_errors,
-        collections_open_existing, collections_pick_directory,
+        collections_git_branches, collections_git_status, collections_list,
+        collections_load_errors, collections_open_existing, collections_pick_directory,
     },
     data_migrations::{MigrationStatus, data_migration_status},
     graphql_subscription::{
@@ -234,6 +234,7 @@ fn main() {
             collection_reveal,
             collections_get_path,
             collections_git_branches,
+            collections_git_status,
             collections_pick_directory,
             collections_open_existing,
             collection_close,

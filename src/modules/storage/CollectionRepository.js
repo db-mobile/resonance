@@ -288,6 +288,11 @@ export class CollectionRepository {
         return this.backendAPI.collections.gitBranches();
     }
 
+    /** @returns {Promise<Object>} */
+    async gitStatus() {
+        return this.backendAPI.collections.gitStatus();
+    }
+
     async _getEndpointData(collectionId, endpointId) {
         try {
             return await this.backendAPI.collections.getEndpointData(collectionId, endpointId);

@@ -17,12 +17,15 @@ function makeController(collections) {
     controller.allCollections = collections;
     controller.loadErrors = [];
     controller._pinnedRequests = null;
+    controller.gitStatus = { c1: { changes: 1, requests: {} } };
+    controller.gitStatusInFlight = false;
     controller.repository = {
         getPinnedRequests: jest.fn().mockResolvedValue({ [endpointKey('c1', 'e1')]: true }),
         togglePinnedRequest: jest.fn(),
-        getLoadErrors: jest.fn().mockResolvedValue([])
+        getLoadErrors: jest.fn().mockResolvedValue([]),
+        gitStatus: jest.fn().mockResolvedValue({})
     };
-    controller.renderer = { renderCollections: jest.fn(), renderLoadErrors: jest.fn(), updatePinnedState: jest.fn() };
+    controller.renderer = { renderCollections: jest.fn(), renderLoadErrors: jest.fn(), updatePinnedState: jest.fn(), updateGitStatus: jest.fn() };
     for (const key of HANDLER_KEYS) {
         controller[key] = jest.fn();
     }
@@ -52,6 +55,7 @@ describe('CollectionController.renderCollections', () => {
         expect(controller.renderer.renderLoadErrors).toHaveBeenCalledWith([], expect.objectContaining({
             onLocate: expect.any(Function), onRemove: expect.any(Function), onRetry: expect.any(Function)
         }));
+        expect(controller.renderer.updateGitStatus).toHaveBeenCalledWith(controller.gitStatus);
     });
 
     test('a search drops expansion-state preservation, expands results and hides load errors', async () => {
@@ -91,6 +95,7 @@ describe('CollectionController._reload', () => {
         expect(controller.allCollections).toEqual(COLLECTIONS);
         expect(controller.renderCollections).toHaveBeenCalledWith(COLLECTIONS, true);
         expect(listener).toHaveBeenCalledWith(COLLECTIONS);
+        expect(controller.repository.gitStatus).toHaveBeenCalledTimes(1);
     });
 
     test('returns an empty list when loading fails', async () => {

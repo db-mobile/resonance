@@ -4622,6 +4622,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha1 0.10.7",
  "tempfile",
  "thiserror 2.0.21",
  "uuid",

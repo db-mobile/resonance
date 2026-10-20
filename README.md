@@ -235,7 +235,6 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 
 - [ ] Response comparison and diff view
 - [ ] In-app Git operations for collections (commit, push, pull & merge)
-- [ ] Team collaboration features
 
 <details>
 <summary>Completed milestones</summary>
