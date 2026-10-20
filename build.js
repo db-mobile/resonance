@@ -16,7 +16,7 @@ if (!fs.existsSync('dist/src/modules')) {
     fs.mkdirSync('dist/src/modules', { recursive: true });
 }
 
-const COPY_SKIP_FILE = /\.(js|map)$/;
+const COPY_SKIP_FILE = /\.(js|map|md)$/;
 
 // Copy static files to dist
 function copyRecursive(src, dest) {
