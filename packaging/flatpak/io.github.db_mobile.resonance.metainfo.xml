@@ -46,7 +46,7 @@
 
   <branding>
     <color type="primary" scheme_preference="light">#80aed0</color>
-    <color type="primary" scheme_preference="dark">#0f1d48</color>
+    <color type="primary" scheme_preference="dark">#385b8f</color>
   </branding>
 
   <screenshots>
@@ -119,6 +119,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.1" date="2026-10-20">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Add request tags with runner and CLI filters</li>
+          <li>Show uncommitted Git changes in the sidebar</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.0" date="2026-10-19">
       <description>
         <p>New features introduced</p>
