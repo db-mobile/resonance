@@ -18,7 +18,8 @@ use sha1::{Digest, Sha1};
 
 use super::find_worktree;
 use super::index::{IndexEntry, read_index};
-use crate::read::LoadedCollection;
+use crate::ipc::folder_id;
+use crate::read::{FolderNode, LoadedCollection};
 
 /// How a file differs from the index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -91,14 +92,16 @@ pub struct CollectionGitStatus {
     pub changes: usize,
     /// Request id to change, for the files that are requests and still exist.
     pub requests: HashMap<String, ChangeKind>,
+    /// Folder id to the number of changes anywhere below that folder.
+    pub folders: HashMap<String, usize>,
 }
 
-/// Maps changed request files onto request ids.
+/// Maps changed files onto request ids and rolls them up to folder ids.
 ///
 /// @param dir - The collection directory the status was taken for
 /// @param loaded - The collection read from that directory
 /// @param status - Changes under the directory
-/// @returns Per-request kinds for request files, every change counted
+/// @returns Per-request kinds, per-folder counts, every change counted
 pub fn collection_git_status(
     dir: &Path,
     loaded: &LoadedCollection,
@@ -120,9 +123,37 @@ pub fn collection_git_status(
         })
         .collect();
 
+    let mut folder_dirs = Vec::new();
+    for folder in &loaded.root.folders {
+        collect_folders(folder, &mut folder_dirs);
+    }
+    let mut folders: HashMap<String, usize> = HashMap::new();
+    for rel in status.changes.keys() {
+        let changed = dir.join(rel);
+        for (folder_dir, id) in &folder_dirs {
+            if changed.starts_with(folder_dir) {
+                *folders.entry(id.clone()).or_default() += 1;
+            }
+        }
+    }
+
     CollectionGitStatus {
         changes: status.changes.len(),
         requests,
+        folders,
+    }
+}
+
+/// Collects every folder below a node, with the id the sidebar knows it by.
+///
+/// @param node - A folder node
+/// @param out - Receives the folder directory and id of the node and its descendants
+fn collect_folders<'a>(node: &'a FolderNode, out: &mut Vec<(&'a Path, String)>) {
+    if let Some(source) = node.source.as_deref() {
+        out.push((source, folder_id(node)));
+    }
+    for folder in &node.folders {
+        collect_folders(folder, out);
     }
 }
 
@@ -551,17 +582,111 @@ mod tests {
     }
 
     #[test]
+    fn collection_git_status_rolls_changes_up_to_folders() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        let dir = root.join("api");
+        write(
+            &dir.join("collection.yaml"),
+            b"resonanceFormat: 2\nid: c1\nname: API\n",
+        );
+        write(
+            &dir.join("health.yaml"),
+            b"resonanceFormat: 2\nid: r1\nname: Health\n",
+        );
+        write(
+            &dir.join("pets").join("_folder.yaml"),
+            b"resonanceFormat: 2\nid: f_pets\nname: Pets\n",
+        );
+        write(
+            &dir.join("pets").join("list.yaml"),
+            b"resonanceFormat: 2\nid: r2\nname: List\n",
+        );
+        write(
+            &dir.join("pets").join("admin").join("x.yaml"),
+            b"resonanceFormat: 2\nid: r3\nname: X\n",
+        );
+        write_index(
+            &git_dir,
+            &[
+                tracked(
+                    "api/collection.yaml",
+                    b"resonanceFormat: 2\nid: c1\nname: API\n",
+                ),
+                tracked(
+                    "api/health.yaml",
+                    b"resonanceFormat: 2\nid: r1\nname: Old\n",
+                ),
+                tracked(
+                    "api/pets/_folder.yaml",
+                    b"resonanceFormat: 2\nid: f_pets\nname: Pets\n",
+                ),
+                tracked(
+                    "api/pets/list.yaml",
+                    b"resonanceFormat: 2\nid: r2\nname: Old\n",
+                ),
+                tracked(
+                    "api/pets/gone.yaml",
+                    b"resonanceFormat: 2\nid: r9\nname: Gone\n",
+                ),
+            ],
+        );
+        let loaded = read_collection_dir(&dir).unwrap();
+        let status = status_for_dir(&dir).unwrap();
+
+        let result = collection_git_status(&dir, &loaded, &status);
+
+        assert_eq!(result.changes, 4);
+        assert_eq!(
+            result.folders,
+            HashMap::from([("f_pets".to_string(), 3), ("folder_admin".to_string(), 1)])
+        );
+    }
+
+    #[test]
+    fn a_deleted_file_in_a_missing_directory_counts_only_at_collection_level() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        let dir = root.join("api");
+        write(
+            &dir.join("collection.yaml"),
+            b"resonanceFormat: 2\nid: c1\nname: API\n",
+        );
+        write_index(
+            &git_dir,
+            &[
+                tracked(
+                    "api/collection.yaml",
+                    b"resonanceFormat: 2\nid: c1\nname: API\n",
+                ),
+                tracked(
+                    "api/old/x.yaml",
+                    b"resonanceFormat: 2\nid: r9\nname: Gone\n",
+                ),
+            ],
+        );
+        let loaded = read_collection_dir(&dir).unwrap();
+        let status = status_for_dir(&dir).unwrap();
+
+        let result = collection_git_status(&dir, &loaded, &status);
+
+        assert_eq!(result.changes, 1);
+        assert_eq!(result.folders, HashMap::new());
+    }
+
+    #[test]
     fn collection_git_status_serializes_for_the_sidebar() {
         let status = CollectionGitStatus {
             changes: 2,
             requests: HashMap::from([("r1".to_string(), ChangeKind::Added)]),
+            folders: HashMap::from([("f1".to_string(), 2)]),
         };
 
         let json = serde_json::to_value(&status).unwrap();
 
         assert_eq!(
             json,
-            serde_json::json!({ "changes": 2, "requests": { "r1": "added" } })
+            serde_json::json!({ "changes": 2, "requests": { "r1": "added" }, "folders": { "f1": 2 } })
         );
     }
 }

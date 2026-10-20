@@ -416,7 +416,12 @@ export class CollectionRenderer {
         this.container.querySelectorAll('.collection-item[data-collection-id]').forEach(item => {
             const badge = item.querySelector('.collection-header .collection-git-badge');
             const changes = statusById[item.dataset.collectionId]?.changes ?? 0;
-            this._setGitDirtyDot(badge, changes);
+            this._setGitDirtyDot(badge, changes, 'collection-git-dirty');
+        });
+        this.container.querySelectorAll('.folder-item[data-folder-id][data-collection-id]').forEach(item => {
+            const header = item.querySelector(':scope > .folder-header');
+            const changes = statusById[item.dataset.collectionId]?.folders?.[item.dataset.folderId] ?? 0;
+            this._setGitDirtyDot(header, changes, 'folder-git-dirty');
         });
         this.container.querySelectorAll('.endpoint-item[data-endpoint-id][data-collection-id]').forEach(item => {
             const kind = statusById[item.dataset.collectionId]?.requests?.[item.dataset.endpointId] ?? null;
@@ -425,23 +430,24 @@ export class CollectionRenderer {
     }
 
     /**
-     * @param {HTMLElement|null} badge
+     * @param {HTMLElement|null} parent
      * @param {number} changes
+     * @param {string} className
      * @returns {void}
      */
-    _setGitDirtyDot(badge, changes) {
-        const existing = badge?.querySelector('.collection-git-dirty') ?? null;
-        if (!badge || changes === 0) {
+    _setGitDirtyDot(parent, changes, className) {
+        const existing = parent?.querySelector(`:scope > .${className}`) ?? null;
+        if (!parent || changes === 0) {
             existing?.remove();
             return;
         }
-        const dot = existing ?? el('span', 'collection-git-dirty');
+        const dot = existing ?? el('span', className);
         dot.title = translateCount('sidebar.git.changes', changes, {
             one: '1 uncommitted change',
             other: '{{count}} uncommitted changes'
         });
         if (!existing) {
-            badge.appendChild(dot);
+            parent.appendChild(dot);
         }
     }
 
@@ -546,6 +552,7 @@ export class CollectionRenderer {
     createFolderElement(folder, collection, eventHandlers, pinnedRequests = {}) {
         const folderDiv = el('div', 'folder-item');
         folderDiv.dataset.folderId = folder.id;
+        folderDiv.dataset.collectionId = collection.id;
 
         const folderHeader = el('div', 'folder-header u-flex u-items-center');
 

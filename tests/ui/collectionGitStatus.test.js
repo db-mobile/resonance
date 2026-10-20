@@ -11,9 +11,21 @@ const COLLECTIONS = [
             { id: 'r1', name: 'Charge', method: 'POST', path: '/charge' },
             { id: 'r2', name: 'Refund', method: 'POST', path: '/refund' }
         ],
-        folders: []
+        folders: [
+            {
+                id: 'f1',
+                name: 'Webhooks',
+                endpoints: [{ id: 'r4', name: 'Register', method: 'PUT', path: '/webhooks' }],
+                folders: [{ id: 'f2', name: 'Legacy', endpoints: [{ id: 'r6', name: 'Old hook', method: 'PUT', path: '/v1/webhooks' }] }]
+            }
+        ]
     },
-    { id: 'c2', name: 'Scratch', endpoints: [{ id: 'r3', name: 'Ping', method: 'GET', path: '/ping' }], folders: [] }
+    {
+        id: 'c2',
+        name: 'Scratch',
+        endpoints: [{ id: 'r3', name: 'Ping', method: 'GET', path: '/ping' }],
+        folders: [{ id: 'f1', name: 'Also webhooks', endpoints: [{ id: 'r5', name: 'Hook', method: 'POST', path: '/hook' }] }]
+    }
 ];
 
 const PINNED = { [endpointKey('c1', 'r1')]: true };
@@ -25,6 +37,9 @@ describe('collection git change markers', () => {
     const dotsOf = id => document.querySelectorAll(`.collection-item[data-collection-id="${id}"] .collection-git-dirty`);
     const rowsOf = id => document.querySelectorAll(`.endpoint-item[data-endpoint-id="${id}"]`);
     const markerOf = id => document.querySelector(`.endpoint-item[data-endpoint-id="${id}"] .endpoint-git-marker`);
+    const folderDotOf = (collectionId, folderId) => document.querySelector(
+        `.collection-item[data-collection-id="${collectionId}"] .folder-item[data-folder-id="${folderId}"] > .folder-header > .folder-git-dirty`
+    );
 
     beforeEach(async () => {
         document.body.innerHTML = '<div id="collections-list"></div>';
@@ -66,6 +81,50 @@ describe('collection git change markers', () => {
             renderer.updateGitStatus({ c2: { changes: 2, requests: {} } });
 
             expect(dotOf('c2')).toBeNull();
+        });
+    });
+
+    describe('folder dots', () => {
+        test('adds a dot with the change count to a folder header', () => {
+            renderer.updateGitStatus({ c1: { changes: 2, requests: {}, folders: { f1: 2 } } });
+
+            expect(folderDotOf('c1', 'f1')).not.toBeNull();
+            expect(folderDotOf('c1', 'f1').title).toBe('2 uncommitted changes');
+            expect(folderDotOf('c1', 'f1').previousElementSibling.classList.contains('folder-name')).toBe(true);
+        });
+
+        test('dots nested folders independently', () => {
+            renderer.updateGitStatus({ c1: { changes: 2, requests: {}, folders: { f1: 2, f2: 1 } } });
+
+            expect(folderDotOf('c1', 'f1').title).toBe('2 uncommitted changes');
+            expect(folderDotOf('c1', 'f2').title).toBe('1 uncommitted change');
+            expect(document.querySelectorAll('.folder-git-dirty')).toHaveLength(2);
+        });
+
+        test('removes the dot when the folder is clean again', () => {
+            renderer.updateGitStatus({ c1: { changes: 1, requests: {}, folders: { f1: 1 } } });
+            renderer.updateGitStatus({ c1: { changes: 1, requests: {}, folders: {} } });
+
+            expect(folderDotOf('c1', 'f1')).toBeNull();
+        });
+
+        test('leaves a folder with the same id in another collection alone', () => {
+            renderer.updateGitStatus({ c1: { changes: 1, requests: {}, folders: { f1: 1 } } });
+
+            expect(folderDotOf('c1', 'f1')).not.toBeNull();
+            expect(folderDotOf('c2', 'f1')).toBeNull();
+        });
+
+        test('can be re-applied after a full re-render', async () => {
+            const status = { c1: { changes: 1, requests: {}, folders: { f2: 1 } } };
+            renderer.updateGitStatus(status);
+            await renderer.renderCollections(COLLECTIONS, {}, false, {}, PINNED);
+
+            expect(folderDotOf('c1', 'f2')).toBeNull();
+
+            renderer.updateGitStatus(status);
+
+            expect(folderDotOf('c1', 'f2').title).toBe('1 uncommitted change');
         });
     });
 
