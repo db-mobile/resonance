@@ -55,21 +55,6 @@ describe('folder editing helpers', () => {
         expect(c.endpoints.filter(e => e.id === 'a1')).toHaveLength(1);
     });
 
-    test('moveRequest works on the items-tree shape', () => {
-        const items = {
-            id: 'c2',
-            items: [
-                { type: 'request', id: 'r1', name: 'R1' },
-                { type: 'folder', id: 'f1', name: 'F', items: [] }
-            ]
-        };
-
-        const moved = moveRequest(items, 'r1', 'f1');
-
-        expect(moved.items).toHaveLength(1);
-        expect(moved.items[0].items.map(i => i.id)).toEqual(['r1']);
-    });
-
     test('moveRequest returns null for an unknown request', () => {
         expect(moveRequest(nested(), 'ghost', null)).toBeNull();
     });

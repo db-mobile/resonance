@@ -66,18 +66,32 @@ A selector is one of:
 | request name (exact, then case-insensitive) | `"Create pet"` |
 
 A name shared by several requests is an error that lists the candidates;
-use the file path instead. `resonance list` prints every path, name and id.
+use the file path instead. `resonance list` prints every path, name, id and
+tags.
+
+### Tags
+
+Requests can carry tags (`tags: [smoke, pets]` in the request file, or
+**Edit tags…** in the app). `--tags smoke,critical` keeps only requests
+carrying at least one listed tag, `--exclude-tags slow` drops any request
+carrying one of those, and both combine with selectors and with `--runner`.
+Matching ignores case. Flow control (`setNextRequest`) can only target
+requests that passed the filter; a jump to a filtered-out request fails that
+request.
 
 ### Runners
 
 `--runner <stem|name|id>` runs a saved runner from `runners/<stem>.yaml`
-with its own queue, overrides, iteration count, delay, stop-on-error setting
-and data file. It cannot be combined with selectors.
+with its own queue, overrides, iteration count, delay, stop-on-error setting,
+tag filter and data file. It cannot be combined with selectors. Passing
+`--tags` or `--exclude-tags` replaces the runner's saved tag filter.
 
 ### Options
 
 | Option | Effect |
 |---|---|
+| `--tags TAGS` | Only run requests carrying any of these comma-separated tags |
+| `--exclude-tags TAGS` | Skip requests carrying any of these comma-separated tags |
 | `--var KEY=VALUE` | Set a variable (repeatable) |
 | `--env-file FILE` | Variables from an environment export of the desktop app (JSON) |
 | `--env NAME` | Which environment to take from `--env-file` when it holds several |

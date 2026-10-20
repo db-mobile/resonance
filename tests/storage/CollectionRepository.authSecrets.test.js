@@ -347,18 +347,17 @@ describe('CollectionRepository auth secret redaction', () => {
                 savedCollection = {
                     id: 'c1',
                     name: 'Test',
-                    items: [
+                    endpoints: [{ id: 'outerRequest' }, { id: 'innerRequest' }],
+                    folders: [
                         {
-                            type: 'folder',
                             id: 'outer',
                             name: 'outer',
-                            items: [
-                                { type: 'request', id: 'outerRequest' },
+                            endpoints: [{ id: 'outerRequest' }],
+                            folders: [
                                 {
-                                    type: 'folder',
                                     id: 'inner',
                                     name: 'inner',
-                                    items: [{ type: 'request', id: 'innerRequest' }]
+                                    endpoints: [{ id: 'innerRequest' }]
                                 }
                             ]
                         }

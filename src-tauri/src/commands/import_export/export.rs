@@ -83,11 +83,17 @@ fn attach_endpoint_data(
 pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<String>) {
     let mut paths: HashMap<String, HashMap<String, Value>> = HashMap::new();
     let mut skipped: Vec<String> = Vec::new();
+    let mut tag_names: Vec<String> = Vec::new();
 
     for endpoint in &collection.endpoints {
         if !is_http_method(&endpoint.method) {
             skipped.push(endpoint.name.clone());
             continue;
+        }
+        for tag in &endpoint.tags {
+            if !tag_names.iter().any(|t| t.eq_ignore_ascii_case(tag)) {
+                tag_names.push(tag.clone());
+            }
         }
         let method = endpoint.method.to_lowercase();
         let mut operation = serde_json::json!({
@@ -101,6 +107,9 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
 
         if let Some(desc) = &endpoint.description {
             operation["description"] = Value::String(desc.clone());
+        }
+        if !endpoint.tags.is_empty() {
+            operation["tags"] = serde_json::json!(endpoint.tags);
         }
 
         if let Some(params) = &endpoint.parameters {
@@ -144,6 +153,14 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
 
     if let Some(base_url) = &collection.base_url {
         spec["servers"] = serde_json::json!([{ "url": base_url }]);
+    }
+    if !tag_names.is_empty() {
+        spec["tags"] = Value::Array(
+            tag_names
+                .into_iter()
+                .map(|name| serde_json::json!({ "name": name }))
+                .collect(),
+        );
     }
 
     (spec, skipped)
@@ -538,6 +555,7 @@ mod tests {
             method: method.to_string(),
             path: format!("/{}", name.to_lowercase().replace(' ', "-")),
             description: None,
+            tags: Vec::new(),
             parameters: None,
             request_body: None,
             responses: None,
@@ -821,6 +839,7 @@ mod tests {
             "header": { "X-Trace": { "example": "abc" } }
         }));
         create.request_body = Some(serde_json::json!({ "example": "{\"name\": \"a\"}" }));
+        create.tags = vec!["Pets".to_string(), "smoke".to_string()];
         let mut note = endpoint("Note", "PUT");
         note.request_body = Some(serde_json::json!({ "example": "plain words" }));
         let mut empty = endpoint("Empty", "POST");
@@ -856,5 +875,11 @@ mod tests {
             serde_json::json!({ "content": { "text/plain": { "example": "plain words" } } })
         );
         assert!(spec["paths"]["/empty"]["post"].get("requestBody").is_none());
+        assert_eq!(post["tags"], serde_json::json!(["Pets", "smoke"]));
+        assert!(spec["paths"]["/note"]["put"].get("tags").is_none());
+        assert_eq!(
+            spec["tags"],
+            serde_json::json!([{ "name": "Pets" }, { "name": "smoke" }])
+        );
     }
 }

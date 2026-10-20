@@ -61,12 +61,6 @@ describe('settingsCache', () => {
             expect((await module.resolveRequestSettings()).timeout).toBeNull();
         });
 
-        it('falls back to the legacy timeout key', async () => {
-            const { module } = await loadModule(jest.fn(async () => ({ timeout: 1234 })));
-
-            expect((await module.resolveRequestSettings()).timeout).toBe(1234);
-        });
-
         it('defaults every field when the settings are empty', async () => {
             const { module } = await loadModule(jest.fn(async () => ({})));
 

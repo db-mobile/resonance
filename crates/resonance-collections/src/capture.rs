@@ -15,6 +15,7 @@ use resonance_core::model::{
     AuthKind, AuthOrigin, AuthSource, AuthTemplate, BodyTemplate, DataFile, ExecutionContext,
     ExecutionError, GraphqlTemplate, Parameter, RequestTemplate, RunInput, RunOptions,
 };
+use resonance_core::tags::normalize;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
@@ -329,6 +330,11 @@ pub fn capture_runner_entry(entry: &CaptureEntry<'_>, target: &CaptureTarget) ->
         endpoint_id: Some(string_or(endpoint.get("id"), "")),
         name: entry.name.to_string(),
         path: string_or(endpoint.get("path"), ""),
+        tags: endpoint
+            .get("tags")
+            .and_then(Value::as_array)
+            .map(|tags| normalize(tags.iter().filter_map(Value::as_str)))
+            .unwrap_or_default(),
         method: endpoint
             .get("method")
             .filter(|m| truthy(m))
@@ -797,6 +803,7 @@ mod tests {
                 delay_ms: 250,
                 iterations: Some(3),
                 max_executions_per_iteration: Some(100),
+                tags: Default::default(),
                 data_file: Some(RunnerDataFile {
                     path: "data/users.csv".into(),
                     name: String::new(),

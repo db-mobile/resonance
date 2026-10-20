@@ -197,12 +197,11 @@ export class CollectionRepository {
     /**
      * @param {string} id
      * @param {Object} tree
-     * @param {Array} [tree.items]
      * @param {Array} [tree.endpoints]
      * @param {Array} [tree.folders]
      * @returns {Promise<Object>}
      */
-    async saveTree(id, { items, endpoints, folders }) {
+    async saveTree(id, { endpoints, folders }) {
         const existing = await this.getById(id);
 
         if (!existing) {
@@ -210,7 +209,7 @@ export class CollectionRepository {
         }
 
         const merged = { ...existing };
-        for (const [field, value] of Object.entries({ items, endpoints, folders })) {
+        for (const [field, value] of Object.entries({ endpoints, folders })) {
             if (value !== undefined) {
                 merged[field] = value;
             }
@@ -287,6 +286,11 @@ export class CollectionRepository {
     /** @returns {Promise<Object>} */
     async gitBranches() {
         return this.backendAPI.collections.gitBranches();
+    }
+
+    /** @returns {Promise<Object>} */
+    async gitStatus() {
+        return this.backendAPI.collections.gitStatus();
     }
 
     async _getEndpointData(collectionId, endpointId) {

@@ -48,6 +48,7 @@ The outgoing request, mutable in pre-request scripts:
 | `body`        | any    | Request body (parsed object for JSON bodies)    |
 | `queryParams` | object | Query parameter name → value map                |
 | `pathParams`  | object | Path parameter name → value map                 |
+| `tags`        | array  | The request's tags (read-only; runner and CLI)  |
 
 ```javascript
 request.headers["Authorization"] = `Bearer ${environment.get("token")}`;
@@ -65,7 +66,8 @@ Notes:
 - Reassigning `request` itself to a non-object is ignored with a warning; the
   original request is kept.
 - In the **collection runner**, `request` contains only `url`, `method`,
-  `headers`, and `body`.
+  `headers`, `body` and `tags`. Tags are filled from the request file; editor
+  sends see an empty array.
 
 ## `response` (test scripts only)
 

@@ -91,6 +91,40 @@
   white-space: nowrap;
 }
 
+.collection-git-dirty,
+.endpoint-git-marker {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--warning-color);
+}
+
+.collection-git-dirty {
+  margin-left: var(--space-1);
+}
+
+.endpoint-git-marker[data-kind="added"] {
+  background-color: var(--success-color);
+}
+
+.endpoint-tags {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.endpoint-tag {
+  padding: 0 var(--space-2);
+  font-weight: 500;
+  opacity: var(--dim-opacity);
+  white-space: nowrap;
+}
+
+.endpoint-item:hover .endpoint-tag {
+  opacity: 1;
+}
+
 .collection-endpoints,
 .folder-endpoints,
 .pinned-section-endpoints {

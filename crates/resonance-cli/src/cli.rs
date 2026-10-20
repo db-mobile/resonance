@@ -1,5 +1,6 @@
 //! The command-line surface.
 use clap::{Args, Parser, Subcommand};
+use resonance_core::tags::TagFilter;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -31,6 +32,12 @@ pub struct RunArgs {
     /// Saved runner to run, by file stem, name or id (runners/<stem>.yaml)
     #[arg(long, value_name = "NAME")]
     pub runner: Option<String>,
+    /// Only run requests carrying any of these tags (comma-separated; replaces a runner's saved filter)
+    #[arg(long, value_name = "TAGS", value_delimiter = ',')]
+    pub tags: Vec<String>,
+    /// Skip requests carrying any of these tags (comma-separated)
+    #[arg(long, value_name = "TAGS", value_delimiter = ',')]
+    pub exclude_tags: Vec<String>,
 
     /// Set a variable (repeatable); RESONANCE_VAR_<KEY> environment variables work too
     #[arg(long = "var", value_name = "KEY=VALUE")]
@@ -116,6 +123,12 @@ pub struct RunArgs {
 }
 
 impl RunArgs {
+    /// The filter from `--tags`/`--exclude-tags`; `None` when neither was given.
+    pub fn tag_filter(&self) -> Option<TagFilter> {
+        let filter = TagFilter::new(&self.tags, &self.exclude_tags);
+        (!filter.is_empty()).then_some(filter)
+    }
+
     /// `--bail`/`--no-bail`, the later one winning; `None` keeps the default.
     pub fn bail(&self) -> Option<bool> {
         if self.bail {
@@ -164,6 +177,33 @@ mod tests {
         assert_eq!(
             run_args(&["run", "col", "pets", "a.yaml"]).selectors,
             vec!["pets", "a.yaml"]
+        );
+    }
+
+    #[test]
+    fn tags_split_on_commas_and_combine_with_selectors_and_runners() {
+        let args = run_args(&[
+            "run",
+            "col",
+            "pets",
+            "--tags",
+            "smoke, Pets",
+            "--exclude-tags",
+            "slow",
+        ]);
+        let filter = args.tag_filter().unwrap();
+        assert_eq!(filter.include, vec!["smoke", "Pets"]);
+        assert_eq!(filter.exclude, vec!["slow"]);
+        assert!(
+            run_args(&["run", "col", "--runner", "smoke", "--tags", "a"])
+                .tag_filter()
+                .is_some()
+        );
+        assert!(run_args(&["run", "col"]).tag_filter().is_none());
+        assert!(
+            run_args(&["run", "col", "--tags", " , "])
+                .tag_filter()
+                .is_none()
         );
     }
 

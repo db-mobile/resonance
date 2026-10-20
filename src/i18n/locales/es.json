@@ -137,7 +137,9 @@
     "rename_title": "Renombrar solicitud",
     "rename_label": "Nombre de la solicitud:",
     "copy_name": "{{name}} (copia)",
-    "duplicate_error": "No se pudo duplicar la solicitud: {{message}}"
+    "duplicate_error": "No se pudo duplicar la solicitud: {{message}}",
+    "tags_title": "Editar etiquetas",
+    "tags_label": "Etiquetas (separadas por comas):"
   },
   "context_menu": {
     "new_collection": "Nueva colección",
@@ -164,7 +166,8 @@
     "delete_folder": "Eliminar carpeta",
     "duplicate_request": "Duplicar solicitud",
     "move_request": "Mover a carpeta…",
-    "show_in_file_manager": "Mostrar en el gestor de archivos"
+    "show_in_file_manager": "Mostrar en el gestor de archivos",
+    "edit_tags": "Editar etiquetas…"
   },
   "docs": {
     "title": "Generar documentación",
@@ -630,7 +633,13 @@
     "migration_dropped_one": "{{count}} runner perdió solicitudes de otras colecciones: {{names}}",
     "migration_dropped_other": "{{count}} runners perdieron solicitudes de otras colecciones: {{names}}",
     "migration_skipped_one": "{{count}} runner guardado no tiene solicitudes y no se movió",
-    "migration_skipped_other": "{{count}} runners guardados no tienen solicitudes y no se movieron"
+    "migration_skipped_other": "{{count}} runners guardados no tienen solicitudes y no se movieron",
+    "tags": "Etiquetas",
+    "tags_include_placeholder": "incluir a, b",
+    "tags_exclude_placeholder": "excluir c",
+    "tags_include_aria": "Ejecutar solo solicitudes con alguna de estas etiquetas",
+    "tags_exclude_aria": "Omitir solicitudes con alguna de estas etiquetas",
+    "error_no_tagged_requests": "Ninguna solicitud en cola coincide con el filtro de etiquetas"
   },
   "mqtt": {
     "title": "MQTT",

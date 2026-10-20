@@ -32,7 +32,7 @@ export async function getSettings() {
  * @returns {{httpVersion: string, timeout: number|null, verifySsl: boolean, followRedirects: boolean}}
  */
 export function deriveRequestSettings(settings) {
-    const savedTimeout = settings?.requestTimeout ?? settings?.timeout;
+    const savedTimeout = settings?.requestTimeout;
     return {
         httpVersion: settings?.httpVersion || 'auto',
         timeout: savedTimeout === 0 ? null : (savedTimeout ?? 30000),

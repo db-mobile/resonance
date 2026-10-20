@@ -6,6 +6,7 @@
 //! written by a newer build survives a round trip through an older one instead
 //! of being silently dropped on the next save.
 
+use resonance_core::tags::TagFilter;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -216,6 +217,8 @@ pub struct RequestDoc {
     pub path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// The absolute URL, for protocols whose endpoint is a URL rather than a
     /// path under the collection's base.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -256,6 +259,7 @@ impl RequestDoc {
             http_method: None,
             path: None,
             description: None,
+            tags: Vec::new(),
             url: None,
             auth: None,
             params: Params::default(),
@@ -317,7 +321,7 @@ pub struct RunnerRequest {
     /// Accepted from the desktop for validation only; never written.
     #[serde(default, skip_serializing)]
     pub collection_id: Option<String>,
-    #[serde(rename = "requestId", alias = "endpointId")]
+    #[serde(rename = "requestId")]
     pub request_id: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -375,6 +379,9 @@ pub struct RunnerOptions {
     pub max_executions_per_iteration: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_file: Option<RunnerDataFile>,
+    /// Applied against each request's live tags when the runner starts.
+    #[serde(default, skip_serializing_if = "TagFilter::is_empty")]
+    pub tags: TagFilter,
     #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
     pub extra: Map<String, Value>,
 }
@@ -387,6 +394,7 @@ impl Default for RunnerOptions {
             iterations: None,
             max_executions_per_iteration: None,
             data_file: None,
+            tags: TagFilter::default(),
             extra: Map::new(),
         }
     }
@@ -419,6 +427,7 @@ mod tests {
         doc.method = Some("POST".into());
         doc.path = Some("/pets".into());
         doc.description = Some("Adds a pet".into());
+        doc.tags = vec!["smoke".into(), "Pets".into()];
         doc.url = Some("https://api.example.com/pets".into());
         doc.auth = Some(json!({"type": "bearer", "config": {"token": ""}}));
         doc.params.query = vec![json!({"key": "limit", "value": "20"})];
@@ -793,6 +802,7 @@ spec:
                 path: "data/users.csv".into(),
                 name: "users.csv".into(),
             }),
+            tags: TagFilter::new(["smoke"], ["slow"]),
             extra: Map::new(),
         };
         doc.requests.push(RunnerRequest {
@@ -906,15 +916,6 @@ spec:
     }
 
     #[test]
-    fn a_legacy_endpoint_id_key_is_accepted_on_read() {
-        let yaml = "resonanceFormat: 2\nid: runner_1\nname: R\nrequests:\n- endpointId: req_a\n  collectionId: c1\n";
-        let parsed: RunnerDoc = serde_yaml_ng::from_str(yaml).unwrap();
-        assert_eq!(parsed.requests[0].request_id, "req_a");
-        assert_eq!(parsed.requests[0].collection_id.as_deref(), Some("c1"));
-        assert!(to_yaml(&parsed).contains("requestId: req_a"));
-    }
-
-    #[test]
     fn an_unknown_runner_field_survives_a_round_trip() {
         let yaml = "resonanceFormat: 2\nid: runner_1\nname: R\nfutureField: kept\noptions:\n  stopOnError: true\n  retries: 3\nrequests:\n- requestId: req_a\n  tag: smoke\n  overrides:\n    cookies: []\n";
         let parsed: RunnerDoc = serde_yaml_ng::from_str(yaml).unwrap();
@@ -953,6 +954,11 @@ options:
   dataFile:
     path: data/users.csv
     name: users.csv
+  tags:
+    include:
+    - smoke
+    exclude:
+    - slow
 requests:
 - requestId: req_a
   name: Create Pet

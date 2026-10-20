@@ -39,6 +39,15 @@ describe('runnerDoc', () => {
         });
     });
 
+    test('a tag filter round-trips normalized and an empty one never reaches the file', () => {
+        const doc = toRunnerDoc({ name: 'x', options: { tags: { include: [' smoke ', 'Smoke', ''], exclude: ['slow'] } } });
+        expect(doc.options.tags).toEqual({ include: ['smoke'], exclude: ['slow'] });
+        expect(fromRunnerDoc('c1', doc).options.tags).toEqual({ include: ['smoke'], exclude: ['slow'] });
+
+        expect(toRunnerDoc({ name: 'x', options: { tags: { include: [], exclude: [' '] } } }).options).not.toHaveProperty('tags');
+        expect(fromRunnerDoc('c1', { id: 'r', name: 'R', options: { tags: { exclude: ['slow'] } } }).options.tags).toEqual({ include: [], exclude: ['slow'] });
+    });
+
     test('normalizeRunnerOptions drops an invalid execution limit and clamps iterations', () => {
         expect(normalizeRunnerOptions({ iterations: '0', maxExecutionsPerIteration: 'abc' })).toEqual({ stopOnError: true, delayMs: 0, iterations: 1, dataFile: null });
         expect(normalizeRunnerOptions({ iterations: 4, maxExecutionsPerIteration: 10 }).maxExecutionsPerIteration).toBe(10);

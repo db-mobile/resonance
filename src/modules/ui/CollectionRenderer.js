@@ -7,9 +7,12 @@ import { app } from '../appContext.js';
 import { templateLoader } from '../templateLoader.js';
 import { flattenRequests, rootRequests, topLevelFolders, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
-import { translate } from '../utils/translate.js';
+import { translate, translateCount } from '../utils/translate.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
+import { normalizeTags } from '../utils/requestTags.js';
+
+const MAX_VISIBLE_TAGS = 2;
 
 /**
  * @param {Object} pinnedRequests
@@ -341,6 +344,22 @@ export class CollectionRenderer {
     }
 
     /**
+     * @param {Array<string>} tags
+     * @returns {HTMLSpanElement}
+     */
+    createTagChips(tags) {
+        const container = el('span', 'endpoint-tags');
+        container.title = tags.join(', ');
+        for (const tag of tags.slice(0, MAX_VISIBLE_TAGS)) {
+            container.appendChild(el('span', 'badge neutral endpoint-tag', tag));
+        }
+        if (tags.length > MAX_VISIBLE_TAGS) {
+            container.appendChild(el('span', 'badge neutral endpoint-tag endpoint-tag-more', `+${tags.length - MAX_VISIBLE_TAGS}`));
+        }
+        return container;
+    }
+
+    /**
      * @param {string} branch
      * @returns {HTMLSpanElement}
      */
@@ -387,6 +406,66 @@ export class CollectionRenderer {
             badge.title = branch;
             badge.querySelector('.collection-git-branch').textContent = branch;
         });
+    }
+
+    /**
+     * @param {Object} statusById
+     * @returns {void}
+     */
+    updateGitStatus(statusById = {}) {
+        this.container.querySelectorAll('.collection-item[data-collection-id]').forEach(item => {
+            const badge = item.querySelector('.collection-header .collection-git-badge');
+            const changes = statusById[item.dataset.collectionId]?.changes ?? 0;
+            this._setGitDirtyDot(badge, changes);
+        });
+        this.container.querySelectorAll('.endpoint-item[data-endpoint-id][data-collection-id]').forEach(item => {
+            const kind = statusById[item.dataset.collectionId]?.requests?.[item.dataset.endpointId] ?? null;
+            this._setEndpointGitMarker(item, kind);
+        });
+    }
+
+    /**
+     * @param {HTMLElement|null} badge
+     * @param {number} changes
+     * @returns {void}
+     */
+    _setGitDirtyDot(badge, changes) {
+        const existing = badge?.querySelector('.collection-git-dirty') ?? null;
+        if (!badge || changes === 0) {
+            existing?.remove();
+            return;
+        }
+        const dot = existing ?? el('span', 'collection-git-dirty');
+        dot.title = translateCount('sidebar.git.changes', changes, {
+            one: '1 uncommitted change',
+            other: '{{count}} uncommitted changes'
+        });
+        if (!existing) {
+            badge.appendChild(dot);
+        }
+    }
+
+    /**
+     * @param {HTMLElement} item
+     * @param {string|null} kind
+     * @returns {void}
+     */
+    _setEndpointGitMarker(item, kind) {
+        const existing = item.querySelector('.endpoint-git-marker');
+        item.classList.toggle('git-modified', kind === 'modified');
+        item.classList.toggle('git-added', kind === 'added');
+        if (kind !== 'modified' && kind !== 'added') {
+            existing?.remove();
+            return;
+        }
+        const marker = existing ?? el('span', 'endpoint-git-marker');
+        marker.dataset.kind = kind;
+        marker.title = kind === 'modified'
+            ? translate('sidebar.git.modified', 'Modified, not committed')
+            : translate('sidebar.git.added', 'New, not committed');
+        if (!existing) {
+            item.querySelector('.endpoint-path')?.after(marker);
+        }
     }
 
     /**
@@ -524,6 +603,7 @@ export class CollectionRenderer {
         const pathSpan = el('span', 'endpoint-path');
         const displayName = endpoint.name || (endpoint.path || '').replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
+        const tags = normalizeTags(endpoint.tags);
 
         const pinBtn = el('span', `icon icon-14 icon-star endpoint-pin-btn${pinned ? ' is-pinned' : ''}`);
         pinBtn.title = pinned ? 'Unpin request' : 'Pin request';
@@ -534,6 +614,9 @@ export class CollectionRenderer {
 
         endpointDiv.appendChild(methodSpan);
         endpointDiv.appendChild(pathSpan);
+        if (tags.length > 0) {
+            endpointDiv.appendChild(this.createTagChips(tags));
+        }
         endpointDiv.appendChild(pinBtn);
 
         if (eventHandlers.onEndpointClick) {

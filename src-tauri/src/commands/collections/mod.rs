@@ -237,11 +237,6 @@ pub(crate) fn resolve_collection_dir(
     }
 
     let default_dir = get_default_collections_dir(app)?;
-    let legacy_dir = default_dir.join(collection_id);
-    if is_collection_dir(&legacy_dir) {
-        return Ok(Some(legacy_dir));
-    }
-
     if !default_dir.exists() {
         return Ok(None);
     }
@@ -1558,6 +1553,44 @@ pub async fn collections_git_branches(app: AppHandle) -> Result<HashMap<String, 
     }
 
     Ok(branches)
+}
+
+/// Uncommitted changes of every registered collection that sits in a working
+/// tree and has any, keyed by collection id. Clean collections and those
+/// outside a repository are left out, so an absent key means no markers.
+///
+/// @param app - Tauri app handle
+/// @returns Change count and per-request change kinds per collection
+#[tauri::command]
+pub async fn collections_git_status(
+    app: AppHandle,
+) -> Result<HashMap<String, git::CollectionGitStatus>, String> {
+    let index = get_collection_index(&app)?;
+    let mut scanner = git::StatusScanner::default();
+    let mut statuses = HashMap::new();
+
+    for (collection_id, path) in index {
+        let dir = Path::new(&path);
+        let Some(status) = scanner.status_for_dir(dir) else {
+            continue;
+        };
+        if status.changes.is_empty() {
+            continue;
+        }
+        let loaded = (Layout::detect(dir) == Some(Layout::V2))
+            .then(|| read_collection_dir_cached(collection_cache(), dir).ok())
+            .flatten();
+        let entry = match &loaded {
+            Some(loaded) => git::collection_git_status(dir, loaded, &status),
+            None => git::CollectionGitStatus {
+                changes: status.changes.len(),
+                requests: HashMap::new(),
+            },
+        };
+        statuses.insert(collection_id, entry);
+    }
+
+    Ok(statuses)
 }
 
 /// Picks a folder.

@@ -66,6 +66,17 @@
   font-size: var(--font-size-small);
 }
 
+.runner-tags-input {
+  width: 110px;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  background-color: var(--view-bg-color);
+  color: inherit;
+  font-size: var(--font-size-small);
+}
+
 .runner-main {
   display: flex;
   flex: 1;

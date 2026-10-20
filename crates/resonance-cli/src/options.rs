@@ -65,7 +65,6 @@ pub fn certificates(args: &RunArgs) -> Vec<Certificate> {
 pub fn execution_settings(args: &RunArgs) -> ExecutionSettings {
     ExecutionSettings {
         request_timeout: args.timeout,
-        timeout: None,
         http_version: if args.http1 {
             Some("http1".into())
         } else if args.http2 {

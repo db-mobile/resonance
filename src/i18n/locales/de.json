@@ -15,6 +15,12 @@
     "history": "Verlauf",
     "import": "Importieren",
     "pinned": "Angeheftet",
+    "git": {
+      "changes_one": "1 nicht committete Änderung",
+      "changes_other": "{{count}} nicht committete Änderungen",
+      "modified": "Geändert, nicht committet",
+      "added": "Neu, nicht committet"
+    },
     "empty": {
       "title": "Willkommen bei Resonance",
       "subtitle": "Erstellen oder importieren Sie eine Sammlung, um zu beginnen",
@@ -137,7 +143,9 @@
     "rename_title": "Anfrage umbenennen",
     "rename_label": "Anfragename:",
     "copy_name": "{{name}} (Kopie)",
-    "duplicate_error": "Die Anfrage konnte nicht dupliziert werden: {{message}}"
+    "duplicate_error": "Die Anfrage konnte nicht dupliziert werden: {{message}}",
+    "tags_title": "Tags bearbeiten",
+    "tags_label": "Tags (durch Komma getrennt):"
   },
   "context_menu": {
     "new_collection": "Neue Sammlung",
@@ -164,7 +172,8 @@
     "delete_folder": "Ordner löschen",
     "duplicate_request": "Anfrage duplizieren",
     "move_request": "In Ordner verschieben…",
-    "show_in_file_manager": "Im Dateimanager anzeigen"
+    "show_in_file_manager": "Im Dateimanager anzeigen",
+    "edit_tags": "Tags bearbeiten…"
   },
   "docs": {
     "title": "Dokumentation generieren",
@@ -630,7 +639,13 @@
     "migration_dropped_one": "{{count}} Runner hat Anfragen aus anderen Sammlungen verloren: {{names}}",
     "migration_dropped_other": "{{count}} Runner haben Anfragen aus anderen Sammlungen verloren: {{names}}",
     "migration_skipped_one": "{{count}} gespeicherter Runner hat keine Anfragen und wurde nicht verschoben",
-    "migration_skipped_other": "{{count}} gespeicherte Runner haben keine Anfragen und wurden nicht verschoben"
+    "migration_skipped_other": "{{count}} gespeicherte Runner haben keine Anfragen und wurden nicht verschoben",
+    "tags": "Tags",
+    "tags_include_placeholder": "einschließen a, b",
+    "tags_exclude_placeholder": "ausschließen c",
+    "tags_include_aria": "Nur Anfragen mit einem dieser Tags ausführen",
+    "tags_exclude_aria": "Anfragen mit einem dieser Tags überspringen",
+    "error_no_tagged_requests": "Keine Anfrage in der Warteschlange passt zum Tag-Filter"
   },
   "mqtt": {
     "title": "MQTT",

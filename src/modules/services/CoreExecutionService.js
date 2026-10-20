@@ -4,6 +4,7 @@ import { findRequest } from '../collections/collectionTree.js';
 import { normalizeFormRows } from '../utils/formDataRows.js';
 import { newRequestId } from '../state/inFlightRequests.js';
 import { translate } from '../utils/translate.js';
+import { isEmptyTagFilter, matchesTagFilter } from '../utils/requestTags.js';
 
 // Repositories use read/modify/write operations. Serialize deltas across concurrent sends.
 let persistenceQueue = Promise.resolve();
@@ -161,12 +162,20 @@ export class CoreExecutionService {
                 targets.set(key, this.captureTarget(entry.collectionId, entry.endpointId));
             }
         }
-        const requests = await Promise.all(
-            captured.requests.map(async (entry) => {
-                const target = await targets.get(JSON.stringify([entry.collectionId, entry.endpointId]));
-                return captureRunnerEntry(entry, target);
-            })
+        const filter = captured.options?.tags;
+        const resolved = await Promise.all(
+            captured.requests.map(async (entry) => ({
+                entry,
+                target: await targets.get(JSON.stringify([entry.collectionId, entry.endpointId]))
+            }))
         );
+        const kept = isEmptyTagFilter(filter)
+            ? resolved
+            : resolved.filter(({ target }) => matchesTagFilter(target?.endpoint?.tags, filter));
+        if (kept.length === 0 && resolved.length > 0) {
+            throw new Error(translate('runner.error_no_tagged_requests', 'No queued request matches the tag filter'));
+        }
+        const requests = kept.map(({ entry, target }) => captureRunnerEntry(entry, target));
         const collectionId = captured.collectionId ?? captured.requests[0]?.collectionId ?? null;
         const dataFile = captured.options?.dataFile?.path
             ? await this.backend.collections.runners

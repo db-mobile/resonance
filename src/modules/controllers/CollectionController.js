@@ -13,6 +13,9 @@ import { ChangeEmitter } from '../services/ChangeEmitter.js';
 import { flattenRequests, requestsInFolder, folderChainForRequest, folderOutline, endpointKey } from '../collections/collectionTree.js';
 import { isRunnable } from '../utils/runnableRequests.js';
 import { translate, translateCount } from '../utils/translate.js';
+import { normalizeTags } from '../utils/requestTags.js';
+
+const GIT_STATUS_SAVE_DEBOUNCE_MS = 1000;
 
 export class CollectionController {
     /**
@@ -30,6 +33,7 @@ export class CollectionController {
      * @param {Object} deps.renameDialog
      * @param {Object} deps.confirmDialog
      * @param {Object} deps.moveRequestDialog
+     * @param {Object} deps.editTagsDialog
      * @param {Object} deps.variableManager
      * @param {Object} deps.collectionAuthDialog
      * @param {import('../requestFormReader.js').RequestFormReader} deps.formReader
@@ -49,6 +53,7 @@ export class CollectionController {
         renameDialog,
         confirmDialog,
         moveRequestDialog,
+        editTagsDialog,
         variableManager,
         collectionAuthDialog,
         formReader,
@@ -67,6 +72,7 @@ export class CollectionController {
         this.renameDialog = renameDialog;
         this.confirmDialog = confirmDialog;
         this.moveRequestDialog = moveRequestDialog;
+        this.editTagsDialog = editTagsDialog;
         this.variableManager = variableManager;
         this.collectionAuthDialog = collectionAuthDialog;
         this.formReader = formReader;
@@ -89,6 +95,10 @@ export class CollectionController {
 
         this.gitRefreshInFlight = false;
         this.refreshGitBranches = this.refreshGitBranches.bind(this);
+        this.gitStatus = {};
+        this.gitStatusInFlight = false;
+        this.refreshGitStatus = this.refreshGitStatus.bind(this);
+        this._debouncedGitStatusRefresh = debounce(this.refreshGitStatus, GIT_STATUS_SAVE_DEBOUNCE_MS);
 
         this.initializeCollectionsSearch();
         this.initializeGitBranchRefresh();
@@ -97,6 +107,7 @@ export class CollectionController {
     /** @returns {void} */
     initializeGitBranchRefresh() {
         window.addEventListener('focus', this.refreshGitBranches);
+        window.addEventListener('focus', this.refreshGitStatus);
     }
 
     /** @returns {Promise<void>} */
@@ -116,10 +127,28 @@ export class CollectionController {
                 return;
             }
             this.renderer.updateGitBadges(branches);
+            this.renderer.updateGitStatus(this.gitStatus);
         } catch (error) {
             return;
         } finally {
             this.gitRefreshInFlight = false;
+        }
+    }
+
+    /** @returns {Promise<void>} */
+    async refreshGitStatus() {
+        if (this.gitStatusInFlight) {
+            return;
+        }
+        this.gitStatusInFlight = true;
+
+        try {
+            this.gitStatus = await this.repository.gitStatus();
+            this.renderer.updateGitStatus(this.gitStatus);
+        } catch (error) {
+            return;
+        } finally {
+            this.gitStatusInFlight = false;
         }
     }
 
@@ -175,6 +204,7 @@ export class CollectionController {
             await this._refreshLoadErrors();
             await this.renderCollections(this.allCollections, preserveExpansionState);
             this._collectionEvents.emit(this.allCollections);
+            void this.refreshGitStatus();
             return this.allCollections;
         } catch (error) {
             return [];
@@ -214,6 +244,7 @@ export class CollectionController {
             onRemove: (error) => this.handleRemoveMissingCollection(error),
             onRetry: () => this.loadCollectionsWithExpansionState()
         });
+        this.renderer.updateGitStatus(this.gitStatus);
     }
 
     initializeCollectionsSearch() {
@@ -299,12 +330,18 @@ export class CollectionController {
     }
 
     endpointMatchesQuery(endpoint, query) {
+        const tags = normalizeTags(endpoint.tags);
+        if (query.startsWith('tag:')) {
+            const wanted = query.slice(4).trim();
+            return wanted !== '' && tags.some(tag => tag.toLowerCase() === wanted);
+        }
         return [
             endpoint.name,
             endpoint.path,
             endpoint.method,
             endpoint.summary,
-            endpoint.description
+            endpoint.description,
+            ...tags
         ].some(value => this.matchesSearchQuery(value, query));
     }
 
@@ -434,6 +471,12 @@ export class CollectionController {
                 translationKey: 'context_menu.rename_request',
                 iconClass: ContextMenu.createRenameIcon(),
                 onClick: () => this.handleRenameRequest(collection, endpoint)
+            },
+            {
+                label: 'Edit Tags…',
+                translationKey: 'context_menu.edit_tags',
+                iconClass: ContextMenu.createRenameIcon(),
+                onClick: () => this.handleEditTags(collection, endpoint)
             },
             {
                 label: 'Duplicate Request',
@@ -1085,6 +1128,27 @@ export class CollectionController {
      * @param {Object} endpoint
      * @returns {Promise<void>}
      */
+    async handleEditTags(collection, endpoint) {
+        try {
+            const current = normalizeTags(endpoint.tags);
+            const tags = await this.editTagsDialog.show(current, {
+                title: translate('endpoint.tags_title', 'Edit Tags'),
+                label: translate('endpoint.tags_label', 'Tags (comma-separated):'),
+                confirmText: translate('common.save', 'Save')
+            });
+            if (!tags || tags.join('\u0000') === current.join('\u0000')) {
+                return;
+            }
+            await this.service.setRequestTags(collection.id, endpoint.id, tags);
+            await this.loadCollectionsWithExpansionState();
+        } catch {}
+    }
+
+    /**
+     * @param {Object} collection
+     * @param {Object} endpoint
+     * @returns {Promise<void>}
+     */
     async handleDeleteRequest(collection, endpoint) {
         const confirmed = await this.confirmDialog.show(
             translate(
@@ -1137,6 +1201,7 @@ export class CollectionController {
      */
     async saveRequestBodyModification(collectionId, endpointId) {
         await this.requestPersistenceService.saveRequestBodyModification(collectionId, endpointId);
+        this._debouncedGitStatusRefresh();
     }
 
     /**
@@ -1146,6 +1211,7 @@ export class CollectionController {
      */
     async saveAllRequestModifications(collectionId, endpointId) {
         await this.requestPersistenceService.saveAllRequestModifications(collectionId, endpointId);
+        this._debouncedGitStatusRefresh();
     }
 
     /**

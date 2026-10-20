@@ -162,10 +162,7 @@ pub fn prepare(
     };
     let body = body(&template.body, method, processor, &vars)?;
     let settings = &context.settings;
-    let timeout = settings
-        .request_timeout
-        .or(settings.timeout)
-        .unwrap_or(30000);
+    let timeout = settings.request_timeout.unwrap_or(30000);
     let timeout = (timeout != 0).then_some(timeout);
     let mut request = json!({"protocol":template.protocol,"method":method,"url":url,"rawUrl":raw,"headers":headers,"pathParams":paths,"queryParams":rows.into_iter().map(|(k,v)|(k,Value::String(v))).collect::<Map<_,_>>(),"body":body,
         "bodyType":if matches!(template.body.mode.as_str(),"text"|"formdata"|"urlencoded"|"binary") {Some(template.body.mode.clone())} else {None},

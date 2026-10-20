@@ -392,6 +392,7 @@ fn convert_request(request: &Value) -> Endpoint {
             .and_then(|d| d.as_str())
             .filter(|d| !d.is_empty())
             .map(|s| s.to_string()),
+        tags: Vec::new(),
         parameters: convert_parameters(request),
         request_body,
         responses: None,

@@ -3,9 +3,11 @@
  * @module storage/runnerDoc
  */
 
+import { normalizeTags, isEmptyTagFilter } from '../utils/requestTags.js';
+
 /**
  * @param {Object|null|undefined} options
- * @returns {{stopOnError: boolean, delayMs: number, iterations: number, maxExecutionsPerIteration?: number, dataFile: ({path: string, name: string}|null)}}
+ * @returns {{stopOnError: boolean, delayMs: number, iterations: number, maxExecutionsPerIteration?: number, dataFile: ({path: string, name: string}|null), tags?: {include: Array<string>, exclude: Array<string>}}}
  */
 export function normalizeRunnerOptions(options) {
     const source = options || {};
@@ -20,6 +22,10 @@ export function normalizeRunnerOptions(options) {
     const limit = Number(source.maxExecutionsPerIteration);
     if (Number.isFinite(limit) && limit > 0) {
         normalized.maxExecutionsPerIteration = limit;
+    }
+    const tags = { include: normalizeTags(source.tags?.include), exclude: normalizeTags(source.tags?.exclude) };
+    if (!isEmptyTagFilter(tags)) {
+        normalized.tags = tags;
     }
     return normalized;
 }

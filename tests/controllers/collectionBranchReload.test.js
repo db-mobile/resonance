@@ -5,7 +5,8 @@ describe('CollectionController.refreshGitBranches', () => {
         gitRefreshInFlight: false,
         allCollections: [{ id: 'c1', gitBranch: 'main' }, { id: 'c2', gitBranch: null }],
         repository: { gitBranches: jest.fn().mockResolvedValue(branches) },
-        renderer: { updateGitBadges: jest.fn() },
+        gitStatus: { c1: { changes: 1, requests: {} } },
+        renderer: { updateGitBadges: jest.fn(), updateGitStatus: jest.fn() },
         loadCollectionsWithExpansionState: jest.fn().mockResolvedValue([])
     });
 
@@ -25,6 +26,7 @@ describe('CollectionController.refreshGitBranches', () => {
 
         expect(fake.loadCollectionsWithExpansionState).not.toHaveBeenCalled();
         expect(fake.renderer.updateGitBadges).toHaveBeenCalledWith({ c1: 'main' });
+        expect(fake.renderer.updateGitStatus).toHaveBeenCalledWith(fake.gitStatus);
         expect(fake.gitRefreshInFlight).toBe(false);
     });
 });

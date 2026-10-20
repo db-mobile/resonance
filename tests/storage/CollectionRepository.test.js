@@ -235,7 +235,7 @@ describe('CollectionRepository', () => {
             mockBackendAPI.collections.save.mockResolvedValue();
         });
 
-        test('replaces the legacy tree and preserves metadata', async () => {
+        test('replaces the tree and preserves metadata', async () => {
             const result = await repository.saveTree('col_1', {
                 endpoints: [{ id: 'e2' }],
                 folders: [{ id: 'f1', endpoints: [] }]
@@ -244,14 +244,6 @@ describe('CollectionRepository', () => {
             expect(result.name).toBe('Test');
             expect(result.endpoints).toEqual([{ id: 'e2' }]);
             expect(result.folders).toEqual([{ id: 'f1', endpoints: [] }]);
-        });
-
-        test('replaces a nested items tree', async () => {
-            const items = [{ type: 'request', id: 'r1' }];
-
-            const result = await repository.saveTree('col_1', { items });
-
-            expect(result.items).toEqual(items);
         });
 
         test('leaves fields the caller omitted untouched', async () => {

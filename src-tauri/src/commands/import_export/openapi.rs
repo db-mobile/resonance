@@ -2,6 +2,7 @@
 
 use super::common::{grouped_params, unique_folder_id};
 use super::{Collection, Endpoint, Folder, VariableEntry};
+use resonance_core::tags::normalize;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -131,6 +132,11 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
                             .get("description")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string()),
+                        tags: operation
+                            .get("tags")
+                            .and_then(Value::as_array)
+                            .map(|tags| normalize(tags.iter().filter_map(Value::as_str)))
+                            .unwrap_or_default(),
                         parameters: parse_parameters(operation.get("parameters"), &spec),
                         request_body: extract_openapi_request_body(
                             operation.get("requestBody"),
@@ -823,6 +829,28 @@ mod tests {
             .find(|e| e.path == "/access-tokens")
             .unwrap();
         assert!(open.security.is_none());
+    }
+
+    #[test]
+    fn operation_tags_are_normalized_onto_the_endpoint() {
+        let mut spec = operation_security_spec();
+        spec["paths"]["/company-users"]["get"]["tags"] = json!(["Pets", "pets", " ", " Smoke "]);
+        let collection = parse_openapi_spec(spec).unwrap();
+
+        let tagged = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/company-users")
+            .unwrap();
+        assert_eq!(tagged.tags, vec!["Pets".to_string(), "Smoke".to_string()]);
+        let untagged = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/access-tokens")
+            .unwrap();
+        assert!(untagged.tags.is_empty());
+        let wire = serde_json::to_value(untagged).unwrap();
+        assert!(wire.get("tags").is_none());
     }
 
     #[test]

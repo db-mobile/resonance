@@ -4,7 +4,7 @@ import { endpointKey } from '../../src/modules/collections/collectionTree.js';
 const ROUTED = [
     'handleNewRequest', 'handleNewFolder', 'handleRunRequests', 'handleVariables', 'handleCollectionAuth',
     'handleExportOpenApiJson', 'handleExportOpenApiYaml', 'handleExportPostman', 'handleGenerateDocumentation',
-    'handleRename', 'handleReveal', 'handleClose', 'handleDelete', 'handleTogglePinned', 'handleRenameRequest', 'handleDuplicateRequest',
+    'handleRename', 'handleReveal', 'handleClose', 'handleDelete', 'handleTogglePinned', 'handleRenameRequest', 'handleEditTags', 'handleDuplicateRequest',
     'handleMoveRequest', 'handleDeleteRequest', 'handleRenameFolder', 'handleFolderAuth', 'handleDeleteFolder',
     'handleNewCollection', 'handleNewRequestInEmptySpace'
 ];
@@ -66,11 +66,13 @@ describe('request context menu', () => {
         await controller.handleEndpointContextMenu(event(), collection, endpoint);
 
         expect(keysOf(controller)).toEqual([
-            'context_menu.pin_request', 'context_menu.rename_request', 'context_menu.duplicate_request',
+            'context_menu.pin_request', 'context_menu.rename_request', 'context_menu.edit_tags', 'context_menu.duplicate_request',
             'context_menu.move_request', 'context_menu.delete_request'
         ]);
         click(controller, 'context_menu.pin_request');
         expect(controller.handleTogglePinned).toHaveBeenCalledWith(collection, endpoint);
+        click(controller, 'context_menu.edit_tags');
+        expect(controller.handleEditTags).toHaveBeenCalledWith(collection, endpoint);
         click(controller, 'context_menu.move_request');
         expect(controller.handleMoveRequest).toHaveBeenCalledWith(collection, endpoint);
         click(controller, 'context_menu.delete_request');
@@ -83,7 +85,7 @@ describe('request context menu', () => {
         await controller.handleEndpointContextMenu(event(), { ...collection, folders: [] }, endpoint);
 
         expect(keysOf(controller)).toEqual([
-            'context_menu.unpin_request', 'context_menu.rename_request', 'context_menu.duplicate_request', 'context_menu.delete_request'
+            'context_menu.unpin_request', 'context_menu.rename_request', 'context_menu.edit_tags', 'context_menu.duplicate_request', 'context_menu.delete_request'
         ]);
     });
 });

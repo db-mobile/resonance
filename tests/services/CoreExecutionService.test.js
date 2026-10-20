@@ -220,6 +220,31 @@ test('captures raw templates, duplicate query rows, and independent duplicate qu
     expect(b.queryRows[0].value).toBe('a');
 });
 
+test('captureRun keeps only queue entries whose live request tags pass the runner filter', async () => {
+    const { service } = setup();
+    const tagsById = { smoke: ['Smoke'], slow: ['smoke', 'slow'], plain: [] };
+    service.captureContext = jest.fn(async () => ({ environment: {} }));
+    service.captureTarget = jest.fn(async (collectionId, endpointId) => ({
+        ...target,
+        endpoint: { ...target.endpoint, id: endpointId, tags: tagsById[endpointId] }
+    }));
+    const runner = (tags) => ({
+        collectionId: 'c',
+        requests: Object.keys(tagsById).map((id) => ({ collectionId: 'c', endpointId: id, name: id })),
+        options: { tags }
+    });
+
+    const filtered = await service.captureRun(runner({ include: ['SMOKE'], exclude: ['slow'] }));
+    expect(filtered.requests.map((r) => r.name)).toEqual(['smoke']);
+    const excluded = await service.captureRun(runner({ exclude: ['slow'] }));
+    expect(excluded.requests.map((r) => r.name)).toEqual(['smoke', 'plain']);
+    const unfiltered = await service.captureRun(runner({ include: [], exclude: [] }));
+    expect(unfiltered.requests).toHaveLength(3);
+    await expect(service.captureRun(runner({ include: ['nightly'] }))).rejects.toThrow(
+        'No queued request matches the tag filter'
+    );
+});
+
 test('cleared body overrides stay empty and missing targets remain per-entry errors', () => {
     expect(captureRunnerEntry({ overrides: { body: '' } }, target).body.content).toBe('');
     expect(captureRunnerEntry({ endpointId: 'missing' }, { ...target, endpoint: null }).captureError.code).toBe(

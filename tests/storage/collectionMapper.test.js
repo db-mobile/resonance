@@ -124,50 +124,6 @@ describe('round trip', () => {
     });
 });
 
-describe('the nested items shape', () => {
-    const treeFixture = () => ({
-        id: 'collection_1',
-        name: 'Petstore',
-        items: [
-            { type: 'request', id: 'r1', name: 'Health' },
-            {
-                type: 'folder',
-                id: 'f1',
-                name: 'pets',
-                items: [
-                    { type: 'request', id: 'r2', name: 'List Pets' },
-                    { type: 'folder', id: 'f2', name: 'admin', items: [] }
-                ]
-            }
-        ]
-    });
-
-    test('fromWire passes a tree through without grafting legacy arrays onto it', () => {
-        const collection = fromWire(treeFixture());
-
-        expect(collection).toEqual(treeFixture());
-        expect(collection).not.toHaveProperty('endpoints');
-        expect(collection).not.toHaveProperty('folders');
-    });
-
-    test('toWire strips the search-expand marker from a nested folder', () => {
-        const collection = treeFixture();
-        collection.items[1].items[1].__searchExpand = true;
-
-        const wire = toWire(collection);
-        expect(wire.items[1].items[1]).not.toHaveProperty('__searchExpand');
-    });
-
-    test('toWire leaves request nodes untouched', () => {
-        const wire = toWire(treeFixture());
-        expect(wire.items[0]).toEqual({ type: 'request', id: 'r1', name: 'Health' });
-    });
-
-    test('round-trips unchanged', () => {
-        expect(toWire(fromWire(treeFixture()))).toEqual(treeFixture());
-    });
-});
-
 describe('the linked flag', () => {
     test('survives a round trip so the menu can swap Delete for Close', () => {
         const wire = { id: 'c1', name: 'Cloned', linked: true };

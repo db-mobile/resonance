@@ -76,6 +76,8 @@ pub struct Endpoint {
     pub method: String,
     pub path: String,
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// Parameters grouped by location: { path: {...}, query: {...}, header: {...} }
     pub parameters: Option<Value>,
     pub request_body: Option<Value>,

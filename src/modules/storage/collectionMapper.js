@@ -34,33 +34,12 @@ function folderToWire(folder) {
 }
 
 /**
- * @param {Array} items
- * @returns {Array}
- */
-function itemsToWire(items) {
-    return items.map(item => {
-        if (item?.type !== 'folder') {
-            return item;
-        }
-        const folder = withoutTransients(item);
-        if (Array.isArray(folder.items)) {
-            folder.items = itemsToWire(folder.items);
-        }
-        return folder;
-    });
-}
-
-/**
  * @param {Object|null|undefined} wire
  * @returns {Object|null}
  */
 export function fromWire(wire) {
     if (!wire) {
         return null;
-    }
-
-    if (Array.isArray(wire.items)) {
-        return { ...wire };
     }
 
     return {
@@ -80,9 +59,6 @@ export function toWire(collection) {
     }
 
     const wire = withoutTransients(collection);
-    if (Array.isArray(wire.items)) {
-        wire.items = itemsToWire(wire.items);
-    }
     if (Array.isArray(wire.folders)) {
         wire.folders = wire.folders.map(folderToWire);
     }

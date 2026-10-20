@@ -13,6 +13,7 @@ pub struct RequestListing<'a> {
     pub method: String,
     pub name: &'a str,
     pub id: &'a str,
+    pub tags: &'a [String],
     pub entry: &'a RequestEntry,
 }
 
@@ -41,6 +42,7 @@ pub fn list(loaded: &LoadedCollection) -> Vec<RequestListing<'_>> {
             method: entry.doc.method.clone().unwrap_or_default(),
             name: &entry.doc.name,
             id: &entry.doc.id,
+            tags: &entry.doc.tags,
             entry,
         })
         .collect()

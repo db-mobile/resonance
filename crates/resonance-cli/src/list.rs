@@ -30,7 +30,7 @@ pub fn list(args: ListArgs, out: &mut dyn Write) -> Result<(), CliError> {
     if args.json {
         let value = json!({
             "collection": {"id": loaded.meta.id, "name": loaded.meta.name},
-            "requests": requests.iter().map(|r| json!({"path": r.path, "method": r.method, "name": r.name, "id": r.id})).collect::<Vec<_>>(),
+            "requests": requests.iter().map(|r| json!({"path": r.path, "method": r.method, "name": r.name, "id": r.id, "tags": r.tags})).collect::<Vec<_>>(),
             "runners": runners.iter().map(|(stem, entry)| json!({"file": format!("runners/{stem}.yaml"), "name": entry.doc.name, "id": entry.doc.id, "requests": entry.doc.requests.len()})).collect::<Vec<_>>(),
         });
         let _ = writeln!(
@@ -48,13 +48,19 @@ pub fn list(args: ListArgs, out: &mut dyn Write) -> Result<(), CliError> {
     }
     let width = requests.iter().map(|r| r.method.len()).max().unwrap_or(0);
     for request in &requests {
+        let tags = if request.tags.is_empty() {
+            String::new()
+        } else {
+            format!("  [{}]", request.tags.join(", "))
+        };
         let _ = writeln!(
             out,
-            "  {:<width$}  {}  {}  ({})",
+            "  {:<width$}  {}  {}  ({}){}",
             request.method,
             request.path,
             request.name,
             request.id,
+            tags,
             width = width
         );
     }
