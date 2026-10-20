@@ -1585,6 +1585,7 @@ pub async fn collections_git_status(
             None => git::CollectionGitStatus {
                 changes: status.changes.len(),
                 requests: HashMap::new(),
+                folders: HashMap::new(),
             },
         };
         statuses.insert(collection_id, entry);

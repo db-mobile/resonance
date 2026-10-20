@@ -2,9 +2,10 @@
 //! collection lives in.
 //!
 //! Collections opened in place usually sit in a checkout, so the sidebar shows
-//! which branch each one is on and which files differ from the index. All of
-//! that comes from reading `.git` files directly, which is why there is no Git
-//! library here: `git2` would pull in libgit2 and `openssl-sys`, and this app
+//! which branch each one is on and which files differ from the index, with
+//! folders rolling up the changes below them. All of that comes from reading
+//! `.git` files directly, which is why there is no Git library here: `git2`
+//! would pull in libgit2 and `openssl-sys`, and this app
 //! is deliberately rustls-only. Reading the files directly also cannot be
 //! talked into running hooks or config-declared filters from a repository the
 //! user has only just opened.

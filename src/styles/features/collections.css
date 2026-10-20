@@ -92,6 +92,7 @@
 }
 
 .collection-git-dirty,
+.folder-git-dirty,
 .endpoint-git-marker {
   flex-shrink: 0;
   width: 6px;

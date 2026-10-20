@@ -116,6 +116,17 @@ describe('collection tree rendering with folders and root-level requests', () =>
             expect(nested).not.toBeNull();
         });
 
+        test('folder rows carry their collection id', () => {
+            const folderDiv = renderer.createFolderElement(
+                nestedCollection.folders[0],
+                nestedCollection,
+                {}
+            );
+
+            expect(folderDiv.dataset.collectionId).toBe('c1');
+            expect(folderDiv.querySelector('.folder-item[data-folder-id="inner"]').dataset.collectionId).toBe('c1');
+        });
+
         test('a request in a nested folder is rendered', () => {
             const folderDiv = renderer.createFolderElement(
                 nestedCollection.folders[0],
