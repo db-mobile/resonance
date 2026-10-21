@@ -1,0 +1,19 @@
+# Advisories `cargo audit` (CI security job) may not fail on. Every entry
+# needs a reason and a condition for removing it.
+[advisories]
+ignore = [
+    # rustls-webpki 0.102 is pulled in by rumqttc 0.25, which uses it only for
+    # a `From<webpki::Error>` conversion in its error type and never for
+    # verification: Resonance passes rumqttc its own rustls 0.23 ClientConfig
+    # (rustls-webpki 0.103, patched) via `Transport::tls_with_config`. Drop
+    # these once rumqttc depends on rustls-webpki >= 0.103.16.
+    "RUSTSEC-2026-0049",
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+    "RUSTSEC-2026-0382",
+    # fast-float 0.2 is Boa 0.19's number parser and has no fixed release.
+    # Boa 0.20+ switched to the maintained fast-float2 fork; drop this with
+    # the Boa upgrade.
+    "RUSTSEC-2025-0003",
+]
