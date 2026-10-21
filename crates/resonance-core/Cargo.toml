@@ -34,7 +34,7 @@ sha1.workspace = true
 hmac = "0.12"
 hex.workspace = true
 ntlmclient = "0.2"
-boa_engine = "0.19"
+boa_engine = "0.20"
 
 [dev-dependencies]
 axum.workspace = true
