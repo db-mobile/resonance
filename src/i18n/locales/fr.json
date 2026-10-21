@@ -356,8 +356,7 @@
   "theme": {
     "light": "Clair",
     "dark": "Sombre",
-    "system": "Système",
-    "black": "Noir (OLED)"
+    "system": "Système"
   },
   "http_version": {
     "auto": "Automatique",

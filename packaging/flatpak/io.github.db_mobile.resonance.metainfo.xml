@@ -17,25 +17,22 @@
     </p>
     <p>Key Features:</p>
     <ul>
-      <li>Import collections from OpenAPI 3.0 specifications and Postman collections</li>
-      <li>Environment management with variable templating for different deployment contexts</li>
-      <li>Multiple authentication methods including Bearer tokens, Basic Auth, API keys, OAuth 2.0, Digest and AWS Signature authentication</li>
-      <li>Generate code snippets in 9 languages: cURL, Python, JavaScript (Fetch), JavaScript (Axios), Node.js, Go, PHP, Ruby, and Java</li>
-      <li>GraphQL support with dedicated query editor and syntax highlighting</li>
-      <li>gRPC support for exploring and testing gRPC services</li>
-      <li>WebSocket support with persistent connections and handshake headers</li>
-      <li>Server-Sent Events (SSE) support with automatic reconnection</li>
-      <li>MQTT support with topic subscribe/publish, QoS levels, and TLS brokers</li>
-      <li>Collection runner for batch request execution with variable chaining between requests</li>
-      <li>Built-in mock server for testing without a backend, with custom responses and configurable delays</li>
-      <li>Workspace tabs for managing multiple concurrent requests with independent state</li>
-      <li>Request history with search and replay capability for easy debugging</li>
-      <li>Performance metrics showing detailed timing breakdown including DNS, TCP, TLS, and download times</li>
-      <li>Cookie management with full attribute display</li>
-      <li>HTTP proxy support with authentication and bypass lists</li>
-      <li>Protocol version control supporting HTTP/1.1, HTTP/2, and HTTP/3</li>
-      <li>Comprehensive keyboard shortcuts for efficient workflow</li>
-      <li>Four theme options: light, dark, system-adaptive, and black (OLED)</li>
+      <li>REST/HTTP (HTTP/1.1 and HTTP/2) with all body modes, detailed timing breakdown and cookie display</li>
+      <li>GraphQL with query and variables editors, schema introspection, an interactive query explorer and subscriptions over WebSocket</li>
+      <li>gRPC with server reflection, local .proto files, all four RPC kinds and TLS/mTLS</li>
+      <li>WebSocket, Server-Sent Events and MQTT connections with live status</li>
+      <li>Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI and Postman</li>
+      <li>Code generation in 9 languages and Markdown/HTML documentation generation</li>
+      <li>Built-in mock server with response templating, custom bodies, status codes and delays</li>
+      <li>Pre-request and test scripts in sandboxed JavaScript with a Postman-compatible pm API</li>
+      <li>Collection runner with data files, request tags, run history and JSON/JUnit XML reports</li>
+      <li>Response schema validation (JSON Schema drafts 4 to 2020-12) and JSONPath/XPath inspection</li>
+      <li>Environments with variable templating and dynamic variables</li>
+      <li>Bearer, Basic, API key, OAuth 2.0 with automatic refresh, Digest, NTLM and AWS Signature v4 authentication</li>
+      <li>Client certificates (mTLS), keychain-backed secrets and HTTP/HTTPS/SOCKS proxy support</li>
+      <li>Git-friendly collections stored as plain files, with the current branch shown in the sidebar</li>
+      <li>Workspace tabs, request history with search and replay, and keyboard shortcuts for everything</li>
+      <li>Light, dark and system themes with 9 accent colours</li>
       <li>Available in English, German, Spanish, French, Italian and Portuguese (BR)</li>
     </ul>
   </description>

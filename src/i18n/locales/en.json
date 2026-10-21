@@ -364,8 +364,7 @@
   "theme": {
     "light": "Light",
     "dark": "Dark",
-    "system": "System",
-    "black": "Black (OLED)"
+    "system": "System"
   },
   "layout": {
     "stacked": "Stacked",

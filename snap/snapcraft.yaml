@@ -8,22 +8,22 @@ description: |
   an excellent user experience for testing and interacting with web services.
 
   Features:
-  - Import collections from OpenAPI 3.0 specifications and Postman collections
-  - Environment management with variable templating
-  - Multiple authentication methods (Bearer, Basic, API keys, OAuth 2.0, Digest, AWS Signature)
-  - Code generation in 9 languages
-  - GraphQL support with dedicated query editor
-  - gRPC support with server reflection
-  - WebSocket support with persistent connections and handshake headers
-  - Server-Sent Events (SSE) support with automatic reconnection
-  - MQTT support with topic subscribe/publish, QoS levels, and TLS brokers
-  - Collection runner for batch request execution with variable chaining
-  - Built-in mock server for testing
-  - Workspace tabs for managing multiple concurrent requests
-  - Request history with search and replay
-  - Performance metrics with detailed timing breakdown
-  - HTTP proxy support
-  - Four theme options: light, dark, system-adaptive, and black (OLED)
+  - REST/HTTP (HTTP/1.1 and HTTP/2) with all body modes, detailed timing breakdown and cookie display
+  - GraphQL with query and variables editors, schema introspection, an interactive query explorer and subscriptions over WebSocket
+  - gRPC with server reflection, local .proto files, all four RPC kinds and TLS/mTLS
+  - WebSocket, Server-Sent Events and MQTT connections with live status
+  - Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI and Postman
+  - Code generation in 9 languages and Markdown/HTML documentation generation
+  - Built-in mock server with response templating, custom bodies, status codes and delays
+  - Pre-request and test scripts in sandboxed JavaScript with a Postman-compatible pm API
+  - Collection runner with data files, request tags, run history and JSON/JUnit XML reports
+  - Response schema validation (JSON Schema drafts 4 to 2020-12) and JSONPath/XPath inspection
+  - Environments with variable templating and dynamic variables
+  - Bearer, Basic, API key, OAuth 2.0 with automatic refresh, Digest, NTLM and AWS Signature v4 authentication
+  - Client certificates (mTLS), keychain-backed secrets and HTTP/HTTPS/SOCKS proxy support
+  - Git-friendly collections stored as plain files, with the current branch shown in the sidebar
+  - Workspace tabs, request history with search and replay, and keyboard shortcuts for everything
+  - Light, dark and system themes with 9 accent colours
   - Available in English, German, Spanish, French, Italian and Portuguese (BR)
 
 grade: stable
@@ -96,8 +96,6 @@ parts:
       - curl
       - wget
       - file
-      - libssl-dev
-      - libayatana-appindicator3-dev
       - librsvg2-dev
       - libwebkit2gtk-4.1-dev
       - build-essential
@@ -105,8 +103,6 @@ parts:
       - dpkg
     stage-packages:
       - libwebkit2gtk-4.1-0
-      - libayatana-appindicator3-1
-      - libssl3
       - libproxy1v5
     source: .
     override-build: |
