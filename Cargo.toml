@@ -46,7 +46,7 @@ hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 tower = { version = "0.5", features = ["util"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-webpki-roots = "0.26"
+webpki-roots = "1.0"
 rustls-pemfile = "2"
 
 serde = { version = "1", features = ["derive"] }
