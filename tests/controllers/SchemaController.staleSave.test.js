@@ -21,8 +21,7 @@ describe('SchemaController stale-context saves', () => {
         });
         editor = {
             getSchema: jest.fn(() => ({ marker: 'schema-A' })),
-            setSchema: jest.fn(),
-            isValidJson: jest.fn(() => true)
+            setSchema: jest.fn()
         };
         controller.editor = editor;
         controller._initialized = true;

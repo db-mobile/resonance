@@ -5,7 +5,7 @@ jest.mock('../src/modules/state/currentEndpoint.js', () => ({
 jest.mock('../src/modules/appContext.js', () => ({ app: {} }));
 jest.mock('../src/modules/ui/mirroredUrlSection.js', () => ({ notifyUrlUpdated: jest.fn() }));
 
-const { normalizeKeyValueRows, activeKeyValueRows } = require('../src/modules/utils/keyValueRows.js');
+const { normalizeKeyValueRows } = require('../src/modules/utils/keyValueRows.js');
 
 const { document, window } = globalThis;
 
@@ -58,16 +58,6 @@ describe('normalizeKeyValueRows', () => {
     test('treats missing data as no rows', () => {
         expect(normalizeKeyValueRows(null)).toEqual([]);
         expect(normalizeKeyValueRows(undefined)).toEqual([]);
-    });
-});
-
-describe('activeKeyValueRows', () => {
-    test('drops disabled and keyless rows', () => {
-        expect(activeKeyValueRows([
-            { key: 'a', value: '1' },
-            { key: 'b', value: '2', enabled: false },
-            { key: '', value: '3' }
-        ])).toEqual([{ key: 'a', value: '1', enabled: true }]);
     });
 });
 

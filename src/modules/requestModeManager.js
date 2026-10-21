@@ -20,11 +20,6 @@ export function getCurrentMode() {
 }
 
 /** @returns {boolean} */
-export function isGrpcMode() {
-    return currentMode === RequestMode.GRPC;
-}
-
-/** @returns {boolean} */
 export function isGraphQLMode() {
     return currentMode === RequestMode.GRAPHQL;
 }

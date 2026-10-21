@@ -85,21 +85,6 @@ export class SchemaEditor extends BaseCodeEditor {
         }
     }
 
-    /** @returns {boolean} */
-    isValidJson() {
-        const value = this.getContent().trim();
-        if (!value) {
-            return true;
-        }
-
-        try {
-            JSON.parse(value);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
     clear() {
         this.setContent('');
     }

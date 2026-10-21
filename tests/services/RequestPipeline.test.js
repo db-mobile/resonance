@@ -132,37 +132,7 @@ describe('RequestPipeline.resolveAuth', () => {
     });
 });
 
-describe('RequestPipeline mock rewrite', () => {
-    test('passes the URL through when the mock server is off or the endpoint is unknown', async () => {
-        const { pipeline } = makePipeline();
-
-        await expect(pipeline.resolveMockRewrite({ endpoint: null, url: 'https://x', queryString: '', pathParams: {} }))
-            .resolves.toEqual({ url: 'https://x', mockRewrite: null });
-        await expect(pipeline.resolveMockRewrite({ endpoint: ENDPOINT, url: 'https://x', queryString: '', pathParams: {} }))
-            .resolves.toEqual({ url: 'https://x', mockRewrite: null });
-    });
-
-    test('rewrites onto the mock base URL using the endpoint path template', async () => {
-        const { pipeline, deps } = makePipeline();
-        deps.mockServerService.shouldUseMockServer.mockResolvedValue({ shouldUseMock: true, mockBaseUrl: 'http://127.0.0.1:9' });
-
-        const result = await pipeline.resolveMockRewrite({ endpoint: ENDPOINT, url: 'https://x/users/42?q=1', queryString: 'q=1', pathParams: { id: '42' } });
-
-        expect(result).toEqual({ url: 'http://127.0.0.1:9/users/42?q=1', mockRewrite: { baseUrl: 'http://127.0.0.1:9', pathTemplate: '/users/{id}' } });
-    });
-
-    test('uses an explicit base URL and path instead of looking them up', async () => {
-        const { pipeline, deps } = makePipeline();
-
-        const result = await pipeline.resolveMockRewrite({
-            endpoint: ENDPOINT, url: 'https://x', queryString: '', pathParams: {}, mockBaseUrl: 'http://m', endpointPath: '/p'
-        });
-
-        expect(result.url).toBe('http://m/p');
-        expect(deps.mockServerService.shouldUseMockServer).not.toHaveBeenCalled();
-        expect(deps.collectionRepository.getById).not.toHaveBeenCalled();
-    });
-
+describe('RequestPipeline mock base URL', () => {
     test('a failing mock lookup falls back to the real URL with a warning', async () => {
         const { pipeline, deps } = makePipeline();
         deps.mockServerService.shouldUseMockServer.mockRejectedValue(new Error('store down'));

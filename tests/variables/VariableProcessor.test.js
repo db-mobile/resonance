@@ -221,29 +221,6 @@ describe('VariableProcessor', () => {
         });
     });
 
-    describe('extractVariableNamesFromObject', () => {
-        test('should extract from nested objects', () => {
-            const obj = {
-                url: 'https://{{ host }}/{{ path }}',
-                headers: {
-                    'Authorization': 'Bearer {{ token }}'
-                },
-                params: ['{{ param1 }}', '{{ param2 }}']
-            };
-            const result = processor.extractVariableNamesFromObject(obj);
-            expect(result.sort()).toEqual(['host', 'path', 'token', 'param1', 'param2'].sort());
-        });
-
-        test('should handle empty object', () => {
-            expect(processor.extractVariableNamesFromObject({})).toEqual([]);
-        });
-
-        test('should handle null/undefined', () => {
-            expect(processor.extractVariableNamesFromObject(null)).toEqual([]);
-            expect(processor.extractVariableNamesFromObject(undefined)).toEqual([]);
-        });
-    });
-
     describe('extractUnresolvedVariableNames', () => {
         test('should report static names missing from the variables map', () => {
             const result = processor.extractUnresolvedVariableNames('{{host}}/{{path}}', { host: 'h' });
@@ -304,90 +281,6 @@ describe('VariableProcessor', () => {
             expect(processor.isValidVariableName('')).toBe(false);
             expect(processor.isValidVariableName(null)).toBe(false);
             expect(processor.isValidVariableName(undefined)).toBe(false);
-        });
-    });
-
-    describe('getPreview', () => {
-        test('should provide preview with missing variables', () => {
-            const template = 'Hello {{ name }}! Welcome to {{ place }}.';
-            const variables = { name: 'Alice' };
-            const result = processor.getPreview(template, variables);
-            
-            expect(result.preview).toBe('Hello Alice! Welcome to {{ place }}.');
-            expect(result.missingVariables).toEqual(['place']);
-            expect(result.foundVariables).toEqual(['name']);
-        });
-
-        test('should handle all variables present', () => {
-            const template = 'Hello {{ name }}!';
-            const variables = { name: 'Alice' };
-            const result = processor.getPreview(template, variables);
-            
-            expect(result.preview).toBe('Hello Alice!');
-            expect(result.missingVariables).toEqual([]);
-            expect(result.foundVariables).toEqual(['name']);
-        });
-
-        test('should handle no variables present', () => {
-            const template = 'Hello {{ name }}!';
-            const variables = {};
-            const result = processor.getPreview(template, variables);
-
-            expect(result.preview).toBe('Hello {{ name }}!');
-            expect(result.missingVariables).toEqual(['name']);
-            expect(result.foundVariables).toEqual([]);
-        });
-
-        test('should show placeholders for dynamic variables', () => {
-            const template = 'ID: {{$uuid}} at {{$timestamp}}';
-            const result = processor.getPreview(template, {});
-
-            expect(result.preview).toBe('ID: [uuid] at [timestamp]');
-            expect(result.dynamicVariables).toEqual(['uuid', 'timestamp']);
-        });
-
-        test('should show placeholders with params for parameterized dynamic variables', () => {
-            const template = 'Random: {{$randomInt:1:100}} and {{$randomString:16}}';
-            const result = processor.getPreview(template, {});
-
-            expect(result.preview).toBe('Random: [randomInt:1:100] and [randomString:16]');
-            expect(result.dynamicVariables).toEqual(['randomInt', 'randomString']);
-        });
-
-        test('should handle mixed regular and dynamic variables in preview', () => {
-            const template = 'User {{ name }} has ID {{$uuid}}';
-            const variables = { name: 'Alice' };
-            const result = processor.getPreview(template, variables);
-
-            expect(result.preview).toBe('User Alice has ID [uuid]');
-            expect(result.foundVariables).toEqual(['name']);
-            expect(result.dynamicVariables).toEqual(['uuid']);
-        });
-
-        test('should report variables introduced by nested expansion', () => {
-            const template = '{{a}}';
-            const variables = { a: '{{missing}}' };
-            const result = processor.getPreview(template, variables);
-
-            expect(result.preview).toBe('{{missing}}');
-            expect(result.foundVariables).toEqual(['a']);
-            expect(result.missingVariables).toEqual(['missing']);
-        });
-
-        test('should report dynamic variables introduced by nested expansion', () => {
-            const template = '{{token}}';
-            const variables = { token: 'Bearer {{$uuid}}' };
-            const result = processor.getPreview(template, variables);
-
-            expect(result.preview).toBe('Bearer [uuid]');
-            expect(result.dynamicVariables).toEqual(['uuid']);
-        });
-
-        test('should report missing hyphen/dot names', () => {
-            const template = '{{api-key}} {{base.url}}';
-            const result = processor.getPreview(template, {});
-
-            expect(result.missingVariables.sort()).toEqual(['api-key', 'base.url']);
         });
     });
 

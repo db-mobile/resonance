@@ -26,14 +26,6 @@ export function normalizeKeyValueRows(entries) {
 }
 
 /**
- * @param {Array|Object|null|undefined} entries
- * @returns {Array<{key: string, value: string, enabled: boolean}>}
- */
-export function activeKeyValueRows(entries) {
-    return normalizeKeyValueRows(entries).filter((row) => row.key && row.enabled);
-}
-
-/**
  * @param {Array<{key: string, value: string, enabled: boolean}>} queryRows
  * @param {Object<string, string>} authQueryParams
  * @returns {void}

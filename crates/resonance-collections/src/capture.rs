@@ -20,9 +20,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::address::folder_chain;
-use crate::ipc::{
-    EndpointData, find_request, folder_id, request_to_endpoint, request_to_endpoint_data,
-};
+use crate::ipc::{EndpointData, folder_id, request_to_endpoint, request_to_endpoint_data};
 use crate::load::LoadError;
 use crate::model::{RunnerDoc, RunnerOverrides};
 use crate::read::{LoadedCollection, RequestEntry, folder_display_name};
@@ -603,11 +601,6 @@ pub fn find_runner<'a>(
         })
         .map(|entry| &entry.doc)
         .ok_or_else(|| LoadError::RunnerNotFound(selector.to_string()))
-}
-
-#[allow(dead_code)]
-fn _assert_find_request_reused(loaded: &LoadedCollection) {
-    let _ = find_request(loaded, "");
 }
 
 #[cfg(test)]

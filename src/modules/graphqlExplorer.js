@@ -431,35 +431,6 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
 
 /**
  * @param {string} queryText
- * @returns {Array<{name: string, type: string, required: boolean}>}
- */
-export function getDeclaredVariableDefs(queryText) {
-    const trimmed = (queryText || '').trim();
-    if (!trimmed) {
-        return [];
-    }
-    let doc;
-    try {
-        doc = parse(trimmed);
-    } catch (_e) {
-        return [];
-    }
-    const defs = [];
-    doc.definitions.forEach(def => {
-        if (def.kind !== Kind.OPERATION_DEFINITION) {
-            return;
-        }
-        (def.variableDefinitions || []).forEach(v => defs.push({
-            name: v.variable.name.value,
-            type: print(v.type),
-            required: v.type.kind === Kind.NON_NULL_TYPE
-        }));
-    });
-    return defs;
-}
-
-/**
- * @param {string} queryText
  * @param {string} [operationType]
  * @param {string|null} [operationName]
  * @returns {Set<string>|null}

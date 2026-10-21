@@ -55,16 +55,14 @@ async function loadApiHandler(sendResult) {
     app.workspaceTabController = {
         service: { getActiveTabId: jest.fn().mockResolvedValue('tab-1'), updateTab }
     };
-    const handleCookiesFromResponse = jest.fn();
     app.cookieController = {
-        handleCookiesFromResponse,
         getCookieHeader: jest.fn().mockResolvedValue(null)
     };
 
     setCurrentEndpoint(null);
     document.getElementById('url-input').value = 'https://api.example.com/items';
 
-    return { ...apiHandler, app, updateTab, handleCookiesFromResponse };
+    return { ...apiHandler, app, updateTab };
 }
 
 afterEach(() => {
@@ -98,7 +96,7 @@ describe('HTTP responses of every status are treated as responses', () => {
     });
 
     test('a 500 is saved to the tab with its body and every Set-Cookie header', async () => {
-        const { handleSendRequest, updateTab, handleCookiesFromResponse, app } = await loadApiHandler({
+        const { handleSendRequest, updateTab, app } = await loadApiHandler({
             success: false,
             status: 500,
             statusText: 'Internal Server Error',
@@ -116,7 +114,6 @@ describe('HTTP responses of every status are treated as responses', () => {
         expect(saved.status).toBe(500);
         expect(saved.data).toEqual({ error: 'boom' });
         expect(saved.cookies.map(c => c.name)).toEqual(['a', 'b']);
-        expect(handleCookiesFromResponse).not.toHaveBeenCalled(); // Cookie deltas are persisted by CoreExecutionService.
         expect(document.getElementById('status-display').textContent).toContain('500');
         delete app.workspaceTabController;
         delete app.cookieController;
@@ -140,7 +137,7 @@ describe('HTTP responses of every status are treated as responses', () => {
     });
 
     test('a transport error (no status) is not saved as a response', async () => {
-        const { handleSendRequest, updateTab, handleCookiesFromResponse, app } = await loadApiHandler({
+        const { handleSendRequest, updateTab, app } = await loadApiHandler({
             success: false,
             message: 'connection refused'
         });
@@ -148,7 +145,6 @@ describe('HTTP responses of every status are treated as responses', () => {
         await handleSendRequest();
 
         expect(updateTab).not.toHaveBeenCalled();
-        expect(handleCookiesFromResponse).not.toHaveBeenCalled();
         expect(document.getElementById('status-display').textContent).toContain('Request Failed');
         delete app.workspaceTabController;
         delete app.cookieController;

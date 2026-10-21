@@ -144,14 +144,6 @@ describe('SchemaEditor', () => {
         editor.destroy();
     });
 
-    test('isValidJson treats empty as valid and garbage as invalid', () => {
-        const editor = new SchemaEditor(mount());
-        expect(editor.isValidJson()).toBe(true);
-        editor.setContent('{nope');
-        expect(editor.isValidJson()).toBe(false);
-        editor.destroy();
-    });
-
     test('the onChange option is debounced, not fired synchronously', () => {
         jest.useFakeTimers();
         const onChange = jest.fn();

@@ -49,7 +49,6 @@ async function loadHarness() {
                     urlAtCall: document.getElementById('url-input')?.value ?? ''
                 });
             }),
-            isGrpcMode: () => false,
             isGraphQLMode: () => false,
             getCurrentMode: () => 'http'
         };

@@ -90,27 +90,6 @@ export class VariableProcessor {
         return [...new Set(matches)];
     }
 
-    extractVariableNamesFromObject(obj) {
-        const variableNames = new Set();
-
-        const extractFromValue = (value) => {
-            if (typeof value === 'string') {
-                const names = this.extractVariableNames(value);
-                names.forEach(name => variableNames.add(name));
-            } else if (Array.isArray(value)) {
-                value.forEach(extractFromValue);
-            } else if (value && typeof value === 'object') {
-                Object.keys(value).forEach(key => {
-                    extractFromValue(key);
-                    extractFromValue(value[key]);
-                });
-            }
-        };
-
-        extractFromValue(obj);
-        return Array.from(variableNames);
-    }
-
     /**
      * @param {*} value
      * @param {Object} [variables={}]
@@ -179,53 +158,5 @@ export class VariableProcessor {
         }
 
         return matches;
-    }
-
-    getPreview(template, variables = {}) {
-        const staticNames = new Set();
-        const dynamicNames = new Set();
-
-        let preview = template;
-        for (let pass = 0; pass < this.MAX_RESOLUTION_PASSES; pass++) {
-            this.extractVariableNames(preview).forEach(name => staticNames.add(name));
-            this.extractDynamicVariableNames(preview).forEach(v => dynamicNames.add(v.name));
-
-            const next = this._previewPass(preview, variables);
-            if (next === preview) {
-                break;
-            }
-            preview = next;
-        }
-
-        const variableNames = Array.from(staticNames);
-
-        return {
-            preview,
-            missingVariables: variableNames.filter(name => !(name in variables)),
-            foundVariables: variableNames.filter(name => name in variables),
-            dynamicVariables: Array.from(dynamicNames)
-        };
-    }
-
-    /**
-     * @param {string} input
-     * @param {Object} variables
-     * @returns {string}
-     */
-    _previewPass(input, variables) {
-        const withDynamic = input.replace(this.DYNAMIC_VARIABLE_PATTERN, (match, variableName, params) => {
-            if (this.dynamicGenerator.isDynamicVariable(variableName)) {
-                return this.dynamicGenerator.getPlaceholder(variableName, params || null);
-            }
-            return match;
-        });
-
-        return withDynamic.replace(this.VARIABLE_PATTERN, (match, variableName) => {
-            const value = variables[variableName];
-            if (value !== undefined && value !== null) {
-                return String(value);
-            }
-            return match;
-        });
     }
 }

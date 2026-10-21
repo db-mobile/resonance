@@ -34,23 +34,6 @@ export class CookieController {
     }
 
     /**
-     * @param {string[]} setCookieHeaders
-     * @param {string} requestUrl
-     */
-    async handleCookiesFromResponse(setCookieHeaders, requestUrl) {
-        try {
-            if (!(await this._isJarEnabled())) { return; }
-            await this.service.processCookiesFromResponse(setCookieHeaders, requestUrl, this._activeEnvironmentId);
-        } catch (_e) {
-        }
-    }
-
-    /** @returns {Promise<Array<Object>>} */
-    async getCookiesForScripts() {
-        return this.service.getAll(this._activeEnvironmentId);
-    }
-
-    /**
      * @param {Array<Object>} changes
      * @returns {Promise<void>}
      */
