@@ -15,10 +15,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -34,10 +34,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: '22.x'
         cache: 'npm'
@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
@@ -69,7 +69,7 @@ jobs:
         sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: '22.x'
         cache: 'npm'
@@ -97,10 +97,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: '22.x'
         cache: 'npm'
@@ -153,7 +153,7 @@ jobs:
         done
 
     - name: Upload Linux artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: release-linux-${{ matrix.arch }}
         path: release-artifacts/*
@@ -165,10 +165,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: '22.x'
         cache: 'npm'
@@ -213,7 +213,7 @@ jobs:
         done
 
     - name: Upload Mac artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: release-mac
         path: release-artifacts/*
@@ -233,10 +233,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v7
       with:
         node-version: '22.x'
         cache: 'npm'
@@ -274,7 +274,7 @@ jobs:
         Copy-Item target/${{ matrix.target }}/release/bundle/nsis/*.exe.sig release-artifacts/ -ErrorAction SilentlyContinue
 
     - name: Upload Windows artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: release-windows-${{ matrix.arch }}
         path: release-artifacts/*
@@ -302,7 +302,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install Rust stable
       uses: dtolnay/rust-toolchain@stable
@@ -362,7 +362,7 @@ jobs:
         Compress-Archive -Path "stage/$NAME" -DestinationPath "release-artifacts/$NAME.zip"
 
     - name: Upload command-line artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: release-cli-${{ matrix.target }}
         path: release-artifacts/*
@@ -376,7 +376,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -555,7 +555,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Extract version
       id: get_version
@@ -594,7 +594,7 @@ jobs:
         sed -i "s/X86_64SUM/${{ steps.checksums.outputs.AMD64_SHA }}/" "$PKGBUILD"
         sed -i "s/AARCH64SUM/${{ steps.checksums.outputs.ARM64_SHA }}/" "$PKGBUILD"
 
-    - uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
+    - uses: KSXGitHub/github-actions-deploy-aur@v4.2.0
       with:
         pkgname: resonance-bin
         pkgbuild: ./packaging/aur/resonance-bin/PKGBUILD
@@ -609,7 +609,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Extract version
       id: get_version
