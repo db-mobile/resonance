@@ -7,8 +7,6 @@ import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
 import { ensureFreshOAuthToken, oauthRefreshKey } from '../auth/oauthRefresh.js';
 import { resolveAuthConfigVariables, withBearerFallback } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
-import { findRequest } from '../collections/collectionTree.js';
-import { buildMockPath } from '../collections/endpointUrl.js';
 
 const REQUIRED_DEPS = Object.freeze([
     'backendAPI',
@@ -112,51 +110,6 @@ export class RequestPipeline {
             console.warn('Mock server check failed, sending to the real URL:', error);
             return null;
         }
-    }
-
-    /**
-     * @param {EndpointRef|null} endpoint
-     * @returns {Promise<string|null>}
-     */
-    async endpointPathFor(endpoint) {
-        if (!endpoint?.collectionId) {
-            return null;
-        }
-        try {
-            const collection = await this.collectionRepository.getById(endpoint.collectionId);
-            return collection ? (findRequest(collection, endpoint.endpointId)?.path || null) : null;
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * @param {Object} options
-     * @param {EndpointRef|null} options.endpoint
-     * @param {string} options.url
-     * @param {string} options.queryString
-     * @param {Object} options.pathParams
-     * @param {string|null} [options.mockBaseUrl]
-     * @param {string|null} [options.endpointPath]
-     * @returns {Promise<{url: string, mockRewrite: {baseUrl: string, pathTemplate: string}|null}>}
-     */
-    async resolveMockRewrite({ endpoint, url, queryString, pathParams, mockBaseUrl, endpointPath }) {
-        if (!endpoint?.collectionId) {
-            return { url, mockRewrite: null };
-        }
-        const baseUrl = mockBaseUrl === undefined ? await this.mockBaseUrlFor(endpoint.collectionId) : mockBaseUrl;
-        if (!baseUrl) {
-            return { url, mockRewrite: null };
-        }
-        const pathTemplate = endpointPath === undefined ? await this.endpointPathFor(endpoint) : endpointPath;
-        if (!pathTemplate) {
-            return { url, mockRewrite: null };
-        }
-        const mockPath = buildMockPath(pathTemplate, pathParams);
-        return {
-            url: queryString ? `${baseUrl}${mockPath}?${queryString}` : `${baseUrl}${mockPath}`,
-            mockRewrite: { baseUrl, pathTemplate }
-        };
     }
 
     /**

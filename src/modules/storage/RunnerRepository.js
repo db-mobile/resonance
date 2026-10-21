@@ -219,14 +219,6 @@ export class RunnerRepository {
     }
 
     /**
-     * @param {string} id
-     * @returns {Promise<number|null>}
-     */
-    async getLastRunAt(id) {
-        return (await this._loadLastRuns())[id] ?? null;
-    }
-
-    /**
      * @param {Object<string, number>} entries
      * @returns {Promise<void>}
      */

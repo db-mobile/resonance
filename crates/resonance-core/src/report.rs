@@ -326,36 +326,6 @@ pub fn to_junit(summary: &RunSummary) -> String {
     lines.join("\n")
 }
 
-/// `<slug>-YYYYMMDD-HHMM.<extension>` in local time, like the desktop's
-/// export dialog proposes.
-pub fn report_file_name(summary: &RunSummary, extension: &str) -> String {
-    let mut slug = String::new();
-    let mut pending_dash = false;
-    for c in summary.runner_name.to_lowercase().chars() {
-        if c.is_ascii_alphanumeric() {
-            if pending_dash && !slug.is_empty() {
-                slug.push('-');
-            }
-            pending_dash = false;
-            slug.push(c);
-        } else {
-            pending_dash = true;
-        }
-    }
-    if slug.is_empty() {
-        slug = "runner".into();
-    }
-    let started = if summary.started_at != 0 {
-        summary.started_at
-    } else {
-        chrono::Utc::now().timestamp_millis()
-    };
-    let local: chrono::DateTime<chrono::Local> = chrono::DateTime::from_timestamp_millis(started)
-        .map(|t| t.with_timezone(&chrono::Local))
-        .unwrap_or_else(chrono::Local::now);
-    format!("{}-{}.{}", slug, local.format("%Y%m%d-%H%M"), extension)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,16 +418,5 @@ mod tests {
         let summary = summarize(&result);
         assert_eq!(summary.requests.len(), MAX_SUMMARY_REQUESTS);
         assert!(summary.truncated);
-    }
-
-    #[test]
-    fn file_names_are_slugged_and_stamped() {
-        let mut summary = summarize(&run());
-        summary.runner_name = "My API / pets".into();
-        let name = report_file_name(&summary, "xml");
-        assert!(name.starts_with("my-api-pets-"), "{name}");
-        assert!(name.ends_with(".xml"));
-        summary.runner_name = "!!!".into();
-        assert!(report_file_name(&summary, "json").starts_with("runner-"));
     }
 }

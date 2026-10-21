@@ -12,14 +12,6 @@ export const bodyEditorContainer = document.getElementById('body-editor-containe
 
 export const bodyTextEditorContainer = document.getElementById('body-text-editor-container');
 
-export const graphqlQueryEditor = document.getElementById('graphql-query-editor');
-
-export const graphqlVariablesEditor = document.getElementById('graphql-variables-editor');
-
-export const graphqlFormatBtn = document.getElementById('graphql-format-btn');
-
-export const bodyModeSelect = document.getElementById('body-mode-select');
-
 export const curlBtn = document.getElementById('curl-btn');
 
 export const sendRequestBtn = document.getElementById('send-request-btn');

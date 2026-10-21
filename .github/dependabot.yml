@@ -1,0 +1,50 @@
+# Weekly grouped dependency updates against dev. Security updates ignore the
+# target-branch setting and are raised against main by GitHub's design.
+#
+# Minor and patch bumps land together in one pull request per ecosystem;
+# major bumps get a pull request each so a breaking change is reviewed on
+# its own. The cooldown keeps a freshly published version out of a pull
+# request until it has been public for a few days.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    # The default covers only crates named in a Cargo.toml; `all` also
+    # refreshes the transitive entries in Cargo.lock.
+    allow:
+      - dependency-type: all
+    cooldown:
+      default-days: 3
+    groups:
+      rust:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      javascript:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,7 +1,6 @@
 import {
   toggleFieldInQuery,
   getSelectedPaths,
-  getDeclaredVariableDefs,
   setArgumentValue,
   getArgumentValue
 } from '../../src/modules/graphqlExplorer.js';
@@ -119,26 +118,6 @@ describe('toggleFieldInQuery default scalar selection', () => {
     const out = toggleFieldInQuery({ queryText: '', path: ['country'], leafIsObject: true });
     expect(getSelectedPaths(out).has('country')).toBe(true);
     expect(getSelectedPaths(out).has('country.code')).toBe(false);
-  });
-});
-
-describe('getDeclaredVariableDefs', () => {
-  test('returns names, printed types, and required flags', () => {
-    expect(getDeclaredVariableDefs('query Q($code: ID!, $n: Int, $l: [String!]) { x }')).toEqual([
-      { name: 'code', type: 'ID!', required: true },
-      { name: 'n', type: 'Int', required: false },
-      { name: 'l', type: '[String!]', required: false }
-    ]);
-  });
-
-  test('lists declared variables in declaration order', () => {
-    expect(getDeclaredVariableDefs('query Q($a: ID!, $b: Int) { x }').map(def => def.name)).toEqual(['a', 'b']);
-  });
-
-  test('returns an empty array for no variables, empty, or invalid input', () => {
-    expect(getDeclaredVariableDefs('{ x }')).toEqual([]);
-    expect(getDeclaredVariableDefs('')).toEqual([]);
-    expect(getDeclaredVariableDefs('{ unclosed')).toEqual([]);
   });
 });
 

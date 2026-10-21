@@ -38,9 +38,6 @@ describe('SchemaController response validation', () => {
             getSchema: () => {
                 try { return JSON.parse(content); } catch { return null; }
             },
-            isValidJson: () => {
-                try { JSON.parse(content); return true; } catch { return !content.trim(); }
-            },
             setSchema: jest.fn((schema) => {
                 content = schema === null || schema === undefined ? '' : JSON.stringify(schema);
             }),

@@ -362,8 +362,7 @@
   "theme": {
     "light": "Hell",
     "dark": "Dunkel",
-    "system": "System",
-    "black": "Schwarz (OLED)"
+    "system": "System"
   },
   "http_version": {
     "auto": "Automatisch",

@@ -17,7 +17,6 @@ resonance-core.workspace = true
 resonance-collections.workspace = true
 clap = { version = "4", features = ["derive"] }
 tokio = { workspace = true, features = ["signal"] }
-serde.workspace = true
 serde_json.workspace = true
 url.workspace = true
 

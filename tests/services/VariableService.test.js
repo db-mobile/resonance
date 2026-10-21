@@ -18,9 +18,7 @@ describe('VariableService', () => {
         mockProcessor = {
             isValidVariableName: jest.fn(),
             processObject: jest.fn(),
-            processTemplate: jest.fn(),
-            getPreview: jest.fn(),
-            extractVariableNamesFromObject: jest.fn()
+            processTemplate: jest.fn()
         };
 
         mockStatusDisplay = {

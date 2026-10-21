@@ -204,5 +204,4 @@ if (isTauri) {
     api = window.backendAPI;
 }
 
-export default api;
 export { api };

@@ -1580,31 +1580,6 @@ pub async fn script_execute_pre_request(
         .map_err(|e| format!("Script execution failed: {}", e))
 }
 
-pub async fn script_execute_test(
-    proxy_settings: ProxySettings,
-    script_data: ScriptExecutionData,
-) -> Result<ScriptResult, String> {
-    if script_data.script.trim().is_empty() {
-        return Ok(ScriptResult {
-            success: true,
-            logs: Vec::new(),
-            errors: Vec::new(),
-            test_results: Vec::new(),
-            modified_request: None,
-            modified_environment: HashMap::new(),
-            modified_collection_variables: HashMap::new(),
-            cookie_changes: Vec::new(),
-            modified_local_variables: HashMap::new(),
-            removed_local_variables: Vec::new(),
-            execution: ExecutionControl::default(),
-        });
-    }
-
-    tokio::task::spawn_blocking(move || run_script_sync(script_data, false, proxy_settings, None))
-        .await
-        .map_err(|e| format!("Script execution failed: {}", e))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

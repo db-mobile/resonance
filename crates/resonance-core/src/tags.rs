@@ -24,11 +24,6 @@ where
     out
 }
 
-/// Splits a comma-separated list the way the CLI and the dialog read it.
-pub fn parse_list(text: &str) -> Vec<String> {
-    normalize(text.split(','))
-}
-
 fn same_tag(a: &str, b: &str) -> bool {
     a.trim().to_lowercase() == b.trim().to_lowercase()
 }
@@ -98,15 +93,6 @@ mod tests {
             normalize([" smoke ", "", "Smoke", "pets", "  ", "PETS", "auth"]),
             tags(&["smoke", "pets", "auth"])
         );
-    }
-
-    #[test]
-    fn parse_list_splits_on_commas() {
-        assert_eq!(
-            parse_list("smoke, Pets ,,auth,pets"),
-            tags(&["smoke", "Pets", "auth"])
-        );
-        assert!(parse_list("  ,  ").is_empty());
     }
 
     #[test]
