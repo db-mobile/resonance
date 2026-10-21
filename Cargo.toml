@@ -65,7 +65,7 @@ hex = "0.4"
 getrandom = "0.3"
 # Share Boa 0.19's ICU4X 1.5 tables with url/idna. One resolution graph, so the
 # pin is workspace-wide. Remove after Boa moves to ICU4X 2.x.
-idna_adapter = "=1.2.0"
+idna_adapter = "=1.2.2"
 
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 tempfile = "3"
