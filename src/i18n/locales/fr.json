@@ -402,7 +402,8 @@
       "help": "Aide",
       "tabs": "Onglets",
       "workspace_tabs": "Onglets d'Espace de Travail",
-      "request_tabs": "Onglets de Requête"
+      "request_tabs": "Onglets de Requête",
+      "response_tabs": "Onglets de Réponse"
     },
     "ctrl_enter": "Envoyer la requête",
     "ctrl_keys": "Enregistrer la requête",
@@ -424,12 +425,7 @@
     "ctrl_digit7": "Passer à l'onglet d'espace de travail 7",
     "ctrl_digit8": "Passer à l'onglet d'espace de travail 8",
     "ctrl_digit9": "Passer à l'onglet d'espace de travail 9",
-    "alt_digit1": "Passer à l'onglet Paramètres de Chemin",
-    "alt_digit2": "Passer à l'onglet Paramètres",
-    "alt_digit3": "Passer à l'onglet En-têtes",
-    "alt_digit4": "Passer à l'onglet Autorisation",
-    "alt_digit5": "Passer à l'onglet Corps",
-    "alt_digit6": "Passer à l'onglet Scripts",
+    "switch_to_tab": "Passer à l'onglet {{label}}",
     "ctrl_keyt": "Nouvel onglet d'espace de travail",
     "ctrl_keyw": "Fermer l'onglet actuel",
     "ctrl_tab": "Passer à l'onglet suivant",

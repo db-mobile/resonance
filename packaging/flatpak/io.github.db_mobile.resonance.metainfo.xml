@@ -116,6 +116,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.3" date="2026-10-22">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Make tab shortcuts follow the visible tabs left to right</li>
+          <li>Update dependencies and add automated dependency checks</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.2" date="2026-10-20">
       <description>
         <p>Feature stabilization release</p>

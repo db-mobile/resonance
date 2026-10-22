@@ -67,10 +67,18 @@ export function initTabListeners() {
 }
 
 /**
- * @param {string} tabType
- * @param {string} tabId
- * @returns {void}
+ * @param {'request'|'response'} tabType
+ * @returns {HTMLElement[]}
  */
+export function visibleTabButtons(tabType) {
+    const selector = tabType === 'request'
+        ? '.request-config .tab-nav .tab-button'
+        : '.response-tabs .tab-button';
+    return Array.from(document.querySelectorAll(selector)).filter(btn =>
+        btn.style.display !== 'none' && !btn.classList.contains('is-hidden') && !btn.hidden
+    );
+}
+
 /**
  * @param {string} protocol
  * @returns {void}
@@ -89,6 +97,11 @@ export function setResponseTabsForProtocol(protocol) {
     }
 }
 
+/**
+ * @param {string} tabType
+ * @param {string} tabId
+ * @returns {void}
+ */
 export function activateTab(tabType, tabId) {
     let buttons;
     let contents;

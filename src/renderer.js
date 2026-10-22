@@ -10,6 +10,7 @@ import { sendRequestBtn, cancelRequestBtn, curlBtn, importCollectionBtn, urlInpu
 
 import { initKeyValueListeners, addKeyValueRow, updateQueryParamsFromUrl } from './modules/keyValueManager.js';
 import { initTabListeners, activateTab } from './modules/tabManager.js';
+import { registerTabShortcuts } from './modules/tabShortcuts.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
@@ -151,15 +152,6 @@ async function switchToWorkspaceTab(position) {
     }
 }
 
-const REQUEST_TAB_SHORTCUTS = [
-    { tab: 'path-params', label: 'Path Params' },
-    { tab: 'query-params', label: 'Query Params' },
-    { tab: 'headers', label: 'Headers' },
-    { tab: 'authorization', label: 'Authorization' },
-    { tab: 'body', label: 'Body' },
-    { tab: 'scripts', label: 'Scripts' }
-];
-
 const SHORTCUTS = [
     {
         key: 'Enter', ctrl: true, category: 'Request', description: 'Send request', hintTarget: 'send-request-btn',
@@ -290,14 +282,7 @@ function initKeyboardShortcuts() {
         });
     }
 
-    REQUEST_TAB_SHORTCUTS.forEach(({ tab, label }, index) => {
-        keyboardShortcuts.register(`Digit${index + 1}`, {
-            alt: true,
-            handler: () => activateTab('request', tab),
-            description: `Switch to ${label} tab`,
-            category: 'Request Tabs'
-        });
-    });
+    registerTabShortcuts(keyboardShortcuts);
 
     for (const { key, ...options } of WORKSPACE_TAB_SHORTCUTS) {
         keyboardShortcuts.register(key, options);

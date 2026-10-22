@@ -402,7 +402,8 @@
       "help": "Ajuda",
       "tabs": "Abas",
       "workspace_tabs": "Abas do Workspace",
-      "request_tabs": "Abas de Requisição"
+      "request_tabs": "Abas de Requisição",
+      "response_tabs": "Abas de Resposta"
     },
     "ctrl_enter": "Enviar requisição",
     "ctrl_keys": "Salvar requisição",
@@ -424,12 +425,7 @@
     "ctrl_digit7": "Ir para aba do workspace 7",
     "ctrl_digit8": "Ir para aba do workspace 8",
     "ctrl_digit9": "Ir para aba do workspace 9",
-    "alt_digit1": "Ir para aba de Parâmetros de Caminho",
-    "alt_digit2": "Ir para aba de Parâmetros de Consulta",
-    "alt_digit3": "Ir para aba de Cabeçalhos",
-    "alt_digit4": "Ir para aba de Autorização",
-    "alt_digit5": "Ir para aba de Corpo",
-    "alt_digit6": "Ir para aba de Scripts",
+    "switch_to_tab": "Mudar para a aba {{label}}",
     "ctrl_keyt": "Nova aba do workspace",
     "ctrl_keyw": "Fechar aba atual",
     "ctrl_tab": "Ir para próxima aba",

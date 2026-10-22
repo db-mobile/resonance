@@ -46,6 +46,7 @@ class KeyboardShortcutsManager {
      * @param {boolean} options.alt
      * @param {string} options.category
      * @param {boolean} options.preventDefault
+     * @param {() => (string|null)} [options.describe]
      */
     register(key, options) {
         const {
@@ -55,7 +56,8 @@ class KeyboardShortcutsManager {
             shift = false,
             alt = false,
             category = 'General',
-            preventDefault = true
+            preventDefault = true,
+            describe = null
         } = options;
 
         const shortcutKey = this._createShortcutKey(key, ctrl, shift, alt);
@@ -65,9 +67,16 @@ class KeyboardShortcutsManager {
             description,
             displayKey: this._getDisplayKey(key, ctrl, shift, alt),
             category,
-            preventDefault
+            preventDefault,
+            describe
         });
 
+        for (const keys of this.categories.values()) {
+            const index = keys.indexOf(shortcutKey);
+            if (index !== -1) {
+                keys.splice(index, 1);
+            }
+        }
         if (!this.categories.has(category)) {
             this.categories.set(category, []);
         }
@@ -132,6 +141,7 @@ class KeyboardShortcutsManager {
 
         if (shortcut) {
             const isInputSafeShortcut = ctrl ||
+                                       alt ||
                                        shortcutKey.includes('enter') ||
                                        shortcutKey.includes('escape');
 
@@ -204,6 +214,8 @@ class KeyboardShortcutsManager {
             for (const key of shortcutKeys) {
                 const shortcut = this.shortcuts.get(key);
                 if (!shortcut) { continue; }
+                const liveDescription = shortcut.describe ? shortcut.describe() : undefined;
+                if (liveDescription === null) { continue; }
                 const itemFragment = templateLoader.cloneSync(
                     SHORTCUTS_TEMPLATE,
                     'tpl-shortcut-item'
@@ -212,7 +224,9 @@ class KeyboardShortcutsManager {
 
                 const descEl = itemEl.querySelector('[data-role="description"]');
                 const keysEl = itemEl.querySelector('[data-role="keys"]');
-                if (descEl) {
+                if (descEl && liveDescription !== undefined) {
+                    descEl.textContent = liveDescription;
+                } else if (descEl) {
                     descEl.textContent = shortcut.description;
                     descEl.setAttribute('data-i18n', `shortcuts.${key.replace(/\+/g, '_')}`);
                 }
@@ -223,7 +237,9 @@ class KeyboardShortcutsManager {
                 listEl.appendChild(itemEl);
             }
 
-            containerEl.appendChild(categoryEl);
+            if (listEl.childElementCount > 0) {
+                containerEl.appendChild(categoryEl);
+            }
         }
     }
 
