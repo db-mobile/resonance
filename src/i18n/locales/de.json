@@ -408,7 +408,8 @@
       "help": "Hilfe",
       "tabs": "Registerkarten",
       "workspace_tabs": "Arbeitsbereich-Tabs",
-      "request_tabs": "Anfrage-Tabs"
+      "request_tabs": "Anfrage-Tabs",
+      "response_tabs": "Antwort-Tabs"
     },
     "ctrl_enter": "Anfrage senden",
     "ctrl_keys": "Anfrage speichern",
@@ -430,12 +431,7 @@
     "ctrl_digit7": "Zu Arbeitsbereich-Tab 7 wechseln",
     "ctrl_digit8": "Zu Arbeitsbereich-Tab 8 wechseln",
     "ctrl_digit9": "Zu Arbeitsbereich-Tab 9 wechseln",
-    "alt_digit1": "Zu Pfad-Parameter wechseln",
-    "alt_digit2": "Zu Query-Parameter wechseln",
-    "alt_digit3": "Zu Header wechseln",
-    "alt_digit4": "Zu Autorisierung wechseln",
-    "alt_digit5": "Zu Body wechseln",
-    "alt_digit6": "Zu Skripte wechseln",
+    "switch_to_tab": "Zum Tab {{label}} wechseln",
     "ctrl_keyt": "Neuer Arbeitsbereich-Tab",
     "ctrl_keyw": "Aktuellen Tab schließen",
     "ctrl_tab": "Zum nächsten Tab wechseln",

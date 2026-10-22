@@ -414,7 +414,8 @@
       "help": "Help",
       "tabs": "Tabs",
       "workspace_tabs": "Workspace Tabs",
-      "request_tabs": "Request Tabs"
+      "request_tabs": "Request Tabs",
+      "response_tabs": "Response Tabs"
     },
     "ctrl_enter": "Send request",
     "ctrl_keys": "Save request",
@@ -436,12 +437,7 @@
     "ctrl_digit7": "Switch to workspace tab 7",
     "ctrl_digit8": "Switch to workspace tab 8",
     "ctrl_digit9": "Switch to workspace tab 9",
-    "alt_digit1": "Switch to Path Params tab",
-    "alt_digit2": "Switch to Query Params tab",
-    "alt_digit3": "Switch to Headers tab",
-    "alt_digit4": "Switch to Authorization tab",
-    "alt_digit5": "Switch to Body tab",
-    "alt_digit6": "Switch to Scripts tab",
+    "switch_to_tab": "Switch to {{label}} tab",
     "ctrl_keyt": "New workspace tab",
     "ctrl_keyw": "Close current tab",
     "ctrl_tab": "Switch to next tab",

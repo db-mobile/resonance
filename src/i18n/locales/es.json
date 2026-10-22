@@ -402,7 +402,8 @@
       "help": "Ayuda",
       "tabs": "Pestañas",
       "workspace_tabs": "Pestañas de Espacio de Trabajo",
-      "request_tabs": "Pestañas de Solicitud"
+      "request_tabs": "Pestañas de Solicitud",
+      "response_tabs": "Pestañas de Respuesta"
     },
     "ctrl_enter": "Enviar solicitud",
     "ctrl_keys": "Guardar solicitud",
@@ -424,12 +425,7 @@
     "ctrl_digit7": "Cambiar a pestaña de espacio de trabajo 7",
     "ctrl_digit8": "Cambiar a pestaña de espacio de trabajo 8",
     "ctrl_digit9": "Cambiar a pestaña de espacio de trabajo 9",
-    "alt_digit1": "Cambiar a pestaña de Parámetros de Ruta",
-    "alt_digit2": "Cambiar a pestaña de Parámetros",
-    "alt_digit3": "Cambiar a pestaña de Encabezados",
-    "alt_digit4": "Cambiar a pestaña de Autorización",
-    "alt_digit5": "Cambiar a pestaña de Cuerpo",
-    "alt_digit6": "Cambiar a pestaña de Scripts",
+    "switch_to_tab": "Cambiar a la pestaña {{label}}",
     "ctrl_keyt": "Nueva pestaña de espacio de trabajo",
     "ctrl_keyw": "Cerrar pestaña actual",
     "ctrl_tab": "Cambiar a siguiente pestaña",

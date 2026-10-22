@@ -402,7 +402,8 @@
       "help": "Aiuto",
       "tabs": "Schede",
       "workspace_tabs": "Schede Area di Lavoro",
-      "request_tabs": "Schede Richiesta"
+      "request_tabs": "Schede Richiesta",
+      "response_tabs": "Schede Risposta"
     },
     "ctrl_enter": "Invia richiesta",
     "ctrl_keys": "Salva richiesta",
@@ -424,12 +425,7 @@
     "ctrl_digit7": "Passa alla scheda area di lavoro 7",
     "ctrl_digit8": "Passa alla scheda area di lavoro 8",
     "ctrl_digit9": "Passa alla scheda area di lavoro 9",
-    "alt_digit1": "Passa alla scheda Parametri del Percorso",
-    "alt_digit2": "Passa alla scheda Parametri",
-    "alt_digit3": "Passa alla scheda Intestazioni",
-    "alt_digit4": "Passa alla scheda Autorizzazione",
-    "alt_digit5": "Passa alla scheda Corpo",
-    "alt_digit6": "Passa alla scheda Scripts",
+    "switch_to_tab": "Passa alla scheda {{label}}",
     "ctrl_keyt": "Nuova scheda area di lavoro",
     "ctrl_keyw": "Chiudi scheda attuale",
     "ctrl_tab": "Passa alla scheda successiva",
