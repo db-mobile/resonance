@@ -13,6 +13,10 @@
 
         <!-- Sidebar: Collections / History -->
         <aside class="sidebar collections-sidebar" role="complementary">
+            <div class="environment-section">
+                <div id="environment-selector-container"></div>
+            </div>
+
             <div class="sidebar-toolbar">
                 <div class="view-switcher sidebar-switcher" role="tablist" aria-label="Sidebar Pages">
                     <button id="close-history-btn"
@@ -40,15 +44,6 @@
                             <span class="icon icon-16 icon-import"></span>
                             <span data-i18n="sidebar.import">Import Collection</span>
                         </button>
-                        <button id="mock-server-btn" class="menu-item"
-                                data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer">
-                            <span class="icon icon-16 icon-mock-server"></span>
-                            <span data-i18n="toolbar.mockServer">Mock Server</span>
-                        </button>
-                        <button id="cookie-jar-btn" class="menu-item" title="Cookie Jar">
-                            <span class="icon icon-16 icon-cookie"></span>
-                            <span>Cookie Jar</span>
-                        </button>
                         <button id="layout-toggle-btn" class="menu-item" title="Side-by-side layout (Ctrl+\)"
                                 role="menuitemcheckbox" aria-checked="false">
                             <span class="icon icon-16 icon-view-dual"></span>
@@ -70,66 +65,78 @@
                 </details>
             </div>
 
-            <div class="sidebar-page sidebar-page-collections">
-                <div class="sidebar-search">
-                    <div class="search-entry search-input-wrap">
-                        <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
-                        <input type="text"
-                               id="collections-search-input"
-                               class="entry compact search-input"
-                               placeholder="Search collections..."
-                               data-i18n-placeholder="sidebar.collections_search_placeholder"
-                               aria-label="Search collections">
+            <div class="sidebar-pages">
+                <div class="sidebar-page sidebar-page-collections">
+                    <div class="sidebar-search">
+                        <div class="search-entry search-input-wrap">
+                            <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+                            <input type="text"
+                                   id="collections-search-input"
+                                   class="entry compact search-input"
+                                   placeholder="Search collections..."
+                                   data-i18n-placeholder="sidebar.collections_search_placeholder"
+                                   aria-label="Search collections">
+                        </div>
                     </div>
-                </div>
 
-                <div class="collections-container sidebar-scroll">
-                    <div id="collections-list" class="collections-list">
-                        <div class="status-page compact collections-empty">
-                            <span class="status-page-icon icon icon-64 icon-spark"></span>
-                            <p class="status-page-title collections-empty-text">No collections imported yet</p>
-                            <p class="status-page-description collections-empty-subtext">Import an OpenAPI collection to get started</p>
+                    <div class="collections-container sidebar-scroll">
+                        <div id="collections-list" class="collections-list">
+                            <div class="status-page compact collections-empty">
+                                <span class="status-page-icon icon icon-64 icon-spark"></span>
+                                <p class="status-page-title collections-empty-text">No collections imported yet</p>
+                                <p class="status-page-description collections-empty-subtext">Import an OpenAPI collection to get started</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="environment-section">
-                    <div id="environment-selector-container"></div>
-                </div>
+                <!-- History page (overlays the collections page when .visible) -->
+                <aside class="sidebar-page sidebar-page-history history-sidebar" role="complementary" id="history-sidebar">
+                    <div class="history-search sidebar-search">
+                        <div class="search-entry search-input-wrap">
+                            <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
+                            <input type="text"
+                                   id="history-search-input"
+                                   class="entry compact search-input"
+                                   placeholder="Search history..."
+                                   data-i18n-placeholder="history.search_placeholder"
+                                   aria-label="Search history">
+                        </div>
+                        <button id="clear-all-history-btn" class="button flat small image-button"
+                                data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
+                            <span class="icon icon-16 icon-trash"></span>
+                        </button>
+                    </div>
+
+                    <div class="history-container sidebar-scroll">
+                        <div id="history-list" class="history-list">
+                            <div class="status-page compact history-empty">
+                                <span class="status-page-icon icon icon-64 icon-history"></span>
+                                <p class="status-page-title history-empty-text" data-i18n="history.empty">No request history</p>
+                                <p class="status-page-description history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
             </div>
 
-            <!-- History page (overlays the collections page when .visible) -->
-            <aside class="sidebar-page sidebar-page-history history-sidebar" role="complementary" id="history-sidebar">
-                <div class="sidebar-section-header">
-                    <span class="caption-heading dim-label" data-i18n="sidebar.history">History</span>
-                    <button id="clear-all-history-btn" class="button flat small image-button"
-                            data-i18n-title="history.clear_all" data-i18n-aria="history.clear_all">
-                        <span class="icon icon-16 icon-trash"></span>
-                    </button>
-                </div>
-
-                <div class="history-search sidebar-search">
-                    <div class="search-entry search-input-wrap">
-                        <span class="search-input-icon icon icon-16 icon-search" aria-hidden="true"></span>
-                        <input type="text"
-                               id="history-search-input"
-                               class="entry compact search-input"
-                               placeholder="Search history..."
-                               data-i18n-placeholder="history.search_placeholder"
-                               aria-label="Search history">
-                    </div>
-                </div>
-
-                <div class="history-container sidebar-scroll">
-                    <div id="history-list" class="history-list">
-                        <div class="status-page compact history-empty">
-                            <span class="status-page-icon icon icon-64 icon-history"></span>
-                            <p class="status-page-title history-empty-text" data-i18n="history.empty">No request history</p>
-                            <p class="status-page-description history-empty-subtext" data-i18n="history.empty_subtext">Send a request to see it here</p>
-                        </div>
-                    </div>
-                </div>
-            </aside>
+            <div class="sidebar-tools">
+                <button id="mock-server-btn" type="button" class="button flat image-button"
+                        data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer"
+                        title="Mock Server" aria-label="Mock Server">
+                    <span class="icon icon-16 icon-mock-server" aria-hidden="true"></span>
+                </button>
+                <button id="cookie-jar-btn" type="button" class="button flat image-button"
+                        data-i18n-title="cookies.title" data-i18n-aria="cookies.title"
+                        title="Cookie Jar" aria-label="Cookie Jar">
+                    <span class="icon icon-16 icon-cookie" aria-hidden="true"></span>
+                </button>
+                <button id="runner-btn" type="button" class="button flat image-button"
+                        data-i18n-title="runner.title" data-i18n-aria="runner.title"
+                        title="Collection Runner" aria-label="Collection Runner">
+                    <span class="icon icon-16 icon-play" aria-hidden="true"></span>
+                </button>
+            </div>
         </aside>
 
         <!-- Sidebar / content separator (draggable) -->
@@ -201,12 +208,6 @@
                             aria-label="Generate Code Snippet"
                             title="Generate Code Snippet (cURL, Python, JavaScript, etc.)">
                         <span class="icon icon-16 icon-curl"></span>
-                    </button>
-
-                    <button id="runner-btn"
-                            class="button flat image-button"
-                            data-i18n-title="runner.title" data-i18n-aria="runner.title" title="Collection Runner">
-                        <span class="icon icon-16 icon-play"></span>
                     </button>
                 </div>
             </section>

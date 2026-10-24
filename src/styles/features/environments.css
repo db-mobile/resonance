@@ -1,5 +1,5 @@
 /**
- * Environment selector (sidebar bottom row) and its dropdown.
+ * Environment selector (sidebar top row) and its dropdown.
  * The manager dialog itself is styled with the dialog widget.
  */
 
@@ -56,11 +56,6 @@
   right: 0;
   max-height: 320px;
   overflow-y: auto;
-}
-
-.environment-section .env-dropdown {
-  top: auto;
-  bottom: calc(100% + var(--space-1));
 }
 
 .cookie-manager-env-selector .env-dropdown {
