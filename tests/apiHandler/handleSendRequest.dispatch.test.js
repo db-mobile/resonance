@@ -4,6 +4,7 @@
 import { requestBarMarkup, requestFormMarkup } from '../helpers/requestBarMarkup.js';
 
 const liveness = { websocket: jest.fn(() => false) };
+const connectWebSocket = jest.fn();
 
 const handlers = {
     websocket: jest.fn(),
@@ -24,8 +25,14 @@ async function loadApiHandler({ resolveVariablesError = null, variables = null }
     jest.resetModules();
     Object.values(handlers).forEach(fn => fn.mockReset());
     Object.values(cancels).forEach(fn => fn.mockReset());
+    connectWebSocket.mockReset();
+    liveness.websocket.mockReset().mockReturnValue(false);
 
     jest.doMock('../../src/modules/websocketHandler.js', () => ({
+        getWebSocketBodyContent: jest.requireActual('../../src/modules/websocketHandler.js').getWebSocketBodyContent,
+        handleWebSocketConnect: connectWebSocket,
+        getWebSocketState: () => liveness.websocket() ? 'open' : 'closed',
+        isWebSocketSending: () => false,
         handleWebSocketSend: handlers.websocket,
         handleWebSocketCancel: cancels.websocket,
         isWebSocketLive: liveness.websocket
@@ -92,6 +99,7 @@ async function loadApiHandler({ resolveVariablesError = null, variables = null }
 
     const { app } = await import('../../src/modules/appContext.js');
     app.authManager = authManager;
+    app.workspaceTabController = { service: { getActiveTabId: jest.fn().mockResolvedValue('tab-1') } };
     const { installTestRequestPipeline } = await import('../helpers/requestPipeline.js');
     await installTestRequestPipeline(app, window.backendAPI);
 
@@ -134,28 +142,28 @@ describe('handleSendRequest dispatches to exactly one protocol handler', () => {
 
 describe('each streaming protocol reads its URL differently', () => {
     test('WebSocket prefers its own mirror over the shared input', async () => {
-        const { handleSendRequest, setRequestMode } = await loadApiHandler();
+        const { handleWebSocketConnectionAction, setRequestMode } = await loadApiHandler();
         setRequestMode('websocket');
 
         document.getElementById('url-input').value = 'wss://peer.example';
         document.getElementById('websocket-url-input').value = 'wss://mirror.example';
 
-        await handleSendRequest();
+        await handleWebSocketConnectionAction();
 
-        expect(urlOf(handlers.websocket)).toBe('wss://mirror.example');
+        expect(connectWebSocket.mock.calls[0][0].url).toBe('wss://mirror.example');
     });
 
     test('WebSocket falls back to the value attribute when the property is empty', async () => {
-        const { handleSendRequest, setRequestMode } = await loadApiHandler();
+        const { handleWebSocketConnectionAction, setRequestMode } = await loadApiHandler();
         setRequestMode('websocket');
 
         const input = document.getElementById('url-input');
         input.value = '';
         input.setAttribute('value', 'wss://attribute.example');
 
-        await handleSendRequest();
+        await handleWebSocketConnectionAction();
 
-        expect(urlOf(handlers.websocket)).toBe('wss://attribute.example');
+        expect(connectWebSocket.mock.calls[0][0].url).toBe('wss://attribute.example');
     });
 
     test('SSE prefers its own mirror over the shared input', async () => {
@@ -207,10 +215,10 @@ describe('the send-in-progress bracket', () => {
 
     test('the button is hidden while the handler is in flight', async () => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler();
-        setRequestMode('websocket');
+        setRequestMode('sse');
 
         let displayDuringSend;
-        handlers.websocket.mockImplementation(() => {
+        handlers.sse.mockImplementation(() => {
             displayDuringSend = document.getElementById('send-request-btn').style.display;
             return Promise.resolve();
         });
@@ -222,7 +230,7 @@ describe('the send-in-progress bracket', () => {
 });
 
 describe('a variable-processing failure stops the send', () => {
-    test.each(['websocket', 'sse', 'mqtt'])('%s reports it and never calls the handler', async (mode) => {
+    test.each(['sse', 'mqtt'])('%s reports it and never calls the handler', async (mode) => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler({
             resolveVariablesError: 'bad template'
         });
@@ -235,7 +243,7 @@ describe('a variable-processing failure stops the send', () => {
             .toContain('Variable processing error: bad template');
     });
 
-    test.each(['websocket', 'sse', 'mqtt'])('%s never enters the in-progress bracket', async (mode) => {
+    test.each(['sse', 'mqtt'])('%s never enters the in-progress bracket', async (mode) => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler({
             resolveVariablesError: 'bad template'
         });
@@ -339,6 +347,20 @@ describe('SSE carries the method and body', () => {
 });
 
 describe('streaming payloads resolve {{variables}}', () => {
+    test('WebSocket sends the selected Text editor with whitespace and variables intact', async () => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler({ variables: { token: 'abc' } });
+        const { app } = await import('../../src/modules/appContext.js');
+        setRequestMode('websocket');
+        document.getElementById('body-mode-select').value = 'text';
+        app.requestBodyTextEditor = { getContent: () => '  {{token}}\n\n' };
+        await handleSendRequest();
+        const [body, tabId, prepare] = handlers.websocket.mock.calls[0];
+        expect(body).toBe('  {{token}}\n\n');
+        expect(tabId).toBe('tab-1');
+        expect(await prepare(body)).toBe('  abc\n\n');
+        expect(connectWebSocket).not.toHaveBeenCalled();
+    });
+
     test('WebSocket sends the resolved message', async () => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler({ variables: { token: 'abc' } });
         setRequestMode('websocket');
@@ -348,7 +370,10 @@ describe('streaming payloads resolve {{variables}}', () => {
 
         await handleSendRequest();
 
-        expect(handlers.websocket.mock.calls[0][2]).toBe('{"token":"abc"}');
+        const [body, tabId, prepare] = handlers.websocket.mock.calls[0];
+        expect(tabId).toBe('tab-1');
+        expect(await prepare(body)).toBe('{"token":"abc"}');
+        expect(connectWebSocket).not.toHaveBeenCalled();
     });
 
     test('MQTT resolves topics, credentials and payload', async () => {
@@ -374,7 +399,7 @@ describe('streaming payloads resolve {{variables}}', () => {
 });
 
 describe('handleCancelRequest dispatches to exactly one protocol cancel', () => {
-    test.each(['websocket', 'sse', 'mqtt'])('%s cancels its own stream and leaves the in-progress bracket', async (mode) => {
+    test.each(['sse', 'mqtt'])('%s cancels its own stream and leaves the in-progress bracket', async (mode) => {
         const { handleSendRequest, handleCancelRequest, setRequestMode } = await loadApiHandler();
         setRequestMode(mode);
         handlers[mode].mockImplementation(() => new Promise(() => {}));
@@ -392,6 +417,14 @@ describe('handleCancelRequest dispatches to exactly one protocol cancel', () => 
         }
         expect(document.getElementById('send-request-btn').style.display).not.toBe('none');
         expect(document.getElementById('cancel-request-btn').style.display).toBe('none');
+    });
+
+    test('WebSocket cancels only its own connection', async () => {
+        const { handleCancelRequest, setRequestMode } = await loadApiHandler();
+        setRequestMode('websocket');
+        await handleCancelRequest();
+        expect(cancels.websocket).toHaveBeenCalledTimes(1);
+        expect(cancels.sse).not.toHaveBeenCalled();
     });
 
     test('grpc delegates to the gRPC cancel handler', async () => {
@@ -417,7 +450,7 @@ describe('handleCancelRequest dispatches to exactly one protocol cancel', () => 
 });
 
 describe('a live stream keeps a Disconnect button', () => {
-    test('the cancel button turns into Disconnect while the WebSocket is open and hides once it closes', async () => {
+    test('the connection button shows Disconnect while open and Connect after closing', async () => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler();
         const { STREAM_STATE_EVENT } = await import('../../src/modules/streaming/streamState.js');
         setRequestMode('websocket');
@@ -427,7 +460,7 @@ describe('a live stream keeps a Disconnect button', () => {
         await handleSendRequest();
         await new Promise(resolve => setTimeout(resolve, 0));
 
-        const cancel = document.getElementById('cancel-request-btn');
+        const cancel = document.getElementById('websocket-connect-btn');
         expect(cancel.style.display).not.toBe('none');
         expect(cancel.textContent).toBe('Disconnect');
 
@@ -435,8 +468,9 @@ describe('a live stream keeps a Disconnect button', () => {
         document.dispatchEvent(new CustomEvent(STREAM_STATE_EVENT));
         await new Promise(resolve => setTimeout(resolve, 0));
 
-        expect(cancel.style.display).toBe('none');
-        expect(cancel.textContent).toBe('Cancel');
+        expect(cancel.style.display).not.toBe('none');
+        expect(cancel.textContent).toBe('Connect');
+        expect(document.getElementById('send-request-btn').disabled).toBe(true);
     });
 
     test('HTTP mode never shows it', async () => {

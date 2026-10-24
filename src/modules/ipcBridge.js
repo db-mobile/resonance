@@ -64,8 +64,9 @@ if (isTauri) {
         pickUploadFile: () => invoke('pick_upload_file'),
         saveResponseBody: (defaultFileName, base64Data) => invoke('save_response_body', { defaultFileName, base64Data }),
         websocket: {
+            connect: (request) => invoke('websocket_connect', { request }),
             send: (request) => invoke('websocket_send', { request }),
-            close: (tabId) => invoke('websocket_close', { tabId })
+            close: (tabId, connectionId) => invoke('websocket_close', { tabId, connectionId })
         },
         graphqlSubscription: {
             send: (request) => invoke('graphql_subscription_send', { request }),

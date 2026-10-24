@@ -105,9 +105,10 @@ export class StreamSession {
     /**
      * @param {object} [options]
      * @param {string} [options.protocol]
+     * @param {boolean} [options.newestFirst]
      * @param {(entry: object, transcript: string, state: string) => (object|null)} [options.buildResponseMeta]
      */
-    constructor({ protocol = null, buildResponseMeta = null } = {}) {
+    constructor({ protocol = null, buildResponseMeta = null, newestFirst = false } = {}) {
         this._entries = new Map();
         if (protocol) {
             registerStreamSource(protocol, () => this._entries.entries());
@@ -116,6 +117,7 @@ export class StreamSession {
         this._persisters = new Map();
         this._renderStates = new Map();
         this._buildResponseMeta = buildResponseMeta;
+        this._newestFirst = newestFirst;
     }
 
     get(tabId) {
@@ -158,6 +160,21 @@ export class StreamSession {
 
     async updateStatus(tabId, text, status = null) {
         await showStatusIfActive(tabId, text, status);
+    }
+
+    /** Empty the log without changing the connection or allowing queued work to restore old entries. */
+    async clearTranscript(tabId) {
+        const current = this.get(tabId);
+        if (!current) { return; }
+        this._buffers.delete(tabId);
+        this._persisters.get(tabId)?.cancel();
+        const previousRender = this._renderStates.get(tabId);
+        if (previousRender?.timer) { clearTimeout(previousRender.timer); }
+        const renderState = { timer: null, lastRenderedAt: 0 };
+        this._renderStates.set(tabId, renderState);
+        this.set(tabId, { ...current, transcript: '' });
+        this._renderNow(tabId, renderState);
+        await this._persist(tabId);
     }
 
     /**
@@ -236,7 +253,9 @@ export class StreamSession {
     }
 
     _push(buffer, line) {
-        buffer.body = buffer.body ? buffer.body + ENTRY_SEPARATOR + line : line;
+        buffer.body = buffer.body
+            ? (this._newestFirst ? line + ENTRY_SEPARATOR + buffer.body : buffer.body + ENTRY_SEPARATOR + line)
+            : line;
         buffer.sizes.push(line.length);
         buffer.chars += line.length + ENTRY_SEPARATOR.length;
     }
@@ -248,16 +267,20 @@ export class StreamSession {
                 || buffer.chars > MAX_TRANSCRIPT_CHARS)
         ) {
             const size = buffer.sizes.shift();
-            buffer.body = buffer.body.slice(size + ENTRY_SEPARATOR.length);
+            buffer.body = this._newestFirst
+                ? buffer.body.slice(0, -(size + ENTRY_SEPARATOR.length))
+                : buffer.body.slice(size + ENTRY_SEPARATOR.length);
             buffer.chars -= size + ENTRY_SEPARATOR.length;
             buffer.dropped += 1;
         }
     }
 
     _compose(buffer) {
-        return buffer.dropped > 0
-            ? droppedNotice(buffer.dropped) + ENTRY_SEPARATOR + buffer.body
-            : buffer.body;
+        if (!buffer.dropped) { return buffer.body; }
+        const notice = droppedNotice(buffer.dropped);
+        return this._newestFirst
+            ? buffer.body + ENTRY_SEPARATOR + notice
+            : notice + ENTRY_SEPARATOR + buffer.body;
     }
 
     _schedulePersist(tabId) {

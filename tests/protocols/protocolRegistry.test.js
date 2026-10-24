@@ -169,6 +169,13 @@ describe('protocolRegistry', () => {
             expect(projected.url).toBeNull();
             expect(projected.headers).toEqual([]);
         });
+
+        test('WebSocket restores Text bodies while excluding unsupported form bodies', () => {
+            const descriptor = getProtocol('websocket');
+            const text = { mode: 'text', content: '  message\n' };
+            expect(projectPersistedData(descriptor, { formBodyData: text }).formBodyData).toEqual(text);
+            expect(projectPersistedData(descriptor, storedData).formBodyData).toBeNull();
+        });
     });
 });
 
@@ -181,7 +188,7 @@ const EXPECTED_URL_SECTIONS = {
     },
     websocket: {
         sectionId: 'websocket-url-section', method: 'WS', label: 'WS', inputType: 'url',
-        placeholder: 'wss://echo.websocket.events', ariaLabel: 'WebSocket URL', peerId: 'url-input', syncQueryParams: true
+        placeholder: 'wss://echo.websocket.org', ariaLabel: 'WebSocket URL', peerId: 'url-input', syncQueryParams: true
     },
     mqtt: {
         sectionId: 'mqtt-url-section', method: 'MQTT', label: 'MQTT', inputType: 'text',
@@ -206,7 +213,7 @@ describe('protocol ui descriptors', () => {
 
     test('body-mode and workbench rules match the former MODE_UI table', () => {
         expect(getProtocol('http').ui).toMatchObject({ showBodyModeSelector: true, forceBodyMode: null, lockBodyMode: false, workbench: null });
-        expect(getProtocol('websocket').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: 'json', lockBodyMode: true, workbench: 'off' });
+        expect(getProtocol('websocket').ui).toMatchObject({ showBodyModeSelector: true, forceBodyMode: null, lockBodyMode: false, workbench: null });
         expect(getProtocol('mqtt').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: 'json', lockBodyMode: true, workbench: 'off' });
         expect(getProtocol('graphql').ui).toMatchObject({ showBodyModeSelector: false, forceBodyMode: null, lockBodyMode: null, workbench: 'on', alwaysActivateDefaultTab: true });
         expect(getProtocol('sse').ui.alwaysActivateDefaultTab).toBeUndefined();

@@ -1,6 +1,7 @@
 /* global document */
 import { CollectionRequestPersistenceService } from '../../src/modules/services/CollectionRequestPersistenceService.js';
 import { RequestFormReader } from '../../src/modules/requestFormReader.js';
+import { app } from '../../src/modules/appContext.js';
 
 describe('CollectionRequestPersistenceService protocol routing', () => {
     let repository;
@@ -69,12 +70,24 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         expect(sseEndpoint.path).toBe('https://api.example.com/v1/stream');
     });
 
+    test('WebSocket persists Text mode and clears stale JSON body data', async () => {
+        collection.endpoints.push({ id: 'ws1', protocol: 'websocket', path: 'wss://example.test' });
+        document.body.insertAdjacentHTML('beforeend', '<select id="body-mode-select"><option value="text" selected>Text</option></select><textarea id="body-input">stale JSON</textarea>');
+        app.requestBodyTextEditor = { getContent: () => '  message\n' };
+        try {
+            await service.saveAllRequestModifications('c1', 'ws1');
+            expect(repository.updateEndpointFields).toHaveBeenCalledWith('c1', 'ws1', expect.objectContaining({
+                modifiedBody: null, formBodyData: { mode: 'text', content: '  message\n' }, graphqlData: null
+            }));
+        } finally { delete app.requestBodyTextEditor; }
+    });
+
     test('an SSE endpoint persists its authentication, unlike a websocket one', async () => {
         collection.endpoints.push({
             id: 'ws1',
             protocol: 'websocket',
             method: 'WS',
-            path: 'wss://echo.websocket.events'
+            path: 'wss://echo.websocket.org'
         });
 
         await service.saveAllRequestModifications('c1', 'sse1');

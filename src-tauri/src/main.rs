@@ -55,7 +55,7 @@ use commands::{
     updater::{
         PendingUpdate, updater_check, updater_download_and_install, updater_get_install_info,
     },
-    websocket::{WebSocketState, websocket_close, websocket_send},
+    websocket::{WebSocketState, websocket_close, websocket_connect, websocket_send},
 };
 
 fn main() {
@@ -192,6 +192,7 @@ fn main() {
             response_inspect,
             // WebSocket
             websocket_send,
+            websocket_connect,
             websocket_close,
             graphql_subscription_send,
             graphql_subscription_close,

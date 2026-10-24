@@ -84,6 +84,16 @@ describe('WorkspaceTabEndpointLoaderService protocol dispatch', () => {
         });
     });
 
+    describe('WebSocket', () => {
+        test.each(['  message\n', ''])('restores the saved Text body exactly: %j', content => {
+            const update = loader.createTabUpdate({
+                id: 'ws', collectionId: 'c1', protocol: 'websocket', path: 'wss://example.test',
+                persistedBody: 'stale JSON', persistedFormBodyData: { mode: 'text', content }
+            });
+            expect(update.request.body).toEqual({ mode: 'text', content });
+        });
+    });
+
     describe('MQTT', () => {
         const mqttEndpoint = {
             id: 'e2',

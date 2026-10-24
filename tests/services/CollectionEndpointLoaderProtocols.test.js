@@ -123,6 +123,14 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
         expect(data.persistedHeaders).toEqual([]);
     });
 
+    test('a WebSocket endpoint loads its saved Text body mode', async () => {
+        repository.getAllPersistedEndpointData.mockResolvedValueOnce({
+            ...storedData, formBodyData: { mode: 'text', content: '  message\n' }
+        });
+        const data = await loadedData({ id: 'ws', protocol: 'websocket', path: 'wss://example.test' });
+        expect(data.persistedFormBodyData).toEqual({ mode: 'text', content: '  message\n' });
+    });
+
     test('an http endpoint still sees the full HTTP data set', async () => {
         const data = await loadedData({
             id: 'e1',
@@ -142,7 +150,7 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
             id: 'e1',
             protocol: 'websocket',
             method: 'WS',
-            path: 'wss://echo.websocket.events'
+            path: 'wss://echo.websocket.org'
         });
 
         expect(data.protocol).toBe('websocket');

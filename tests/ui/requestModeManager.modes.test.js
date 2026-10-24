@@ -57,8 +57,8 @@ const EXPECTED = {
         methodSelect: false,
         sharedUrlBar: false,
         urlSection: 'websocket-url-section',
-        bodyModes: ALL_MODE_VALUES,
-        selectorVisible: false
+        bodyModes: ['json', 'text'],
+        selectorVisible: true
     },
     [RequestMode.MQTT]: {
         tabs: ['mqtt', 'body'],
@@ -287,7 +287,7 @@ describe('graphql body manager interactions', () => {
         expect(stub.setGraphQLModeEnabled).toHaveBeenCalledWith(false);
     });
 
-    test.each([RequestMode.WEBSOCKET, RequestMode.MQTT])(
+    test.each([RequestMode.MQTT])(
         '%s forces the body to JSON and swaps the visible panel',
         (mode) => {
             document.getElementById('body-mode-select').value = 'formdata';

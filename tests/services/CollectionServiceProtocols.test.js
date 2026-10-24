@@ -118,16 +118,16 @@ describe('CollectionService.addRequestToCollection protocol handling', () => {
         const endpoint = await service.addRequestToCollection('c1', {
             name: 'Echo',
             protocol: 'websocket',
-            url: 'wss://echo.websocket.events'
+            url: 'wss://echo.websocket.org'
         });
 
         expect(endpoint.protocol).toBe('websocket');
         expect(endpoint.method).toBe('WS');
-        expect(endpoint.path).toBe('wss://echo.websocket.events');
+        expect(endpoint.path).toBe('wss://echo.websocket.org');
         expect(repository.savePersistedUrl).toHaveBeenCalledWith(
             'c1',
             endpoint.id,
-            'wss://echo.websocket.events'
+            'wss://echo.websocket.org'
         );
     });
 

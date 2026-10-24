@@ -13,7 +13,7 @@ import { initTabListeners, activateTab } from './modules/tabManager.js';
 import { registerTabShortcuts } from './modules/tabShortcuts.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
-import { handleSendRequest, handleCancelRequest, handleGenerateCurl } from './modules/apiHandler.js';
+import { handleSendRequest, handleCancelRequest, handleGenerateCurl, handleWebSocketConnectionAction } from './modules/apiHandler.js';
 import { getSettingsCache } from './modules/state/settingsCache.js';
 import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
@@ -168,7 +168,11 @@ const SHORTCUTS = [
     {
         key: 'Escape', category: 'Request', description: 'Cancel request', hintTarget: 'cancel-request-btn',
         handler: () => {
-            if (cancelRequestBtn && !cancelRequestBtn.disabled && cancelRequestBtn.style.display !== 'none') {
+            const connectionButton = document.getElementById('websocket-connect-btn');
+            if (connectionButton && connectionButton.style.display !== 'none' && !connectionButton.disabled
+                && connectionButton.classList.contains('destructive-action')) {
+                handleCancelRequest();
+            } else if (cancelRequestBtn && !cancelRequestBtn.disabled && cancelRequestBtn.style.display !== 'none') {
                 handleCancelRequest();
             }
         }
@@ -396,6 +400,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     curlBtn.addEventListener('click', handleGenerateCurl);
     sendRequestBtn.addEventListener('click', handleSendRequest);
     cancelRequestBtn.addEventListener('click', handleCancelRequest);
+    document.getElementById('websocket-connect-btn')?.addEventListener('click', handleWebSocketConnectionAction);
 
     const mqttDisconnectBtn = document.getElementById('mqtt-disconnect-btn');
     if (mqttDisconnectBtn) {

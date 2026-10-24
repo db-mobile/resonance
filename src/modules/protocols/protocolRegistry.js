@@ -54,6 +54,8 @@ export const RequestMode = {
  * @property {() => Promise<*>} send
  * @property {() => Promise<*>} cancel
  * @property {(tabId: ?string) => boolean} isLive
+ * @property {(tabId: ?string) => string} [connectionState]
+ * @property {(tabId: ?string) => boolean} [isSending]
  */
 
 /**
@@ -207,16 +209,17 @@ export const PROTOCOLS = Object.freeze({
         urlBased: true,
         needsMethod: false,
         needsTarget: false,
-        pathPlaceholder: 'wss://echo.websocket.events',
+        pathPlaceholder: 'wss://echo.websocket.org',
         requestTabs: Object.freeze(['query-params', 'headers', 'body']),
         defaultTab: 'body',
-        bodyModes: null,
+        bodyModes: Object.freeze(['json', 'text']),
         responseTabSet: 'none',
         persisted: Object.freeze(capabilities({
             url: true,
             queryParams: true,
             headers: true,
-            modifiedBody: true
+            modifiedBody: true,
+            formBodyData: true
         })),
         createSidecars: Object.freeze(['url']),
         liveControl: 'cancel',
@@ -226,15 +229,15 @@ export const PROTOCOLS = Object.freeze({
                 method: 'WS',
                 label: 'WS',
                 inputType: 'url',
-                placeholder: 'wss://echo.websocket.events',
+                placeholder: 'wss://echo.websocket.org',
                 ariaLabel: 'WebSocket URL',
                 peerId: 'url-input',
                 syncQueryParams: true
             }),
-            showBodyModeSelector: false,
-            forceBodyMode: 'json',
-            lockBodyMode: true,
-            workbench: 'off'
+            showBodyModeSelector: true,
+            forceBodyMode: null,
+            lockBodyMode: false,
+            workbench: null
         })
     }),
     [RequestMode.GRAPHQL]: Object.freeze({
@@ -473,6 +476,11 @@ export function projectPersistedData(descriptor, persistedData) {
         projected[kind] = descriptor.persisted[kind]
             ? (source[kind] ?? emptyValue)
             : emptyValue;
+
+        if (kind === 'formBodyData' && descriptor.bodyModes
+            && !descriptor.bodyModes.includes(projected[kind]?.mode)) {
+            projected[kind] = emptyValue;
+        }
 
         return projected;
     }, {});

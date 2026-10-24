@@ -25,7 +25,7 @@ jest.mock('../../src/modules/requestBodyHelper.js', () => ({
 import { displayResponseWithLineNumbersForTab } from '../../src/modules/responseView.js';
 import { updateStatusDisplay } from '../../src/modules/statusDisplay.js';
 import { app } from '../../src/modules/appContext.js';
-import { initWebSocketHandler, handleWebSocketSend } from '../../src/modules/websocketHandler.js';
+import { initWebSocketHandler, handleWebSocketConnect, clearWebSocketState } from '../../src/modules/websocketHandler.js';
 import { initMqttHandler } from '../../src/modules/mqttHandler.js';
 
 describe('streaming handlers ignore events for tabs with no session', () => {
@@ -42,7 +42,11 @@ describe('streaming handlers ignore events for tabs with no session', () => {
         };
 
         window.backendAPI = {
-            websocket: { send: jest.fn().mockResolvedValue(undefined) },
+            websocket: {
+                connect: jest.fn().mockResolvedValue({ success: true }),
+                send: jest.fn().mockResolvedValue({ success: true }),
+                close: jest.fn().mockResolvedValue({ success: true })
+            },
             mqtt: { connect: jest.fn().mockResolvedValue(undefined) }
         };
 
@@ -50,7 +54,8 @@ describe('streaming handlers ignore events for tabs with no session', () => {
         await initMqttHandler();
     });
 
-    afterAll(() => {
+    afterAll(async () => {
+        await clearWebSocketState('tab-1');
         delete window.__TAURI_INTERNALS__;
         delete window.backendAPI;
         app.workspaceTabController = null;
@@ -91,15 +96,16 @@ describe('streaming handlers ignore events for tabs with no session', () => {
     });
 
     test('a live websocket tab still renders its open and message events', async () => {
-        await handleWebSocketSend('wss://example.test/socket');
+        await handleWebSocketConnect({ tabId: 'tab-1', url: 'wss://example.test/socket' });
+        const { connectionId } = window.backendAPI.websocket.connect.mock.calls.at(-1)[0];
 
         jest.clearAllMocks();
 
         await handlers['websocket-event']({
-            payload: { tabId: 'tab-1', eventType: 'open', url: 'wss://example.test/socket' }
+            payload: { tabId: 'tab-1', connectionId, eventType: 'open', url: 'wss://example.test/socket' }
         });
         await handlers['websocket-event']({
-            payload: { tabId: 'tab-1', eventType: 'message', message: 'hello' }
+            payload: { tabId: 'tab-1', connectionId, eventType: 'message', message: 'hello' }
         });
         await new Promise((resolve) => setTimeout(resolve, 120));
 

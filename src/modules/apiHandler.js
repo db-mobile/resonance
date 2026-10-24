@@ -34,7 +34,7 @@ import { getRequestBodyContent, captureSnippetBody } from './requestBodyHelper.j
 import { isGraphQLMode, getCurrentMode, RequestMode } from './requestModeManager.js';
 import { getProtocol, getProtocolHandler, registerProtocolHandler } from './protocols/protocolRegistry.js';
 import { handleGrpcSend, handleGrpcCancel } from './grpcHandler.js';
-import { handleWebSocketCancel, handleWebSocketSend, isWebSocketLive } from './websocketHandler.js';
+import { handleWebSocketConnect, handleWebSocketCancel, handleWebSocketSend, isWebSocketLive, getWebSocketState, isWebSocketSending, getWebSocketBodyContent } from './websocketHandler.js';
 import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import { readMqttForm } from './mqtt/mqttFields.js';
@@ -273,16 +273,42 @@ function readMqttOptions() {
  * @property {(prepared: Object, payload: *) => Promise<*>} send
  */
 
-/** @type {StreamingSend} */
-const WEBSOCKET_STREAM = Object.freeze({
-    useAuth: true,
-    buildPayload: ({ variables, processor }) => {
-        const message = processor.processTemplate(getRequestBodyContent() || '', variables);
-        warnUnresolvedVariables(processor, { body: message });
-        return message;
-    },
-    send: ({ url, headers }, message) => handleWebSocketSend(url, headers, message)
-});
+/** Toggle only the connection; the composer is deliberately excluded. */
+export async function handleWebSocketConnectionAction() {
+    const tab = getActiveTabId();
+    const request = {
+        url: readSendUrl(RequestMode.WEBSOCKET),
+        headers: parseKeyValuePairs(document.getElementById('headers-list')),
+        queryParams: parseKeyValuePairs(document.getElementById('query-params-list')),
+        endpoint: getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null,
+        authConfig: clone(app.authManager?.getAuthConfig?.())
+    };
+    const tabId = await tab;
+    if (getWebSocketState(tabId) !== 'closed') { return handleWebSocketCancel(tabId); }
+    scheduleEndpointSave();
+    return handleWebSocketConnect({
+        tabId, url: request.url,
+        prepare: async () => {
+            const prepared = await resolveRequestPipeline({ ...request, useAuth: true });
+            if (!prepared.ok) { throw new Error(prepared.error); }
+            return prepared;
+        }
+    });
+}
+
+async function sendWebSocketMessage() {
+    const tab = getActiveTabId();
+    const message = getWebSocketBodyContent() || '';
+    const endpoint = getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null;
+    const tabId = await tab;
+    scheduleEndpointSave();
+    return handleWebSocketSend(message, tabId, async (body) => {
+        const { variables, processor } = await getRequestPipeline().requestBuilder.resolveVariables(endpoint, {});
+        const processed = processor.processTemplate(body, variables);
+        warnUnresolvedVariables(processor, { body: processed });
+        return processed;
+    });
+}
 
 /** @type {StreamingSend} */
 const SSE_STREAM = Object.freeze({
@@ -653,9 +679,11 @@ registerProtocolHandler(RequestMode.HTTP, {
     isLive: () => false
 });
 registerProtocolHandler(RequestMode.WEBSOCKET, {
-    send: () => runStreamingSend(RequestMode.WEBSOCKET, WEBSOCKET_STREAM),
-    cancel: () => cancelStreaming(handleWebSocketCancel),
-    isLive: isWebSocketLive
+    send: sendWebSocketMessage,
+    cancel: handleWebSocketCancel,
+    isLive: isWebSocketLive,
+    connectionState: getWebSocketState,
+    isSending: isWebSocketSending
 });
 registerProtocolHandler(RequestMode.SSE, {
     send: () => runStreamingSend(RequestMode.SSE, SSE_STREAM),

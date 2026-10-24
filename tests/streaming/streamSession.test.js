@@ -113,6 +113,66 @@ describe('StreamSession transcript', () => {
         expect(session.get(TAB).transcript).toContain('[5 earlier entries dropped]');
         expect(session.get('tab-2').transcript).not.toContain('dropped');
     });
+
+    test('newest-first sessions prepend complete entries, including multiline payloads', async () => {
+        const newest = new StreamSession({ newestFirst: true });
+        newest.set(TAB, { state: 'open', transcript: '' });
+        await newest.append(TAB, 'RECEIVED', 'older\n\nmessage');
+        await newest.append(TAB, 'RECEIVED', 'newer\nmessage');
+        expect(newest.get(TAB).transcript).toMatch(/^\[[^\]]+\] RECEIVED\nnewer\nmessage\n\n\[[^\]]+\] RECEIVED\nolder\n\nmessage$/);
+    });
+
+    test('newest-first sessions trim the oldest entries and put the notice at the end', async () => {
+        const newest = new StreamSession({ newestFirst: true });
+        newest.set(TAB, { state: 'open', transcript: '' });
+        for (let i = 0; i < 505; i += 1) { await newest.append(TAB, 'EVENT', `data: ${i}`); }
+        const entries = newest.get(TAB).transcript.split('\n\n');
+        expect(entries).toHaveLength(501);
+        expect(entries[0]).toMatch(/EVENT\ndata: 504$/);
+        expect(entries.at(-2)).toMatch(/EVENT\ndata: 5$/);
+        expect(entries.at(-1)).toBe('[5 earlier entries dropped]');
+    });
+
+    test('newest-first sessions enforce the byte budget without cutting a message in half', async () => {
+        const newest = new StreamSession({ newestFirst: true });
+        newest.set(TAB, { state: 'open', transcript: '' });
+        const body = 'x'.repeat(100 * 1024);
+        for (let i = 0; i < 5; i += 1) { await newest.append(TAB, `MESSAGE ${i}`, body); }
+        const { transcript } = newest.get(TAB);
+        expect(transcript.length).toBeLessThan(256 * 1024);
+        expect(transcript).toMatch(/^\[[^\]]+\] MESSAGE 4/);
+        expect(transcript).toContain(`MESSAGE 3\n${body}`);
+        expect(transcript).not.toContain('MESSAGE 2');
+        expect(transcript).toMatch(/\[3 earlier entries dropped\]$/);
+    });
+
+    test('clearing immediately empties the display and persistence while preserving connection state', async () => {
+        const connection = { id: 'live' };
+        session.set(TAB, { ...session.get(TAB), connection });
+        await session.append(TAB, 'EVENT', 'older');
+        await session.append(TAB, 'EVENT', 'queued');
+        await session.clearTranscript(TAB);
+        expect(lastRendered()).toBe('');
+        expect(session.get(TAB)).toMatchObject({ state: 'open', connection, transcript: '' });
+        expect(updateTab).toHaveBeenLastCalledWith(TAB, { response: { data: '', state: 'open' } });
+        await jest.advanceTimersByTimeAsync(500);
+        expect(lastRendered()).toBe('');
+        await session.append(TAB, 'EVENT', 'fresh');
+        await jest.advanceTimersByTimeAsync(500);
+        expect(lastRendered()).toMatch(/EVENT\nfresh$/);
+        expect(lastRendered()).not.toContain('older');
+        expect(lastRendered()).not.toContain('queued');
+    });
+
+    test('clearing resets dropped-entry bookkeeping and leaves other tabs intact', async () => {
+        session.set('tab-2', { state: 'open', transcript: '' });
+        await session.append('tab-2', 'EVENT', 'other tab');
+        for (let i = 0; i < 505; i += 1) { await session.append(TAB, 'EVENT', String(i)); }
+        await session.clearTranscript(TAB);
+        await session.append(TAB, 'EVENT', 'fresh');
+        expect(session.get(TAB).transcript).not.toContain('dropped');
+        expect(session.get('tab-2').transcript).toContain('other tab');
+    });
 });
 
 describe('StreamSession persistence', () => {

@@ -38,7 +38,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 - **REST/HTTP** — HTTP/1.1 and HTTP/2, all body modes (JSON, form data, URL-encoded, plain text, binary files, multipart file uploads), detailed timing breakdown (DNS, TCP, TLS, TTFB, download), cookie display, configurable timeouts
 - **GraphQL** — dedicated query and variables editors with syntax highlighting, auto-format, schema introspection and an interactive query explorer, and live subscriptions over WebSocket (`graphql-transport-ws`)
 - **gRPC** — server reflection (v1/v1alpha) with automatic service discovery, local `.proto` file loading, all four RPC kinds (unary, server-, client-, and bidirectional streaming), TLS/mTLS options, metadata and trailers display
-- **WebSocket** — persistent connections per tab, handshake headers, transcript-style message display
+- **WebSocket** — explicit Connect/Send/Disconnect controls, JSON and Text message modes with formatting available for JSON, persistent connections per tab, handshake headers, and newest-first message transcripts. Clear the response log while keeping the connection open. The Request Timeout setting limits connection setup only (0 disables it); open sockets stay connected until disconnected or closed by the server. Try `wss://echo.websocket.org`.
 - **Server-Sent Events** — automatic reconnection honoring `retry`, `Last-Event-ID` resumption, live connection lifecycle status
 - **MQTT** — plaintext and TLS brokers, topic subscribe/publish with wildcards, QoS 0/1/2, retain flag, live connection status
 

@@ -396,7 +396,10 @@ export class WorkspaceTabEndpointLoaderService {
             pathParams: {},
             queryParams,
             headers,
-            body: {
+            body: endpoint.persistedFormBodyData?.mode === 'text' ? {
+                mode: 'text',
+                content: endpoint.persistedFormBodyData.content || ''
+            } : {
                 mode: 'json',
                 content: endpoint.persistedBody || ''
             },
