@@ -218,6 +218,26 @@ describe('response restoration across protocols', () => {
     );
 });
 
+describe('WebSocket body restoration', () => {
+    afterEach(() => { document.body.innerHTML = ''; });
+
+    test('restores Text mode with whitespace intact', async () => {
+        const { manager, graphqlBodyManager, app } = await loadHarness();
+        app.requestBodyTextEditor = { setContent: jest.fn() };
+        await manager.restoreTabState(tabFor('websocket', { body: { mode: 'text', content: '  text message\n' } }));
+        expect(graphqlBodyManager.switchMode).toHaveBeenCalledWith('text');
+        expect(app.requestBodyTextEditor.setContent).toHaveBeenCalledWith('  text message\n');
+    });
+
+    test('legacy JSON messages retain JSON mode and exact content', async () => {
+        const { manager, graphqlBodyManager } = await loadHarness();
+        document.getElementById('body').insertAdjacentHTML('beforeend', '<textarea id="body-input"></textarea>');
+        await manager.restoreTabState(tabFor('websocket', { body: { mode: 'json', content: '{ "a": 1 }\n' } }));
+        expect(graphqlBodyManager.switchMode).toHaveBeenCalledWith('json');
+        expect(document.getElementById('body-input').value).toBe('{ "a": 1 }\n');
+    });
+});
+
 describe('MQTT fans its broker record out across the connection fields', () => {
     afterEach(() => {
         document.body.innerHTML = '';

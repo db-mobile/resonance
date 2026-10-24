@@ -1,77 +1,56 @@
-//! Shared machinery for the two WebSocket-backed transports: the raw WebSocket
-//! client and the `graphql-transport-ws` subscription client.
-//!
-//! The two differ only in the Tauri event they emit on, whether they advertise
-//! a subprotocol, and the wording of a handful of user-facing errors. Everything
-//! else — connection registry, reuse policy, the writer/reader task pair, and
-//! the event payload shape — is identical and lives here, so a fix to the socket
-//! lifecycle lands on both transports at once.
-//!
-//! Each transport supplies a [`WsChannel`] describing its differences and owns
-//! its own `#[tauri::command]` wrappers and managed state; the payload wire
-//! format is shared, so the frontend contract is per-event-name only.
-
-use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tauri::{AppHandle, Emitter, Runtime};
-use tokio::sync::mpsc;
-use tokio_tungstenite::{
-    client_async_tls_with_config, connect_async_tls_with_config,
-    tungstenite::{client::IntoClientRequest, protocol::Message},
-};
-
+//! Shared WebSocket lifecycle for raw sockets and GraphQL subscriptions.
 use super::api_request::ClientCertConfig;
 use super::proxy::{ProxySettings, WsProxyAction};
 use super::proxy_tunnel::connect_through_proxy;
 use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 use super::tls::{build_ws_connector, ws_uri_is_secure};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, time::Duration};
+use tauri::{AppHandle, Emitter, Runtime};
+use tokio::sync::{mpsc, oneshot, watch};
+use tokio_tungstenite::{
+    client_async_tls_with_config, connect_async_tls_with_config,
+    tungstenite::{
+        Error as WsError,
+        client::IntoClientRequest,
+        protocol::{CloseFrame, Message, frame::coding::CloseCode},
+    },
+};
 
-/// Everything that differs between the two transports. All fields are static:
-/// a channel is a constant per transport, not per request.
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+
 pub(crate) struct WsChannel {
-    /// Tauri event name the payloads are emitted on.
     pub event_name: &'static str,
-    /// Advertised in `Sec-WebSocket-Protocol`, when the transport needs one.
     pub subprotocol: Option<&'static str>,
-    /// Names the transport when a request cannot be built
-    /// ("Failed to build {} request").
     pub request_label: &'static str,
-    /// Qualifies header validation errors ("Invalid {}header name"). The
-    /// WebSocket transport names itself here; the subscription one does not.
     pub header_error_qualifier: &'static str,
-    /// Reported when the caller supplies no URL.
     pub url_required_error: &'static str,
-    /// Reported when the writer task can no longer be reached.
     pub send_failed_error: &'static str,
 }
 
 pub(crate) enum WsCommand {
     Send(String),
     Close,
+    Flush,
 }
 
-/// A live socket. The entry is only ever removed by its own reader task, once
-/// the socket has actually ended, so that task alone reports `close` for the
-/// tab; a closing socket stays registered but is never reused.
 pub(crate) struct WsConnection {
     sender: mpsc::UnboundedSender<WsCommand>,
+    shutdown: watch::Sender<bool>,
+    connection_id: Option<String>,
     url: String,
     headers: HashMap<String, String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
+    open: bool,
     closing: bool,
 }
-
 impl WsConnection {
-    /// Ask the writer to send a close frame, at most once.
     fn begin_close(&mut self) {
-        if !self.closing {
-            let _ = self.sender.send(WsCommand::Close);
-            self.closing = true;
-        }
+        self.closing = true;
+        self.shutdown.send_replace(true);
     }
-
     fn is_reusable_for(
         &self,
         url: &str,
@@ -79,10 +58,8 @@ impl WsConnection {
         verify_ssl: bool,
         client_cert: &Option<ClientCertConfig>,
     ) -> bool {
-        // The TLS material is part of the identity of the socket: reusing a
-        // connection opened under different certificate settings would silently
-        // ignore the change the user just made.
-        !self.closing
+        self.open
+            && !self.closing
             && !self.sender.is_closed()
             && self.url == url
             && self.headers == *headers
@@ -90,8 +67,6 @@ impl WsConnection {
             && self.client_cert == *client_cert
     }
 }
-
-/// Registry of live sockets, keyed by tab id.
 pub(crate) type WsConnections = TabSessions<WsConnection>;
 
 #[derive(Debug, Deserialize)]
@@ -103,14 +78,29 @@ pub struct WsSendRequest {
     pub headers: Option<HashMap<String, String>>,
     #[serde(default)]
     pub message: Option<String>,
-    /// Mirrors the HTTP and SSE request options: `Some(false)` turns
-    /// certificate verification off, and the client certificate / custom CA are
-    /// resolved per host by the frontend from the certificate store. Both only
-    /// apply to `wss://` URLs.
     #[serde(default)]
     pub verify_ssl: Option<bool>,
     #[serde(default)]
     pub client_cert: Option<ClientCertConfig>,
+}
+fn default_connect_timeout() -> Option<u64> {
+    Some(30_000)
+}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsConnectRequest {
+    #[serde(flatten)]
+    pub options: WsSendRequest,
+    pub connection_id: String,
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout_ms: Option<u64>,
+}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsMessageRequest {
+    pub tab_id: String,
+    pub connection_id: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -120,47 +110,45 @@ struct WsEventPayload {
     event_type: String,
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    connection_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
 }
-
 impl WsEventPayload {
     fn new(tab_id: &str, url: &str, event_type: &str) -> Self {
         Self {
-            tab_id: tab_id.to_string(),
-            event_type: event_type.to_string(),
-            url: url.to_string(),
+            tab_id: tab_id.into(),
+            url: url.into(),
+            event_type: event_type.into(),
+            connection_id: None,
             message: None,
             code: None,
             reason: None,
         }
     }
-
     fn open(tab_id: &str, url: &str) -> Self {
         Self {
             code: Some(101),
-            reason: Some("Switching Protocols".to_string()),
+            reason: Some("Switching Protocols".into()),
             ..Self::new(tab_id, url, "open")
         }
     }
-
     fn message(tab_id: &str, url: &str, message: String) -> Self {
         Self {
             message: Some(message),
             ..Self::new(tab_id, url, "message")
         }
     }
-
     fn error(tab_id: &str, url: &str, message: String) -> Self {
         Self {
             message: Some(message),
             ..Self::new(tab_id, url, "error")
         }
     }
-
     fn close(tab_id: &str, url: &str, code: Option<u16>, reason: Option<String>) -> Self {
         Self {
             code,
@@ -169,37 +157,73 @@ impl WsEventPayload {
         }
     }
 }
-
-/// Host and port to name in the `CONNECT` request. Tungstenite has already
-/// validated the scheme, so the only defaulting needed is the port.
-fn target_authority(
-    uri: &tokio_tungstenite::tungstenite::http::Uri,
-    is_secure: bool,
-) -> Result<(String, u16), String> {
-    let host = uri
-        .host()
-        .ok_or_else(|| "The URL has no host to tunnel to".to_string())?
-        .to_string();
-    let port = uri.port_u16().unwrap_or(if is_secure { 443 } else { 80 });
-    Ok((host, port))
-}
-
 fn emit_event<R: Runtime>(app: &AppHandle<R>, channel: &WsChannel, payload: WsEventPayload) {
     let _ = app.emit(channel.event_name, payload);
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn establish_connection<R: Runtime>(
+/// Owns one generation. Check and emit under the same lock so superseded tasks stay silent.
+struct Lifecycle<R: Runtime> {
     app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: WsConnections,
     tab_id: String,
     url: String,
+    connection_id: Option<String>,
+    generation: u64,
+}
+impl<R: Runtime> Lifecycle<R> {
+    async fn emit(&self, mut payload: WsEventPayload, terminal: bool) {
+        let mut guard = self.connections.lock().await;
+        if guard
+            .get(&self.tab_id)
+            .is_none_or(|s| s.generation != self.generation)
+        {
+            return;
+        }
+        payload.connection_id = self.connection_id.clone();
+        emit_event(&self.app, self.channel, payload);
+        if terminal {
+            guard.remove(&self.tab_id);
+        }
+    }
+    async fn error(&self, message: String, terminal: bool) {
+        self.emit(
+            WsEventPayload::error(&self.tab_id, &self.url, message),
+            terminal,
+        )
+        .await;
+    }
+}
+
+trait SocketIo:
+    Stream<Item = Result<Message, WsError>> + Sink<Message, Error = WsError> + Unpin + Send
+{
+}
+impl<T> SocketIo for T where
+    T: Stream<Item = Result<Message, WsError>> + Sink<Message, Error = WsError> + Unpin + Send
+{
+}
+type Socket = Box<dyn SocketIo>;
+
+fn target_authority(
+    uri: &tokio_tungstenite::tungstenite::http::Uri,
+    secure: bool,
+) -> Result<(String, u16), String> {
+    Ok((
+        uri.host()
+            .ok_or("The URL has no host to tunnel to")?
+            .to_string(),
+        uri.port_u16().unwrap_or(if secure { 443 } else { 80 }),
+    ))
+}
+async fn establish_connection(
+    channel: &'static WsChannel,
+    url: String,
     headers: HashMap<String, String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
     proxy: WsProxyAction,
-) -> Result<mpsc::UnboundedSender<WsCommand>, String> {
+) -> Result<Socket, String> {
     let mut request = url.clone().into_client_request().map_err(|error| {
         format!(
             "Failed to build {} request: {}",
@@ -256,18 +280,7 @@ async fn establish_connection<R: Runtime>(
             let (stream, _) = connect_async_tls_with_config(request, None, false, connector)
                 .await
                 .map_err(|error| format!("Failed to connect: {}", error))?;
-            Ok(spawn_pumps(
-                app,
-                channel,
-                connections,
-                tab_id,
-                url,
-                headers,
-                verify_ssl,
-                client_cert,
-                stream,
-            )
-            .await)
+            Ok(Box::new(stream) as Socket)
         }
         WsProxyAction::Tunnel(endpoint) => {
             let (host, port) = target_authority(request.uri(), is_secure)?;
@@ -275,256 +288,324 @@ async fn establish_connection<R: Runtime>(
             let (stream, _) = client_async_tls_with_config(request, tunnel, None, connector)
                 .await
                 .map_err(|error| format!("Failed to connect through proxy: {}", error))?;
-            Ok(spawn_pumps(
-                app,
-                channel,
-                connections,
-                tab_id,
-                url,
-                headers,
-                verify_ssl,
-                client_cert,
-                stream,
-            )
-            .await)
+            Ok(Box::new(stream) as Socket)
         }
     }
 }
 
-/// Register the connection, announce it, and start the writer/reader tasks.
-///
-/// Generic over the transport so the proxied and unproxied paths share it: the
-/// former is tunnelled through a boxed stream, the latter is whatever
-/// tungstenite dialled.
-#[allow(clippy::too_many_arguments)]
-async fn spawn_pumps<R: Runtime, S>(
-    app: AppHandle<R>,
-    channel: &'static WsChannel,
-    connections: WsConnections,
-    tab_id: String,
-    url: String,
-    headers: HashMap<String, String>,
-    verify_ssl: bool,
-    client_cert: Option<ClientCertConfig>,
-    stream: tokio_tungstenite::WebSocketStream<S>,
-) -> mpsc::UnboundedSender<WsCommand>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
-{
-    let (mut writer, mut reader) = stream.split();
-    let (sender, mut receiver) = mpsc::unbounded_channel::<WsCommand>();
-    let generation = connections.next_generation();
-
-    connections.lock().await.insert(
-        tab_id.clone(),
-        Session {
-            generation,
-            value: WsConnection {
-                sender: sender.clone(),
-                url: url.clone(),
-                headers,
-                verify_ssl,
-                client_cert,
-                closing: false,
-            },
-        },
-    );
-
-    emit_event(&app, channel, WsEventPayload::open(&tab_id, &url));
-
-    let write_app = app.clone();
-    let write_tab_id = tab_id.clone();
-    let write_url = url.clone();
-    tokio::spawn(async move {
-        while let Some(command) = receiver.recv().await {
-            match command {
-                WsCommand::Send(message) => {
-                    if let Err(error) = writer.send(Message::text(message)).await {
-                        emit_event(
-                            &write_app,
-                            channel,
-                            WsEventPayload::error(&write_tab_id, &write_url, error.to_string()),
-                        );
-                        break;
-                    }
-                }
-                WsCommand::Close => {
-                    let _ = writer.send(Message::Close(None)).await;
-                    break;
-                }
-            }
-        }
-    });
-
-    let read_app = app.clone();
-    tokio::spawn(async move {
-        let mut close_payload = None;
-
-        while let Some(message) = reader.next().await {
-            match message {
-                Ok(Message::Text(text)) => {
-                    emit_event(
-                        &read_app,
-                        channel,
-                        WsEventPayload::message(&tab_id, &url, text.to_string()),
-                    );
-                }
-                Ok(Message::Binary(bytes)) => {
-                    emit_event(
-                        &read_app,
-                        channel,
-                        WsEventPayload::message(
-                            &tab_id,
-                            &url,
-                            format!("[Binary message received: {} bytes]", bytes.len()),
-                        ),
-                    );
-                }
-                Ok(Message::Close(frame)) => {
-                    close_payload = Some(WsEventPayload::close(
-                        &tab_id,
-                        &url,
-                        frame.as_ref().map(|value| value.code.into()),
-                        frame.as_ref().map(|value| value.reason.to_string()),
-                    ));
-                    break;
-                }
-                Ok(Message::Ping(_)) | Ok(Message::Pong(_)) | Ok(Message::Frame(_)) => {}
-                Err(error) => {
-                    emit_event(
-                        &read_app,
-                        channel,
-                        WsEventPayload::error(&tab_id, &url, error.to_string()),
-                    );
-                    break;
-                }
-            }
-        }
-
-        // A socket replaced by a reconnect on this tab stays silent, so its
-        // late `close` cannot tear down the successor in the UI.
-        if connections
-            .remove_if_current(&tab_id, generation)
-            .await
-            .is_some()
-        {
-            let payload = close_payload.unwrap_or_else(|| {
-                WsEventPayload::close(
-                    &tab_id,
-                    &url,
-                    Some(1000),
-                    Some("Connection closed".to_string()),
-                )
-            });
-            emit_event(&read_app, channel, payload);
-        }
-    });
-
-    sender
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn get_or_create_connection<R: Runtime>(
+/// Register before dialing. The acknowledgement means cancellation can now find the attempt.
+async fn start<R: Runtime>(
     app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: &WsConnections,
-    tab_id: &str,
-    url: &str,
-    headers: &HashMap<String, String>,
-    verify_ssl: bool,
-    client_cert: &Option<ClientCertConfig>,
     proxy: WsProxyAction,
-) -> Result<mpsc::UnboundedSender<WsCommand>, String> {
-    {
-        let mut guard = connections.lock().await;
-        if let Some(session) = guard.get_mut(tab_id) {
-            let connection = &mut session.value;
-            if connection.is_reusable_for(url, headers, verify_ssl, client_cert) {
-                return Ok(connection.sender.clone());
-            }
-            connection.begin_close();
-        }
+    request: WsSendRequest,
+    connection_id: Option<String>,
+    timeout_ms: Option<u64>,
+) -> Result<oneshot::Receiver<Result<mpsc::UnboundedSender<WsCommand>, String>>, String> {
+    require_tab_id(&request.tab_id)?;
+    if request.url.trim().is_empty() {
+        return Err(channel.url_required_error.into());
     }
-
-    establish_connection(
+    let (sender, receiver) = mpsc::unbounded_channel();
+    let (shutdown, mut stopped) = watch::channel(false);
+    let (ready, ready_rx) = oneshot::channel();
+    let generation = connections.next_generation();
+    let headers = request.headers.unwrap_or_default();
+    let verify_ssl = request.verify_ssl != Some(false);
+    let context = Lifecycle {
         app,
         channel,
-        connections.clone(),
-        tab_id.to_string(),
-        url.to_string(),
-        headers.clone(),
-        verify_ssl,
-        client_cert.clone(),
-        proxy,
-    )
-    .await
+        connections: connections.clone(),
+        tab_id: request.tab_id.clone(),
+        url: request.url.clone(),
+        connection_id: connection_id.clone(),
+        generation,
+    };
+    {
+        let mut guard = connections.lock().await;
+        if let Some(old) = guard.get_mut(&request.tab_id) {
+            old.value.begin_close();
+        }
+        guard.insert(
+            request.tab_id.clone(),
+            Session {
+                generation,
+                value: WsConnection {
+                    sender: sender.clone(),
+                    shutdown,
+                    connection_id,
+                    url: request.url.clone(),
+                    headers: headers.clone(),
+                    verify_ssl,
+                    client_cert: request.client_cert.clone(),
+                    open: false,
+                    closing: false,
+                },
+            },
+        );
+    }
+    tokio::spawn(async move {
+        let dial = establish_connection(
+            channel,
+            request.url,
+            headers,
+            verify_ssl,
+            request.client_cert,
+            proxy,
+        );
+        let handshake = async {
+            match timeout_ms.filter(|ms| *ms > 0) {
+                Some(ms) => tokio::time::timeout(Duration::from_millis(ms), dial)
+                    .await
+                    .map_err(|_| format!("Connection timed out after {ms} ms"))?,
+                None => dial.await,
+            }
+        };
+        let socket = tokio::select! {
+            biased;
+            _ = async { let _ = stopped.wait_for(|value| *value).await; } => {
+                context.emit(WsEventPayload::new(&context.tab_id, &context.url, "cancelled"), true).await;
+                let _ = ready.send(Err("Connection cancelled".into()));
+                return;
+            }
+            result = handshake => match result {
+                Ok(socket) => socket,
+                Err(error) => {
+                    context.error(error.clone(), true).await;
+                    let _ = ready.send(Err(error));
+                    return;
+                }
+            }
+        };
+        {
+            let mut guard = context.connections.lock().await;
+            let Some(entry) = guard
+                .get_mut(&context.tab_id)
+                .filter(|s| s.generation == generation)
+            else {
+                return;
+            };
+            if entry.value.closing {
+                drop(guard);
+                context
+                    .emit(
+                        WsEventPayload::new(&context.tab_id, &context.url, "cancelled"),
+                        true,
+                    )
+                    .await;
+                let _ = ready.send(Err("Connection cancelled".into()));
+                return;
+            }
+            entry.value.open = true;
+            let mut payload = WsEventPayload::open(&context.tab_id, &context.url);
+            payload.connection_id = context.connection_id.clone();
+            emit_event(&context.app, channel, payload);
+        }
+        let _ = ready.send(Ok(sender.clone()));
+        pump(context, socket, sender, receiver, stopped).await;
+    });
+    Ok(ready_rx)
 }
 
-/// Connect-or-reuse, then send `request.message` if it is non-empty.
+async fn pump<R: Runtime>(
+    context: Lifecycle<R>,
+    socket: Socket,
+    sender: mpsc::UnboundedSender<WsCommand>,
+    mut receiver: mpsc::UnboundedReceiver<WsCommand>,
+    mut stopped: watch::Receiver<bool>,
+) {
+    let (mut writer, mut reader) = socket.split();
+    let mut write_task = tokio::spawn(async move {
+        while let Some(command) = receiver.recv().await {
+            match command {
+                WsCommand::Send(text) => writer.send(Message::text(text)).await?,
+                WsCommand::Close => {
+                    writer
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Normal,
+                            reason: "".into(),
+                        })))
+                        .await?;
+                    break;
+                }
+                WsCommand::Flush => {
+                    writer.flush().await?;
+                    break;
+                }
+            }
+        }
+        Ok::<(), WsError>(())
+    });
+    let deadline = tokio::time::sleep(CLOSE_TIMEOUT);
+    tokio::pin!(deadline);
+    let mut closing = false;
+    let mut writer_done = false;
+    let mut failure = None;
+    let mut code = 1006;
+    let mut reason = "Connection closed without a close frame".to_string();
+    loop {
+        tokio::select! {
+            biased;
+            _ = async { let _ = stopped.wait_for(|value| *value).await; }, if !closing => {
+                closing = true;
+                deadline.as_mut().reset(tokio::time::Instant::now() + CLOSE_TIMEOUT);
+                let _ = sender.send(WsCommand::Close);
+            }
+            _ = &mut deadline, if closing => { failure = Some("Close handshake timed out".to_string()); reason = "Close handshake timed out".into(); break; }
+            result = &mut write_task, if !writer_done => {
+                writer_done = true;
+                if let Err(error) = result.unwrap_or_else(|error| Err(WsError::Io(std::io::Error::other(error.to_string())))) {
+                    failure = Some(error.to_string()); break;
+                }
+            }
+            message = reader.next() => match message {
+                Some(Ok(Message::Text(text))) => context.emit(WsEventPayload::message(&context.tab_id, &context.url, text.to_string()), false).await,
+                Some(Ok(Message::Binary(bytes))) => context.emit(WsEventPayload::message(&context.tab_id, &context.url, format!("[Binary message received: {} bytes]", bytes.len())), false).await,
+                Some(Ok(Message::Close(frame))) => {
+                    code = frame.as_ref().map(|f| f.code.into()).unwrap_or(1005);
+                    reason = frame.map(|f| f.reason.to_string()).unwrap_or_default();
+                    // Reading queues the automatic close reply; flush it before dropping the socket.
+                    if !writer_done {
+                        let _ = sender.send(WsCommand::Flush);
+                        let limit = if closing { deadline.deadline() } else { tokio::time::Instant::now() + CLOSE_TIMEOUT };
+                        writer_done = tokio::time::timeout_at(limit, &mut write_task).await.is_ok();
+                    }
+                    break;
+                }
+                Some(Ok(_)) => {}
+                Some(Err(error)) => { failure = Some(error.to_string()); break; }
+                None => { failure = Some(reason.clone()); break; }
+            }
+        }
+    }
+    if !writer_done {
+        write_task.abort();
+        let _ = write_task.await;
+    }
+    drop(reader);
+    if let Some(error) = failure {
+        context.error(error, false).await;
+    }
+    context
+        .emit(
+            WsEventPayload::close(&context.tab_id, &context.url, Some(code), Some(reason)),
+            true,
+        )
+        .await;
+}
+
+pub(crate) async fn connect<R: Runtime>(
+    app: AppHandle<R>,
+    channel: &'static WsChannel,
+    connections: &WsConnections,
+    proxy: &ProxySettings,
+    request: WsConnectRequest,
+) -> Result<CommandAck, String> {
+    if request.connection_id.trim().is_empty() {
+        return Err("Connection ID is required".into());
+    }
+    let action = proxy.ws_proxy_action(&request.options.url);
+    let _ready = start(
+        app,
+        channel,
+        connections,
+        action,
+        request.options,
+        Some(request.connection_id),
+        request.connect_timeout_ms,
+    )
+    .await?;
+    Ok(CommandAck::ok())
+}
+
+pub(crate) async fn send_message(
+    connections: &WsConnections,
+    request: WsMessageRequest,
+) -> Result<CommandAck, String> {
+    require_tab_id(&request.tab_id)?;
+    let guard = connections.lock().await;
+    let entry = guard
+        .get(&request.tab_id)
+        .filter(|entry| {
+            entry.value.connection_id.as_deref() == Some(request.connection_id.as_str())
+                && entry.value.open
+                && !entry.value.closing
+        })
+        .ok_or("WebSocket is not connected")?;
+    entry
+        .value
+        .sender
+        .send(WsCommand::Send(request.message))
+        .map_err(|_| "WebSocket is not connected")?;
+    Ok(CommandAck::ok())
+}
+
+/// GraphQL keeps its connect-or-reuse-and-send contract.
 pub(crate) async fn send<R: Runtime>(
     app: AppHandle<R>,
     channel: &'static WsChannel,
     connections: &WsConnections,
-    proxy_settings: &ProxySettings,
+    proxy: &ProxySettings,
     request: WsSendRequest,
 ) -> Result<CommandAck, String> {
-    require_tab_id(&request.tab_id)?;
-
-    if request.url.trim().is_empty() {
-        return Err(channel.url_required_error.to_string());
-    }
-
-    let message = request.message.unwrap_or_default();
-    let headers = request.headers.unwrap_or_default();
-    let verify_ssl = request.verify_ssl != Some(false);
-
-    let sender = match get_or_create_connection(
-        app.clone(),
-        channel,
-        connections,
-        &request.tab_id,
-        &request.url,
-        &headers,
-        verify_ssl,
-        &request.client_cert,
-        proxy_settings.ws_proxy_action(&request.url),
-    )
-    .await
-    {
-        Ok(sender) => sender,
-        Err(error) => {
-            emit_event(
-                &app,
-                channel,
-                WsEventPayload::error(&request.tab_id, &request.url, error.clone()),
-            );
-            return Err(error);
+    let existing = {
+        let guard = connections.lock().await;
+        guard
+            .get(&request.tab_id)
+            .filter(|entry| {
+                entry.value.is_reusable_for(
+                    &request.url,
+                    &request.headers.clone().unwrap_or_default(),
+                    request.verify_ssl != Some(false),
+                    &request.client_cert,
+                )
+            })
+            .map(|entry| entry.value.sender.clone())
+    };
+    let message = request.message.clone().unwrap_or_default();
+    let sender = match existing {
+        Some(sender) => sender,
+        None => {
+            let action = proxy.ws_proxy_action(&request.url);
+            start(app, channel, connections, action, request, None, None)
+                .await?
+                .await
+                .map_err(|_| "Connection cancelled".to_string())??
         }
     };
-
     if !message.is_empty() {
         sender
             .send(WsCommand::Send(message))
             .map_err(|_| channel.send_failed_error.to_string())?;
     }
-
     Ok(CommandAck::ok())
 }
 
-/// Ask the tab's writer task to close. The entry stays until the reader sees
-/// the socket end, which is what lets it emit the terminal `close`.
+pub(crate) async fn close_matching(
+    connections: &WsConnections,
+    tab_id: String,
+    connection_id: Option<&str>,
+) -> Result<CommandAck, String> {
+    require_tab_id(&tab_id)?;
+    let mut guard = connections.lock().await;
+    if let Some(entry) = guard.get_mut(&tab_id).filter(|entry| {
+        connection_id.is_none() || entry.value.connection_id.as_deref() == connection_id
+    }) {
+        entry.value.begin_close();
+    }
+    Ok(CommandAck::ok())
+}
 pub(crate) async fn close(
     connections: &WsConnections,
     tab_id: String,
 ) -> Result<CommandAck, String> {
-    require_tab_id(&tab_id)?;
-
-    if let Some(session) = connections.lock().await.get_mut(&tab_id) {
-        session.value.begin_close();
-    }
-
-    Ok(CommandAck::ok())
+    close_matching(connections, tab_id, None).await
 }
+
+#[cfg(test)]
+#[path = "ws_stream_lifecycle_tests.rs"]
+mod lifecycle_tests;
 
 #[cfg(test)]
 mod tests {

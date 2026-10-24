@@ -63,6 +63,7 @@ async function handleBackendEvent(event) {
     if (!current) {
         return;
     }
+    if (current.state === 'closed') { return; }
 
     if (isStaleEvent(current, url, payload.eventType)) {
         return;
@@ -87,16 +88,16 @@ async function handleBackendEvent(event) {
 
     if (payload.eventType === 'close') {
         session.set(tabId, { ...current, url, state: 'closed' });
-        await session.updateStatus(tabId, `Subscription closed (${payload.code || 1000})`, null);
+        await session.updateStatus(tabId, `Subscription closed (${payload.code ?? 1005})`, null);
         await session.append(
             tabId,
-            `CLOSED ${payload.code || 1000}${payload.reason ? ` ${payload.reason}` : ''}`
+            `CLOSED ${payload.code ?? 1005}${payload.reason ? ` ${payload.reason}` : ''}`
         );
         return;
     }
 
     if (payload.eventType === 'error') {
-        session.set(tabId, { ...current, url, state: current.state || 'closed' });
+        session.set(tabId, { ...current, url, state: current.state === 'connecting' ? 'closed' : current.state || 'closed' });
         await session.updateStatus(
             tabId,
             `Subscription error${payload.message ? `: ${payload.message}` : ''}`,
@@ -191,6 +192,7 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
     const tabId = await getActiveTabId();
 
     const entry = {
+        attemptId: crypto.randomUUID(),
         url: normalizedUrl,
         headers,
         query,
@@ -208,6 +210,9 @@ export async function handleGraphQLSubscriptionStart({ url, headers = {}, query,
     try {
         await sendFrame(tabId, entry, buildConnectionInit(connectionInitPayload(headers)));
     } catch (error) {
+        const current = session.get(tabId);
+        if (!current || current.attemptId !== entry.attemptId || current.state === 'closed') { return; }
+        session.set(tabId, { ...current, state: 'closed' });
         await session.append(tabId, 'ERROR', `Connection failed: ${error.message || error}`);
         await session.updateStatus(tabId, 'Subscription connection failed', null);
     }
@@ -222,6 +227,9 @@ export async function handleGraphQLSubscriptionCancel() {
         return false;
     }
 
+    session.set(tabId, { ...entry, state: 'closed' });
+    await session.updateStatus(tabId, 'Subscription stopped', null);
+    await session.append(tabId, 'STOPPED', 'subscription stopped by user');
     try {
         if (entry.acked) {
             await sendFrame(tabId, entry, buildComplete(SUB_ID));
@@ -229,9 +237,6 @@ export async function handleGraphQLSubscriptionCancel() {
         await window.backendAPI.graphqlSubscription.close(tabId);
     } catch {}
 
-    session.set(tabId, { ...entry, state: 'closed' });
-    await session.updateStatus(tabId, 'Subscription stopped', null);
-    await session.append(tabId, 'STOPPED', 'subscription stopped by user');
     return true;
 }
 

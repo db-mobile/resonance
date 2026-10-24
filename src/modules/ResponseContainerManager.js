@@ -5,6 +5,9 @@ import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { attachSaveResponseHandler } from './responseSaver.js';
 import { PreviewManager } from './PreviewManager.js';
 import { ResponseInspectionController } from './ResponseInspectionController.js';
+import { clearWebSocketTranscript } from './websocketHandler.js';
+import { toast } from './ui/Toast.js';
+import { translate } from './utils/translate.js';
 
 const PANEL_ROLES = [
     'response-body',
@@ -22,6 +25,7 @@ const TAB_SCOPED_SELECTORS = [
     '.preview-mode-btn',
     '.copy-response-btn',
     '.save-response-btn',
+    '.clear-response-btn',
     '.copy-headers-btn',
     '.response-body-container',
     '.response-preview-container',
@@ -173,6 +177,18 @@ export class ResponseContainerManager {
         attachSaveResponseHandler(wrapper.querySelector('.save-response-btn'), tabId);
         attachHeadersCopyHandler(wrapper.querySelector('.copy-headers-btn'), tabId);
 
+        const clearBtn = wrapper.querySelector('.clear-response-btn');
+        if (clearBtn) {
+            clearBtn.textContent = translate('request.clear_response', 'Clear');
+            const label = translate('request.clear_response_label', 'Clear response');
+            clearBtn.setAttribute('aria-label', label);
+            clearBtn.title = label;
+            clearBtn.addEventListener('click', async () => {
+                try { await clearWebSocketTranscript(tabId); }
+                catch (error) { toast.error(`Failed to clear response: ${error.message || error}`); }
+            });
+        }
+
         const container = {
             wrapper,
             tabId,
@@ -186,6 +202,7 @@ export class ResponseContainerManager {
             scriptsDisplay: wrapper.querySelector('.response-scripts-display'),
             languageSelector,
             copyBtn,
+            clearBtn,
             editor,
             previewContainer,
             codeBtn,

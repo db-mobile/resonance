@@ -1,9 +1,25 @@
 /* global document */
 
+let listenerSpy;
+beforeEach(() => { listenerSpy = jest.spyOn(document, 'addEventListener'); });
+afterEach(() => {
+    for (const [event, listener] of listenerSpy.mock.calls) {
+        if (event === 'resonance:stream-state') { document.removeEventListener(event, listener); }
+    }
+    listenerSpy.mockRestore();
+});
+
 function markup() {
     return `
         <button id="send-request-btn" title="Send request">Send</button>
+        <button id="websocket-connect-btn" style="display: none;">Connect</button>
         <button id="cancel-request-btn" style="display: none;">Cancel</button>
+        <input id="websocket-url-input">
+        <div id="headers-list"><input><button>Remove</button></div>
+        <div id="query-params-list"><input type="checkbox"><input></div>
+        <button id="add-header-btn">Add header</button>
+        <button id="add-query-param-btn">Add query</button>
+        <textarea id="message-body"></textarea>
     `;
 }
 
@@ -19,11 +35,13 @@ async function loadSendControls({ mode = 'http', activeTabId = 'tab-1' } = {}) {
 
     const { registerProtocolHandler } = await import('../../src/modules/protocols/protocolRegistry.js');
     const live = { websocket: jest.fn(() => false), sse: jest.fn(() => false), grpc: jest.fn(() => false), graphql: jest.fn(() => false) };
+    const websocketState = { current: 'closed', sending: false };
     for (const id of ['http', 'mqtt']) {
         registerProtocolHandler(id, { send: jest.fn(), cancel: jest.fn(), isLive: () => false });
     }
     for (const id of Object.keys(live)) {
-        registerProtocolHandler(id, { send: jest.fn(), cancel: jest.fn(), isLive: live[id] });
+        registerProtocolHandler(id, { send: jest.fn(), cancel: jest.fn(), isLive: live[id],
+            ...(id === 'websocket' ? { connectionState: () => websocketState.current, isSending: () => websocketState.sending } : {}) });
     }
 
     const controls = await import('../../src/modules/sendControls.js');
@@ -31,7 +49,7 @@ async function loadSendControls({ mode = 'http', activeTabId = 'tab-1' } = {}) {
     const { STREAM_STATE_EVENT } = await import('../../src/modules/streaming/streamState.js');
     const setRequestRunning = jest.fn();
     app.statusBar = { setRequestRunning };
-    return { ...controls, live, modeState, setRequestRunning, STREAM_STATE_EVENT };
+    return { ...controls, live, modeState, websocketState, setRequestRunning, STREAM_STATE_EVENT };
 }
 
 function flush() {
@@ -73,17 +91,49 @@ describe('sendControls', () => {
         expect(setRequestRunning).toHaveBeenLastCalledWith(false);
     });
 
-    test('a live websocket shows the Cancel button labelled Disconnect', async () => {
-        const { live, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'websocket' });
-        live.websocket.mockReturnValue(true);
+    test('a connected websocket shows separate Send and Disconnect controls', async () => {
+        const { websocketState, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'websocket' });
+        websocketState.current = 'open';
 
         await notify(STREAM_STATE_EVENT);
 
-        expect(live.websocket).toHaveBeenCalledWith('tab-1');
-        expect(cancelBtn().style.display).toBe('inline-block');
-        expect(cancelBtn().textContent).toBe('Disconnect');
-        expect(cancelBtn().getAttribute('aria-label')).toBe('Disconnect');
+        const connection = document.getElementById('websocket-connect-btn');
+        expect(cancelBtn().style.display).toBe('none');
+        expect(connection.textContent).toBe('Disconnect');
+        expect(connection.getAttribute('aria-label')).toBe('Disconnect');
+        expect(sendBtn().disabled).toBe(false);
         expect(sendBtn().textContent).toBe('Send');
+    });
+
+    test.each([
+        ['closed', 'Connect', true, false],
+        ['connecting', 'Cancel', true, true],
+        ['open', 'Disconnect', false, true],
+        ['closing', 'Disconnecting…', true, true]
+    ])('WebSocket state %s controls actions and handshake editing', async (state, label, sendDisabled, locked) => {
+        const { websocketState, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'websocket' });
+        websocketState.current = state;
+        await notify(STREAM_STATE_EVENT);
+        const connection = document.getElementById('websocket-connect-btn');
+        expect(connection.textContent).toBe(label);
+        expect(connection.disabled).toBe(state === 'closing');
+        expect(sendBtn().disabled).toBe(sendDisabled);
+        expect(document.getElementById('websocket-url-input').readOnly).toBe(locked);
+        for (const input of document.querySelectorAll('#headers-list input, #headers-list button, #query-params-list input, #add-header-btn, #add-query-param-btn')) {
+            expect(input.disabled).toBe(locked);
+        }
+        expect(document.getElementById('message-body').disabled).toBe(false);
+    });
+
+    test('switching to HTTP unlocks handshake fields and hides WebSocket controls', async () => {
+        const { websocketState, modeState, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'websocket' });
+        websocketState.current = 'open';
+        await notify(STREAM_STATE_EVENT);
+        modeState.current = 'http';
+        await notify(STREAM_STATE_EVENT);
+        expect(document.getElementById('websocket-connect-btn').style.display).toBe('none');
+        expect(document.querySelector('#headers-list input').disabled).toBe(false);
+        expect(sendBtn().disabled).toBe(false);
     });
 
     test('a closed stream hides Cancel and restores the Cancel label', async () => {
@@ -138,7 +188,7 @@ describe('sendControls', () => {
     });
 
     test('stream state events do not touch the buttons while a request is in progress', async () => {
-        const { setRequestInProgress, live, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'websocket' });
+        const { setRequestInProgress, live, STREAM_STATE_EVENT } = await loadSendControls({ mode: 'sse' });
         setRequestInProgress(true);
         live.websocket.mockReturnValue(true);
 

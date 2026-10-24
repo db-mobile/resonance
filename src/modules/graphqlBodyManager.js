@@ -11,6 +11,8 @@ import { markTabModified } from './state/tabModified.js';
 import { fetchGraphQLIntrospection, buildSchemaFromIntrospection } from './graphqlIntrospection.js';
 import { GraphQLExplorer } from './graphqlExplorer.js';
 import { resetRequestBias, setRequestBias } from './resizer.js';
+import { getCurrentMode } from './requestModeManager.js';
+import { getRequestBodyContent, setRequestBodyContent } from './requestBodyHelper.js';
 
 const SCHEMA_STORE_KEY = 'graphqlSchemaCache';
 const SCHEMA_STORE_LIMIT = 50;
@@ -72,6 +74,13 @@ export class GraphQLBodyManager {
         if (modeSelect) {
             modeSelect.addEventListener('change', (e) => {
                 const mode = e.target.value;
+                if (getCurrentMode() === 'websocket' && mode !== this.currentMode) {
+                    const content = this.currentMode === 'text'
+                        ? (app.requestBodyTextEditor?.getContent() || '')
+                        : getRequestBodyContent();
+                    if (mode === 'text') { app.requestBodyTextEditor?.setContent(content); }
+                    else if (mode === 'json') { setRequestBodyContent(content); }
+                }
                 this.switchMode(mode);
                 markTabModified();
             });

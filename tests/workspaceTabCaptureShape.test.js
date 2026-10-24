@@ -183,6 +183,15 @@ describe('captureCurrentState shape per protocol', () => {
         expect(state).not.toHaveProperty('activeResponseTab');
     });
 
+    test('WebSocket captures its selected Text mode and exact content', async () => {
+        const { manager, setRequestMode, app } = await loadHarness();
+        setRequestMode('websocket');
+        app.requestBodyTextEditor = { getContent: () => '  text message\n' };
+        document.getElementById('body-mode-select').value = 'text';
+        const { request } = await manager.captureCurrentState();
+        expect(request.body).toEqual({ mode: 'text', content: '  text message\n' });
+    });
+
     test('the active response tab defaults to the body tab', async () => {
         const { manager, setRequestMode } = await loadHarness();
         setRequestMode('http');

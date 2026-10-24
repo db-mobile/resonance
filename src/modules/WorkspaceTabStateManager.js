@@ -141,7 +141,7 @@ export class WorkspaceTabStateManager {
                 url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
                 method: 'WS',
                 ...this._captureStreamKeyValues(),
-                body: {
+                body: captureFormBody(document.getElementById('body-mode-select')?.value) ?? {
                     mode: 'json',
                     content: getRequestBodyContent() || ''
                 },
@@ -337,7 +337,9 @@ export class WorkspaceTabStateManager {
      */
     async _restoreResponseState(tab) {
         activateTab('response', tab.activeResponseTab || 'response-body');
-        app.responseContainerManager?.getOrCreateContainer(tab.id)?.inspection?.restore(tab.responseInspection);
+        const container = app.responseContainerManager?.getOrCreateContainer(tab.id);
+        container?.inspection?.restore(tab.responseInspection);
+        container?.clearBtn?.classList.toggle('is-hidden', tab.request?.protocol !== 'websocket');
 
         if (tab.response) {
             await this._restoreResponse(tab.response, tab.id);
@@ -429,7 +431,13 @@ export class WorkspaceTabStateManager {
         setRequestMode(RequestMode.WEBSOCKET);
 
         this._restoreUrlInputs('websocket', request.url);
-        this._restorePlainJsonBody(request.body?.content);
+        if (request.body?.mode === 'text') {
+            this.graphqlBodyManager?.switchMode('text');
+            app.requestBodyTextEditor?.setContent(request.body.content || '');
+        } else {
+            this.graphqlBodyManager?.switchMode('json');
+            setRequestBodyContent(request.body?.content || '');
+        }
 
         this._restoreKeyValueList(this.dom.queryParamsList, request.queryParams, {
             onPopulated: updateUrlFromQueryParams

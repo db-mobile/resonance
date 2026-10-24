@@ -96,6 +96,7 @@ export function requestBarMarkup() {
                 <div class="url-autocomplete-wrapper">
                     <input type="url" id="url-input" class="entry url-input monospace" aria-label="API URL">
                 </div>
+                <button id="websocket-connect-btn" class="button" style="display: none;">Connect</button>
                 <button id="send-request-btn" class="button"></button>
                 <button id="cancel-request-btn" class="button" style="display: none;"></button>
                 <button id="curl-btn" class="button flat image-button"></button>

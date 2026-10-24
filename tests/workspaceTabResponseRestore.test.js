@@ -29,6 +29,7 @@ async function loadHarness() {
     const { app } = await import('../src/modules/appContext.js');
 
     const container = {
+        clearBtn: document.createElement('button'),
         headersEditor: { setContent: jest.fn() },
         cookiesDisplay: document.createElement('div'),
         performanceDisplay: null,
@@ -45,6 +46,18 @@ function responseOf(data) {
 }
 
 describe('_restoreResponse', () => {
+    test('WebSocket response Clear remains available after restoring a disconnected tab', async () => {
+        const { manager, container } = await loadHarness();
+        container.clearBtn.classList.add('is-hidden');
+        await manager._restoreResponseState({ id: 'tab-1', request: { protocol: 'websocket' }, response: null });
+        expect(container.clearBtn.classList.contains('is-hidden')).toBe(false);
+    });
+
+    test('the WebSocket Clear control stays hidden for other protocols', async () => {
+        const { manager, container } = await loadHarness();
+        await manager._restoreResponseState({ id: 'tab-1', request: { protocol: 'http' }, response: null });
+        expect(container.clearBtn.classList.contains('is-hidden')).toBe(true);
+    });
     test('restores unary gRPC inspection state and its typed completed source', async () => {
         const { manager, container } = await loadHarness();
         container.inspection = { restore: jest.fn(), setSource: jest.fn() };
