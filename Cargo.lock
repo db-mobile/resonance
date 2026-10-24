@@ -1170,7 +1170,7 @@ dependencies = [
  "hkdf",
  "num",
  "once_cell",
- "sha2",
+ "sha2 0.10.9",
  "zeroize",
 ]
 
@@ -3109,6 +3109,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98"
+dependencies = [
+ "cfg-if",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "md4"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3323,7 +3333,7 @@ dependencies = [
  "des",
  "digest 0.10.7",
  "hmac 0.12.1",
- "md-5",
+ "md-5 0.10.6",
  "md4",
  "rand 0.8.8",
  "windows 0.58.0",
@@ -3697,13 +3707,13 @@ dependencies = [
  "futures-util",
  "hkdf",
  "hmac 0.12.1",
- "md-5",
+ "md-5 0.10.6",
  "num",
  "num-bigint-dig",
  "pbkdf2",
  "rand 0.8.8",
  "serde",
- "sha2",
+ "sha2 0.10.9",
  "subtle",
  "tokio",
  "zbus",
@@ -4605,7 +4615,7 @@ dependencies = [
  "serde_json",
  "serde_json_path",
  "serde_yaml_ng",
- "sha2",
+ "sha2 0.11.1",
  "sxd-document",
  "sxd-xpath",
  "tauri",
@@ -4652,7 +4662,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "sha1 0.10.7",
+ "sha1 0.11.0",
  "tempfile",
  "thiserror 2.0.21",
  "uuid",
@@ -4671,7 +4681,7 @@ dependencies = [
  "hex",
  "hmac 0.13.0",
  "http",
- "md-5",
+ "md-5 0.11.0",
  "ntlmclient",
  "regex",
  "reqwest",
@@ -4679,8 +4689,8 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
- "sha1 0.10.7",
- "sha2",
+ "sha1 0.11.0",
+ "sha2 0.11.1",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
@@ -4979,7 +4989,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.8",
  "serde",
- "sha2",
+ "sha2 0.10.9",
  "zbus",
 ]
 
@@ -5336,6 +5346,17 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
  "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -5836,7 +5857,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.10.9",
  "syn 2.0.119",
  "tauri-utils",
  "thiserror 2.0.21",
@@ -7549,7 +7570,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "raw-window-handle",
- "sha2",
+ "sha2 0.10.9",
  "soup3",
  "tao-macros",
  "thiserror 2.0.21",
