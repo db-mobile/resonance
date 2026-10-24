@@ -6,8 +6,14 @@ import { attachSaveResponseHandler } from './responseSaver.js';
 import { PreviewManager } from './PreviewManager.js';
 import { ResponseInspectionController } from './ResponseInspectionController.js';
 import { clearWebSocketTranscript } from './websocketHandler.js';
+import { clearSseTranscript } from './sseHandler.js';
 import { toast } from './ui/Toast.js';
 import { translate } from './utils/translate.js';
+
+const transcriptClearers = new Map([
+    ['websocket', clearWebSocketTranscript],
+    ['sse', clearSseTranscript]
+]);
 
 const PANEL_ROLES = [
     'response-body',
@@ -179,12 +185,11 @@ export class ResponseContainerManager {
 
         const clearBtn = wrapper.querySelector('.clear-response-btn');
         if (clearBtn) {
-            clearBtn.textContent = translate('request.clear_response', 'Clear');
             const label = translate('request.clear_response_label', 'Clear response');
             clearBtn.setAttribute('aria-label', label);
             clearBtn.title = label;
             clearBtn.addEventListener('click', async () => {
-                try { await clearWebSocketTranscript(tabId); }
+                try { await transcriptClearers.get(clearBtn.dataset.protocol)?.(tabId); }
                 catch (error) { toast.error(`Failed to clear response: ${error.message || error}`); }
             });
         }

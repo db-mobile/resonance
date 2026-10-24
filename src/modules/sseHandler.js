@@ -1,4 +1,5 @@
 import { clearResponseDisplayForTab } from './responseView.js';
+import { app } from './appContext.js';
 import { resolveTlsOptions } from './tlsOptions.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
@@ -12,6 +13,7 @@ import { isLiveEntry, isStaleEvent } from './streaming/streamState.js';
 
 const session = new StreamSession({
     protocol: 'SSE',
+    newestFirst: true,
     buildResponseMeta: transcriptResponseMeta({ status: 200, statusText: 'OK', key: 'sse' })
 });
 
@@ -167,6 +169,18 @@ export async function clearSseState(tabId) {
         await window.backendAPI.sse.close(tabId);
     }
     session.remove(tabId);
+}
+
+/** Clear live or restored events without interrupting the stream or its resume ID. */
+export async function clearSseTranscript(tabId) {
+    if (!tabId) { tabId = await getActiveTabId(); }
+    if (!tabId) { return; }
+    if (session.get(tabId)) {
+        await session.clearTranscript(tabId);
+    } else {
+        clearResponseDisplayForTab(tabId);
+        await app.workspaceTabController?.service.updateTab(tabId, { response: null });
+    }
 }
 
 /**

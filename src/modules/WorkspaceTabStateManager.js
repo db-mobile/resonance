@@ -339,7 +339,11 @@ export class WorkspaceTabStateManager {
         activateTab('response', tab.activeResponseTab || 'response-body');
         const container = app.responseContainerManager?.getOrCreateContainer(tab.id);
         container?.inspection?.restore(tab.responseInspection);
-        container?.clearBtn?.classList.toggle('is-hidden', tab.request?.protocol !== 'websocket');
+        if (container?.clearBtn) {
+            const protocol = tab.request?.protocol;
+            container.clearBtn.dataset.protocol = protocol || '';
+            container.clearBtn.classList.toggle('is-hidden', !['websocket', 'sse'].includes(protocol));
+        }
 
         if (tab.response) {
             await this._restoreResponse(tab.response, tab.id);
