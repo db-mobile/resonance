@@ -636,6 +636,8 @@
     "migration_skipped_one": "{{count}} gespeicherter Runner hat keine Anfragen und wurde nicht verschoben",
     "migration_skipped_other": "{{count}} gespeicherte Runner haben keine Anfragen und wurden nicht verschoben",
     "tags": "Tags",
+    "tags_include": "Tags einschließen",
+    "tags_exclude": "Tags ausschließen",
     "tags_include_placeholder": "einschließen a, b",
     "tags_exclude_placeholder": "ausschließen c",
     "tags_include_aria": "Nur Anfragen mit einem dieser Tags ausführen",
