@@ -1,4 +1,4 @@
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, digest::KeyInit};
 use reqwest::{Method, RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
