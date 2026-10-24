@@ -63,7 +63,6 @@ export class GraphQLBodyManager {
         );
 
         this.methodSelectContainer = document.querySelector('.method-select-container');
-        this.runnerBtn = document.getElementById('runner-btn');
 
         this.workbenchActive = false;
         this.savedMethod = null;
@@ -212,9 +211,6 @@ export class GraphQLBodyManager {
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = 'none';
             }
-            if (this.runnerBtn) {
-                this.runnerBtn.style.display = 'none';
-            }
             setRequestBias(0.6);
             this._setDocsRailVisible(true);
         } else {
@@ -225,9 +221,6 @@ export class GraphQLBodyManager {
             }
             if (this.methodSelectContainer) {
                 this.methodSelectContainer.style.display = '';
-            }
-            if (this.runnerBtn) {
-                this.runnerBtn.style.display = '';
             }
             resetRequestBias();
             this._setDocsRailVisible(false);
