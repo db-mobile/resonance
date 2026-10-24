@@ -6,7 +6,7 @@
                 <div class="runner-selector-wrapper">
                     <div class="runner-selector" data-role="runner-selector">
                         <input type="text"
-                               class="runner-selector-input"
+                               class="entry runner-selector-input"
                                placeholder="Untitled Runner"
                                data-i18n="runner.untitled"
                                data-role="runner-name"
@@ -49,83 +49,65 @@
                         </div>
                     </div>
                 </div>
-                <div class="runner-config">
-                    <label class="runner-chip toggle-switch">
-                        <input type="checkbox" data-option="stop-on-error" checked>
-                        <span class="toggle-track"></span>
-                        <span data-i18n="runner.stop_on_error">Stop on error</span>
-                    </label>
-                    <div class="runner-chip">
-                        <span class="runner-chip-label" data-i18n="runner.iterations">Iterations</span>
-                        <input type="number"
-                               class="runner-delay-input-sm"
-                               data-option="iterations"
-                               value="1"
-                               min="1"
-                               max="1000"
-                               aria-label="Iterations"
-                               data-i18n-aria="runner.iterations">
-                    </div>
-                    <label class="runner-chip">
-                        <span class="runner-chip-label" data-i18n="runner.flow.max_executions">Max executions / iteration</span>
-                        <input type="number" class="runner-delay-input-sm" data-option="max-executions" value="1000" min="1" max="100000" required aria-label="Maximum executions per iteration" data-i18n-aria="runner.flow.max_executions">
-                    </label>
-                    <div class="runner-chip">
-                        <span class="runner-chip-label" data-i18n="runner.delay">Delay</span>
-                        <input type="number"
-                               class="runner-delay-input-sm"
-                               data-option="delay"
-                               value="0"
-                               min="0"
-                               max="10000"
-                               aria-label="Delay in milliseconds">
-                        <span>ms</span>
-                    </div>
-                    <div class="runner-chip runner-tags-chip">
-                        <span class="runner-chip-label" data-i18n="runner.tags">Tags</span>
-                        <input type="text"
-                               class="runner-tags-input"
-                               data-option="tags-include"
-                               placeholder="include a, b"
-                               aria-label="Only run requests with any of these tags"
-                               data-i18n-placeholder="runner.tags_include_placeholder"
-                               data-i18n-aria="runner.tags_include_aria">
-                        <input type="text"
-                               class="runner-tags-input"
-                               data-option="tags-exclude"
-                               placeholder="exclude c"
-                               aria-label="Skip requests with any of these tags"
-                               data-i18n-placeholder="runner.tags_exclude_placeholder"
-                               data-i18n-aria="runner.tags_exclude_aria">
-                    </div>
-                    <div class="runner-chip runner-data-chip" data-role="data-chip">
-                        <span class="runner-chip-label" data-i18n="runner.data_file">Data</span>
-                        <button type="button"
-                                class="runner-data-file-btn"
-                                data-action="pick-data-file"
-                                data-i18n-title="runner.pick_data_file"
-                                title="Choose a CSV or JSON file">
-                            <span data-role="data-file-label" data-i18n="runner.no_data_file">None</span>
-                        </button>
-                        <button type="button"
-                                class="runner-data-clear-btn is-hidden"
-                                data-action="clear-data-file"
-                                data-i18n-title="runner.clear_data_file"
-                                data-i18n-aria="runner.clear_data_file"
-                                title="Remove data file"
-                                aria-label="Remove data file">
-                            <span class="icon icon-14 icon-x"></span>
-                        </button>
-                    </div>
-                </div>
-                <div class="runner-header-controls">
-                    <button class="btn btn-primary runner-run-btn" data-action="run" aria-label="Run Collection">
-                        <span class="icon icon-16 icon-play"></span>
-                        <span data-i18n="runner.run">Run</span>
+            </div>
+            <div class="runner-header-controls">
+                <button class="btn btn-primary runner-run-btn" data-action="run" aria-label="Run Collection">
+                    <span class="icon icon-16 icon-play"></span>
+                    <span data-i18n="runner.run">Run</span>
+                </button>
+                <button class="btn btn-danger is-hidden" data-action="stop" aria-label="Stop Run">
+                    <span class="icon icon-16 icon-x"></span>
+                    <span data-i18n="runner.stop">Stop</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="runner-config">
+            <label class="form-group">
+                <span class="form-label" data-i18n="runner.iterations">Iterations</span>
+                <input type="number" class="entry" data-option="iterations" value="1" min="1" max="1000">
+            </label>
+            <label class="form-group">
+                <span class="form-label" data-i18n="runner.delay">Delay</span>
+                <span class="runner-input-with-unit">
+                    <input type="number" class="entry" data-option="delay" value="0" min="0" max="10000">
+                    <span class="runner-input-unit">ms</span>
+                </span>
+            </label>
+            <label class="form-group">
+                <span class="form-label" data-i18n="runner.flow.max_executions">Max executions / iteration</span>
+                <input type="number" class="entry" data-option="max-executions" value="1000" min="1" max="100000" required>
+            </label>
+            <label class="form-group runner-stop-on-error">
+                <span class="form-label" data-i18n="runner.stop_on_error">Stop on error</span>
+                <span class="runner-switch-control">
+                    <input type="checkbox" class="switch" data-option="stop-on-error" checked>
+                </span>
+            </label>
+            <label class="form-group">
+                <span class="form-label" data-i18n="runner.tags_include">Include tags</span>
+                <input type="text" class="entry" data-option="tags-include"
+                       placeholder="include a, b" data-i18n-placeholder="runner.tags_include_placeholder"
+                       title="Only run requests with any of these tags" data-i18n-title="runner.tags_include_aria">
+            </label>
+            <label class="form-group">
+                <span class="form-label" data-i18n="runner.tags_exclude">Exclude tags</span>
+                <input type="text" class="entry" data-option="tags-exclude"
+                       placeholder="exclude c" data-i18n-placeholder="runner.tags_exclude_placeholder"
+                       title="Skip requests with any of these tags" data-i18n-title="runner.tags_exclude_aria">
+            </label>
+            <div class="form-group runner-data-chip" data-role="data-chip">
+                <span class="form-label" data-i18n="runner.data_file">Data</span>
+                <div class="runner-data-control">
+                    <button type="button" class="btn runner-data-file-btn" data-action="pick-data-file"
+                            data-i18n-title="runner.pick_data_file" data-i18n-aria="runner.pick_data_file"
+                            title="Choose a CSV or JSON file" aria-label="Choose a CSV or JSON file">
+                        <span data-role="data-file-label" data-i18n="runner.no_data_file">None</span>
                     </button>
-                    <button class="btn btn-danger is-hidden" data-action="stop" aria-label="Stop Run">
-                        <span class="icon icon-16 icon-x"></span>
-                        <span data-i18n="runner.stop">Stop</span>
+                    <button type="button" class="btn btn-icon runner-data-clear-btn is-hidden" data-action="clear-data-file"
+                            data-i18n-title="runner.clear_data_file" data-i18n-aria="runner.clear_data_file"
+                            title="Remove data file" aria-label="Remove data file">
+                        <span class="icon icon-14 icon-x"></span>
                     </button>
                 </div>
             </div>

@@ -630,6 +630,8 @@
     "migration_skipped_one": "{{count}} runner guardado no tiene solicitudes y no se movió",
     "migration_skipped_other": "{{count}} runners guardados no tienen solicitudes y no se movieron",
     "tags": "Etiquetas",
+    "tags_include": "Incluir etiquetas",
+    "tags_exclude": "Excluir etiquetas",
     "tags_include_placeholder": "incluir a, b",
     "tags_exclude_placeholder": "excluir c",
     "tags_include_aria": "Ejecutar solo solicitudes con alguna de estas etiquetas",

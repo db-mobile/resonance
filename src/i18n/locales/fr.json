@@ -630,6 +630,8 @@
     "migration_skipped_one": "{{count}} runner enregistré n’a aucune requête et n’a pas été déplacé",
     "migration_skipped_other": "{{count}} runners enregistrés n’ont aucune requête et n’ont pas été déplacés",
     "tags": "Tags",
+    "tags_include": "Inclure des tags",
+    "tags_exclude": "Exclure des tags",
     "tags_include_placeholder": "inclure a, b",
     "tags_exclude_placeholder": "exclure c",
     "tags_include_aria": "N’exécuter que les requêtes portant l’un de ces tags",

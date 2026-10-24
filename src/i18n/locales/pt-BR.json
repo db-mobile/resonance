@@ -638,6 +638,8 @@
     "migration_skipped_one": "{{count}} runner salvo não tem requisições e não foi movido",
     "migration_skipped_other": "{{count}} runners salvos não têm requisições e não foram movidos",
     "tags": "Tags",
+    "tags_include": "Incluir tags",
+    "tags_exclude": "Excluir tags",
     "tags_include_placeholder": "incluir a, b",
     "tags_exclude_placeholder": "excluir c",
     "tags_include_aria": "Executar apenas requisições com alguma destas tags",
