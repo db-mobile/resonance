@@ -116,6 +116,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.4" date="2026-10-26">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Improve the collection runner layout and keep the request editor size stable across tabs</li>
+          <li>Move global tools to the sidebar footer and reorder sidebar controls</li>
+          <li>Improve WebSocket controls, SSE transcripts and response clearing</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.3" date="2026-10-22">
       <description>
         <p>Feature stabilization release</p>
