@@ -12,8 +12,4 @@ ignore = [
     "RUSTSEC-2026-0099",
     "RUSTSEC-2026-0104",
     "RUSTSEC-2026-0382",
-    # fast-float 0.2 is Boa 0.19's number parser and has no fixed release.
-    # Boa 0.20+ switched to the maintained fast-float2 fork; drop this with
-    # the Boa upgrade.
-    "RUSTSEC-2025-0003",
 ]
