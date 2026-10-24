@@ -46,11 +46,12 @@ function responseOf(data) {
 }
 
 describe('_restoreResponse', () => {
-    test('WebSocket response Clear remains available after restoring a disconnected tab', async () => {
+    test.each(['websocket', 'sse'])('%s response Clear remains available after restoring a disconnected tab', async protocol => {
         const { manager, container } = await loadHarness();
         container.clearBtn.classList.add('is-hidden');
-        await manager._restoreResponseState({ id: 'tab-1', request: { protocol: 'websocket' }, response: null });
+        await manager._restoreResponseState({ id: 'tab-1', request: { protocol }, response: null });
         expect(container.clearBtn.classList.contains('is-hidden')).toBe(false);
+        expect(container.clearBtn.dataset.protocol).toBe(protocol);
     });
 
     test('the WebSocket Clear control stays hidden for other protocols', async () => {
