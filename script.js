@@ -1,18 +1,25 @@
 document.addEventListener('DOMContentLoaded', function () {
 
-  /* ── Version badge ── */
-  fetch('https://api.github.com/repos/db-mobile/resonance/releases/latest')
-    .then(r => r.json())
-    .then(data => {
-      const raw = data.tag_name || data.name || '';
-      const ver = raw.startsWith('v') ? raw.slice(1) : raw;
-      const el = document.getElementById('vb-val');
-      if (el) { el.textContent = ver || '—'; }
-    })
-    .catch(() => {
-      const el = document.getElementById('vb-val');
-      if (el) { el.textContent = '—'; }
-    });
+  /* ── Version badge (deferred: not needed for first paint) ── */
+  const loadVersion = () => {
+    fetch('https://api.github.com/repos/db-mobile/resonance/releases/latest', { priority: 'low' })
+      .then(r => r.json())
+      .then(data => {
+        const raw = data.tag_name || data.name || '';
+        const ver = raw.startsWith('v') ? raw.slice(1) : raw;
+        const el = document.getElementById('vb-val');
+        if (el) { el.textContent = ver || '—'; }
+      })
+      .catch(() => {
+        const el = document.getElementById('vb-val');
+        if (el) { el.textContent = '—'; }
+      });
+  };
+  if (document.readyState === 'complete') {
+    loadVersion();
+  } else {
+    window.addEventListener('load', loadVersion, { once: true });
+  }
 
   /* ── Sticky header shadow on scroll ── */
   const header = document.getElementById('header');
@@ -24,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   };
   window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  requestAnimationFrame(onScroll);
 
   /* ── Smooth scroll for anchor links ── */
   document.querySelectorAll('a[href^="#"]').forEach(link => {

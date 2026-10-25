@@ -10,6 +10,7 @@
   <meta property="og:description" content="No accounts. No cloud. No telemetry. A fast, lightweight API client that runs entirely on your machine.">
   <meta property="og:image" content="assets/icons/icon.svg">
   <title>Resonance — Local-first API Client</title>
+  <link rel="preload" as="image" href="assets/icons/icon.svg" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
 </head>
@@ -21,12 +22,11 @@
   <header id="header">
     <nav class="container nav-inner">
       <a href="index.html" class="logo">
-        <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+        <img src="assets/icons/icon.svg" alt="" class="logo-img">
         <span class="logo-text">Resonance</span>
       </a>
       <ul class="nav-links" id="nav-links">
         <li><a href="#features">Features</a></li>
-        <li><a href="#screenshots">Screenshots</a></li>
         <li><a href="#download">Download</a></li>
         <li><a href="https://github.com/db-mobile/resonance" target="_blank" rel="noopener">GitHub</a></li>
         <li><a href="documentation.html" class="nav-cta">Docs</a></li>
@@ -79,7 +79,7 @@
             <span class="vb-prompt">$</span>
             <span class="vb-cmd">resonance</span>
             <span class="vb-flag">--version</span>
-            <span class="vb-val" id="vb-val">loading...</span>
+            <span class="vb-val" id="vb-val">&hellip;</span>
           </div>
         </div>
         <div class="hero-visual" aria-hidden="true">
@@ -87,234 +87,172 @@
             <div class="ring ring-a"></div>
             <div class="ring ring-b"></div>
             <div class="ring ring-c"></div>
-            <img src="assets/icons/icon.svg" alt="" class="hero-icon">
+            <img src="assets/icons/icon.svg" alt="" class="hero-icon" width="160" height="160" fetchpriority="high">
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Features -->
-    <section id="features" class="section features">
+    <!-- Tour -->
+    <section id="features" class="section tour">
       <div class="container">
         <div class="section-header reveal">
-          <div class="section-label">// 01 &middot; features</div>
-          <h2>Built lean.<br>Works hard.</h2>
+          <div class="section-label">// 01 &middot; tour</div>
+          <h2>From the first request<br>to the CI run.</h2>
+          <p class="section-sub">Import a spec, send and script requests, mock what is not built yet, and run the same collections headless. One window, your machine.</p>
         </div>
-        <div class="features-grid">
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V21H3V8"/><path d="M1 3h22v5H1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            </div>
-            <h3>Collection Import</h3>
-            <p>Drop in an OpenAPI 3.x or Swagger 2.0 spec, a Postman or Insomnia collection, a HAR file, or a cURL command and Resonance builds out your request tree instantly — examples included.</p>
-          </div>
+        <div class="tour-steps">
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <article class="tour-step reveal">
+            <div class="tour-text">
+              <div class="step-num">01</div>
+              <h3>Send requests across six protocols</h3>
+              <p>REST, GraphQL, gRPC, WebSocket, SSE and MQTT share one editor, one sidebar and one set of environments.</p>
+              <ul class="tour-points">
+                <li>Auth per request, folder or collection: Bearer, Basic, API Key, OAuth 2.0 with auto-refresh, Digest, NTLM, AWS SigV4</li>
+                <li>Responses as trees, queried with JSONPath or XPath, validated against a JSON Schema</li>
+                <li>Timing split into DNS, TCP, TLS, first byte and transfer</li>
+                <li>Any request as code in cURL, Python, JavaScript, Node.js, Go, PHP, Ruby or Java</li>
+              </ul>
             </div>
-            <h3>Scripts &amp; Automation</h3>
-            <p>Write JavaScript that runs before a request or after a response. Set variables, assert values, chain calls, sign requests with built-in HMAC and hashing — and run most Postman <code>pm.*</code> scripts unchanged.</p>
-          </div>
+            <div class="tour-media">
+              <div class="screenshot-frame">
+                <div class="frame-bar"><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-title">request editor</span></div>
+                <img src="assets/screenshots/main_window-1000.webp" srcset="assets/screenshots/main_window-600.webp 600w, assets/screenshots/main_window-800.webp 800w, assets/screenshots/main_window-1000.webp 1000w, assets/screenshots/main_window-2000.webp 2000w" sizes="(max-width: 860px) calc(100vw - 48px), (max-width: 1160px) calc((100vw - 104px) * 0.583), 616px" width="1000" height="700" alt="Request editor with collections sidebar and response pane">
+              </div>
+            </div>
+          </article>
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <article class="tour-step reveal">
+            <div class="tour-text">
+              <div class="step-num">02</div>
+              <h3>Switch environments, keep secrets out of git</h3>
+              <p>Collections are plain files you can commit. Anything sensitive goes to the OS keychain instead.</p>
+              <ul class="tour-points">
+                <li>Named environments, <code>&#123;&#123; variables &#125;&#125;</code> anywhere, switched in one click</li>
+                <li>Secret values stored in Keychain, Credential Manager or Secret Service</li>
+                <li>Client certificates for mutual TLS and your own CAs, mapped per host</li>
+                <li>Request history and workspace tabs restored after a restart</li>
+              </ul>
             </div>
-            <h3>Environment Management</h3>
-            <p>Group variables into named environments and switch between them in one click. Use <code>&#123;&#123; variableName &#125;&#125;</code> anywhere in your request.</p>
-          </div>
+            <div class="tour-media">
+              <div class="screenshot-frame">
+                <div class="frame-bar"><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-title">environments</span></div>
+                <img loading="lazy" src="assets/screenshots/environment-1000.webp" srcset="assets/screenshots/environment-600.webp 600w, assets/screenshots/environment-800.webp 800w, assets/screenshots/environment-1000.webp 1000w" sizes="(max-width: 860px) calc(100vw - 48px), (max-width: 1160px) calc((100vw - 104px) * 0.583), 616px" width="1000" height="700" alt="Environment manager with variables and secret flags">
+              </div>
+            </div>
+          </article>
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <article class="tour-step reveal">
+            <div class="tour-text">
+              <div class="step-num">03</div>
+              <h3>Mock what is not built yet</h3>
+              <p>Import a spec and serve it locally before the backend exists.</p>
+              <ul class="tour-points">
+                <li>Import OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR or a cURL command</li>
+                <li>Responses from your examples and schemas, with templates that echo the request</li>
+                <li>A <code>Prefer</code> header picks error responses on demand</li>
+                <li>Every hit shows up in the request log</li>
+              </ul>
             </div>
-            <h3>Authentication</h3>
-            <p>Handles Bearer, Basic, API Key, OAuth 2.0 (with automatic token renewal), Digest, NTLM, and AWS Signature v4 — per request, folder, or collection, with credentials kept in your OS keychain.</p>
-          </div>
+            <div class="tour-media">
+              <div class="screenshot-frame">
+                <div class="frame-bar"><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-title">mock server</span></div>
+                <img loading="lazy" src="assets/screenshots/mock_server-1000.webp" srcset="assets/screenshots/mock_server-600.webp 600w, assets/screenshots/mock_server-800.webp 800w, assets/screenshots/mock_server-1000.webp 1000w" sizes="(max-width: 860px) calc(100vw - 48px), (max-width: 1160px) calc((100vw - 104px) * 0.583), 616px" width="1000" height="700" alt="Mock server with endpoint list and request log">
+              </div>
+            </div>
+          </article>
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <article class="tour-step reveal">
+            <div class="tour-text">
+              <div class="step-num">04</div>
+              <h3>Script it, then run it in CI</h3>
+              <p>The runner you build in the app is the runner the command line executes.</p>
+              <ul class="tour-points">
+                <li>JavaScript before and after each request, with HMAC and hashing built in</li>
+                <li>Most Postman <code>pm.*</code> scripts run unchanged</li>
+                <li>Collection runner with chained variables, delays and stop-on-error</li>
+                <li>Headless runs with JUnit reports and exit codes, plus a GitHub Action</li>
+              </ul>
             </div>
-            <h3>Code Generation</h3>
-            <p>Turn any request into runnable code in one click: cURL, Python, JavaScript, Node.js, Go, PHP, Ruby, or Java.</p>
-          </div>
+            <div class="tour-media">
+              <div class="code-terminal tour-terminal">
+                <div class="terminal-bar">
+                  <span class="term-dot dot-red"></span><span class="term-dot dot-yellow"></span><span class="term-dot dot-green"></span>
+                  <span class="term-title">ci</span>
+                </div>
+                <pre class="code-body"><code><span class="prompt">$</span> resonance run collections/petstore \
+    --runner smoke --junit reports/junit.xml
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-            </div>
-            <h3>Mock Server</h3>
-            <p>Spin up a local HTTP server that returns responses from your OpenAPI examples and schemas — with templates that echo the request and a <code>Prefer</code> header to pick error responses. No network needed.</p>
-          </div>
+  <span class="t-ok">✓</span> GET  /pets                      200   142 ms
+  <span class="t-ok">✓</span> POST /pets                      201    98 ms
+  <span class="t-ok">✓</span> GET  /pets/{petId}              200    61 ms
+  <span class="t-ok">✓</span> GET  /store/inventory           200    57 ms
+  <span class="t-fail">✗</span> POST /store/orders              500   210 ms
+    <span class="t-dim">expected status 201, got 500</span>
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+<span class="t-dim">5 requests · 4 passed · 1 failed
+junit report: reports/junit.xml</span>
+<span class="prompt">$</span> echo $?
+1</code></pre>
+              </div>
             </div>
-            <h3>Performance Metrics</h3>
-            <p>See exactly where the time went: DNS lookup, TCP handshake, TLS negotiation, time-to-first-byte, and data transfer — per request.</p>
-          </div>
+          </article>
 
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <article class="tour-step reveal">
+            <div class="tour-text">
+              <div class="step-num">05</div>
+              <h3>Make it yours</h3>
+              <p>Settings follow your desktop, not the other way round.</p>
+              <ul class="tour-points">
+                <li>Light, dark or system theme with nine accent colours</li>
+                <li>English, Portuguese (BR), German, Spanish, French and Italian</li>
+                <li>HTTP, HTTPS or SOCKS proxy with auth and bypass lists</li>
+                <li>Platform-native shortcuts; <code>Ctrl/Cmd+/</code> lists them</li>
+              </ul>
             </div>
-            <h3>Themes &amp; i18n</h3>
-            <p>Light, dark, or follow the system theme, with nine accent colors. Ships with translations for English, Portuguese (BR), German, Spanish, French, and Italian.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6.01" y2="10" stroke-width="2.5"/><line x1="10" y1="10" x2="10.01" y2="10" stroke-width="2.5"/><line x1="14" y1="10" x2="14.01" y2="10" stroke-width="2.5"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+            <div class="tour-media">
+              <div class="screenshot-frame">
+                <div class="frame-bar"><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-title">settings</span></div>
+                <img loading="lazy" src="assets/screenshots/settings-1000.webp" srcset="assets/screenshots/settings-600.webp 600w, assets/screenshots/settings-800.webp 800w, assets/screenshots/settings-1000.webp 1000w" sizes="(max-width: 860px) calc(100vw - 48px), (max-width: 1160px) calc((100vw - 104px) * 0.583), 616px" width="1000" height="700" alt="Settings with theme, accent colour and language">
+              </div>
             </div>
-            <h3>Keyboard Shortcuts</h3>
-            <p>Shortcuts for almost everything, with platform-native bindings on macOS, Linux, and Windows. Press <code>Ctrl/Cmd+/</code> to see them all.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5.5" y2="17"/><line x1="12" y1="7" x2="18.5" y2="17"/><line x1="7" y1="19" x2="17" y2="19"/></svg>
-            </div>
-            <h3>GraphQL Support</h3>
-            <p>A first-class GraphQL editor with autocompletion, automatic schema introspection, and live subscriptions over WebSocket — plus a click-to-build Explorer that turns ticked fields and inline arguments into a real query with <code>$variables</code>.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-            </div>
-            <h3>gRPC</h3>
-            <p>Point at a server and let reflection discover its services — no <code>.proto</code> juggling. Unary, server-streaming, client-streaming, and bidirectional calls, all with TLS and schema-generated message skeletons.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-            <h3>Realtime &amp; Messaging</h3>
-            <p>Persistent WebSocket connections, Server-Sent Events with automatic reconnect, and MQTT pub/sub with QoS and TLS brokers — each with a live transcript of every message, in and out.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </div>
-            <h3>Secret Vault</h3>
-            <p>Flag any variable or credential as secret and it lands in your OS keychain — Keychain, Credential Manager, or Secret Service — never in the git-friendly collection files. Commit a collection without leaking a thing.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>
-            </div>
-            <h3>Client Certificates</h3>
-            <p>Present a PEM cert and key for servers that require mutual TLS, and trust your own private or self-signed CAs. Mapped per host — and only file paths are stored, never the keys themselves.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <h3>Request History</h3>
-            <p>Every request you send is logged with its full response. Search the lot, then replay any one with a click — no need to reconstruct what you ran an hour ago.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-            </div>
-            <h3>Collection Runner</h3>
-            <p>Run a batch of requests in sequence, chaining variables from one response into the next via post-response scripts. Set delays, stop-on-error, and watch progress live — then save the setup to rerun. Run the same saved runners headlessly in CI with the <a href="command-line.html">command line</a>, JUnit reports and exit codes included.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-            </div>
-            <h3>Proxy Support</h3>
-            <p>Route requests through an HTTP, HTTPS, or SOCKS proxy, with auth and bypass lists. Handy behind a corporate gateway or when inspecting traffic through a debugging proxy.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/><polyline points="8 9 6 11 8 13"/><polyline points="14 9 16 11 14 13"/></svg>
-            </div>
-            <h3>Response Inspection</h3>
-            <p>Query big responses with JSONPath or XPath 1.0, preview JSON and XML as trees, and validate bodies against a JSON Schema on every send. Every cookie a response sets is laid out with all its attributes, not buried in a header string.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="9"/></svg>
-            </div>
-            <h3>Workspace Tabs</h3>
-            <p>Open multiple requests side by side in independent tabs. State persists across restarts — pick up exactly where you left off.</p>
-          </div>
-
-          <div class="feature-card reveal">
-            <div class="feature-icon-wrap">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            </div>
-            <h3>Secure Architecture</h3>
-            <p>Tauri's Rust core handles all network I/O. Scripts run in a sandboxed JS runtime. Your data never leaves the process boundary.</p>
-          </div>
+          </article>
 
         </div>
       </div>
     </section>
 
-    <!-- Screenshots -->
-    <section id="screenshots" class="section screenshots">
+    <!-- At a glance -->
+    <section id="screenshots" class="section glance">
       <div class="container">
         <div class="section-header reveal">
-          <div class="section-label">// 02 &middot; screenshots</div>
-          <h2>What you'll actually see.</h2>
+          <div class="section-label">// 02 &middot; at a glance</div>
+          <h2>The full list.</h2>
         </div>
-        <div class="screenshots-grid">
-          <div class="screenshot-item reveal">
-            <div class="screenshot-frame">
-              <div class="frame-bar">
-                <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
-                <span class="frame-title">main_window</span>
-              </div>
-              <img src="assets/screenshots/main_window.png" alt="Main interface with request configuration" loading="lazy">
-            </div>
-            <p class="screenshot-caption">Main interface with request configuration</p>
-          </div>
-          <div class="screenshot-item reveal">
-            <div class="screenshot-frame">
-              <div class="frame-bar">
-                <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
-                <span class="frame-title">environment</span>
-              </div>
-              <img src="assets/screenshots/environment.png" alt="Environment management" loading="lazy">
-            </div>
-            <p class="screenshot-caption">Environment management</p>
-          </div>
-          <div class="screenshot-item reveal">
-            <div class="screenshot-frame">
-              <div class="frame-bar">
-                <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
-                <span class="frame-title">mock_server</span>
-              </div>
-              <img src="assets/screenshots/mock_server.png" alt="Mock server with request logging" loading="lazy">
-            </div>
-            <p class="screenshot-caption">Mock server with request logging</p>
-          </div>
-          <div class="screenshot-item reveal">
-            <div class="screenshot-frame">
-              <div class="frame-bar">
-                <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
-                <span class="frame-title">settings</span>
-              </div>
-              <img src="assets/screenshots/settings.png" alt="Settings with theme selection" loading="lazy">
-            </div>
-            <p class="screenshot-caption">Settings with theme selection</p>
-          </div>
-        </div>
+        <ul class="glance-grid reveal">
+          <li>REST, GraphQL, gRPC, WebSocket, SSE, MQTT</li>
+          <li>Import: OpenAPI, Swagger, Postman, Insomnia, HAR, cURL</li>
+          <li>OAuth 2.0 auto-refresh, Digest, NTLM, AWS SigV4</li>
+          <li>GraphQL Explorer, introspection, subscriptions</li>
+          <li>gRPC reflection and all four streaming modes</li>
+          <li>Pre- and post-request scripts, <code>pm.*</code> compatible</li>
+          <li>Collection runner with saved setups</li>
+          <li>Command line and GitHub Action for CI</li>
+          <li>Mock server from OpenAPI examples</li>
+          <li>JSONPath, XPath, JSON Schema validation</li>
+          <li>Per-request timing breakdown</li>
+          <li>Code generation in eight languages</li>
+          <li>Secrets in the OS keychain</li>
+          <li>Client certificates and custom CAs</li>
+          <li>HTTP, HTTPS and SOCKS proxies</li>
+          <li>Request history with replay</li>
+          <li>Workspace tabs restored on start</li>
+          <li>Rust network core, sandboxed JS runtime</li>
+          <li>Light, dark, system; nine accents; six languages</li>
+          <li>No account, no cloud sync, no telemetry</li>
+        </ul>
       </div>
     </section>
 
@@ -391,7 +329,13 @@
               <div class="term-os-icon">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
               </div>
-              <p>NSIS installer for Windows 10 and above. No elevated permissions required.</p>
+              <p>NSIS installer for Windows 10 and above, or install via winget. No elevated permissions required.</p>
+              <div class="install-options">
+                <div class="install-cmd">
+                  <span class="install-label">winget</span>
+                  <code>winget install DBMobile.Resonance</code>
+                </div>
+              </div>
               <a href="https://github.com/db-mobile/resonance/releases/latest" class="btn btn-download" target="_blank" rel="noopener">Download for Windows</a>
             </div>
           </div>
@@ -424,7 +368,8 @@
               <span class="term-dot dot-green"></span>
               <span class="term-title">bash</span>
             </div>
-            <pre class="code-body"><code><span class="prompt">$</span> curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh | sh
+            <pre class="code-body"><code><span class="prompt">$</span> curl -fsSL https://raw.githubusercontent.com/db-mobile/resonance/main/install.sh \
+    | sh
 <span class="prompt">$</span> resonance run collections/petstore --runner smoke --junit reports/junit.xml</code></pre>
           </div>
           <p class="source-note">Linux and macOS; static binaries, verified against the release checksums. Windows and GitHub Actions: see the <a href="command-line.html">command-line guide</a>.</p>
@@ -467,7 +412,7 @@
     <div class="container footer-inner">
       <div class="footer-brand">
         <a href="index.html" class="logo">
-          <img src="assets/icons/icon.svg" alt="Resonance" class="logo-img">
+          <img src="assets/icons/icon.svg" alt="" class="logo-img">
           <span class="logo-text">Resonance</span>
         </a>
         <p class="footer-tagline">A Tauri desktop app. Open source under the MIT license.</p>
