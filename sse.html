@@ -66,7 +66,8 @@
           <li>Reconnects automatically, honoring the server&rsquo;s <code>retry</code> interval</li>
           <li>Resumes with <code>Last-Event-ID</code> after a reconnect so you don&rsquo;t miss events</li>
           <li>Shows the connection lifecycle: connecting, connected, reconnecting, closed, error</li>
-          <li>Persists the transcript per tab</li>
+          <li>Lists events newest first and persists the transcript per tab</li>
+          <li>Clears the transcript on demand without dropping the stream</li>
         </ul>
 
         <h3>Connecting</h3>
@@ -76,6 +77,7 @@
           <li>Click <strong>Send</strong> &mdash; events stream into the transcript as the server emits them</li>
           <li>To stop, click <strong>Disconnect</strong> next to <strong>Send</strong>, or press <code>Esc</code></li>
         </ol>
+        <p>New events appear at the top of the transcript. The trash button in the response header clears the transcript while the stream stays connected; the <code>Last-Event-ID</code> is kept, so a later reconnect still resumes from the right place.</p>
 
         <h3>Reading Events</h3>
         <p>Each event is shown with its individual fields parsed out, so you can read the <code>event</code> name, <code>id</code>, suggested <code>retry</code> interval, and <code>data</code> payload separately rather than as one raw blob.</p>

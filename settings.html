@@ -69,7 +69,7 @@
         <h4>Requests</h4>
         <ul class="doc-list">
           <li><strong>HTTP Version</strong> &mdash; <strong>Auto</strong> (default) negotiates HTTP/2 or HTTP/1.1 with the server; <strong>HTTP/1.x</strong> forces HTTP/1.1; <strong>HTTP/2</strong> uses HTTP/2 without negotiation, so servers that only speak HTTP/1 will fail</li>
-          <li><strong>Request Timeout</strong> &mdash; in milliseconds; <code>0</code> (default) means no timeout</li>
+          <li><strong>Request Timeout</strong> &mdash; in milliseconds; <code>0</code> (default) means no timeout. For <a href="websocket.html">WebSocket</a> connections it limits the handshake only; an open socket stays connected until disconnected or closed by the server</li>
           <li><strong>Verify SSL certificates</strong> &mdash; on by default. Turn it off for self-signed certificates in development; it applies to HTTP, WebSocket, SSE, gRPC, MQTT, and GraphQL subscriptions</li>
           <li><strong>Automatically follow HTTP redirects</strong> &mdash; on by default. Turn it off to inspect a redirect response itself</li>
           <li><strong>History Limit</strong> &mdash; how many requests <a href="requests.html#history">history</a> keeps (default 100, minimum 10)</li>

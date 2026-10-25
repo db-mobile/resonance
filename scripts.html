@@ -182,8 +182,21 @@ request.headers[&quot;X-Signature&quot;] = signature;</code></pre>
           <div class="api-item"><code>pm.globals</code><span>Mapped to the active environment — Resonance has no global scope.</span></div>
           <div class="api-item"><code>pm.request / pm.sendRequest / pm.cookies</code><span>The same objects as <code>request</code>, <code>sendRequest</code> and <code>cookies</code>.</span></div>
           <div class="api-item"><code>pm.info / pm.iterationData</code><span>Position and data row of a <a href="collection-runner.html">runner</a> iteration.</span></div>
+          <div class="api-item"><code>pm.execution.setNextRequest(target)</code><span>In a <a href="collection-runner.html">runner</a> run, continues with the request named or identified by <code>target</code> after this one; <code>null</code> ends the current iteration. The last call wins, and a request can jump to itself to loop. Ignored when the request is sent on its own; <code>postman.setNextRequest</code> is an alias.</span></div>
+          <div class="api-item"><code>pm.execution.skipRequest()</code><span>Pre-request scripts only: stops the script immediately and does not send the request. The runner moves on to the next request, so a <code>setNextRequest</code> made earlier in the same script is discarded.</span></div>
         </div>
-        <p>Not supported yet: <code>pm.execution.setNextRequest</code> / <code>skipRequest</code>, <code>pm.vault</code>, and <code>require</code> for modules other than <code>crypto-js</code>.</p>
+<pre><code>// Pre-request: poll until the job is done, at most 5 times
+if (Number(pm.variables.get(&quot;attempt&quot;) || 0) &gt;= 5) {
+    pm.execution.setNextRequest(null);
+}
+
+// Post-response: retry this request while the job is still running
+if (pm.response.json().state === &quot;running&quot;) {
+    pm.variables.set(&quot;attempt&quot;, Number(pm.variables.get(&quot;attempt&quot;) || 0) + 1);
+    pm.execution.setNextRequest(pm.info.requestName);
+}</code></pre>
+        <p>A target that matches no request in the run, or more than one, stops the run with an error. A failing script discards its <code>setNextRequest</code>. The <strong>Max executions per iteration</strong> option of the <a href="collection-runner.html">runner</a> (1000 by default) ends a workflow that keeps looping.</p>
+        <p>Not supported yet: <code>pm.vault</code>, and <code>require</code> for modules other than <code>crypto-js</code>.</p>
 
         <h3>Limitations</h3>
 <ul class="doc-list">
