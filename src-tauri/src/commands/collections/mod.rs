@@ -526,6 +526,7 @@ fn prepare_collection_dir(app: &AppHandle, collection: Collection) -> Result<Col
         persisted.storage_path = Some(dir.to_string_lossy().to_string());
         persisted.storage_parent_path = None;
         persisted.linked = true;
+        persisted.can_close = true;
         redact_collection_secrets(&mut persisted);
         return Ok(persisted);
     }
@@ -572,6 +573,7 @@ fn prepare_collection_dir(app: &AppHandle, collection: Collection) -> Result<Col
     persisted.storage_path = Some(target_dir.to_string_lossy().to_string());
     persisted.storage_parent_path = None;
     persisted.linked = false;
+    persisted.can_close = !link::is_under(&get_default_collections_dir(app)?, &target_dir);
     redact_collection_secrets(&mut persisted);
 
     Ok(persisted)
@@ -825,6 +827,7 @@ pub async fn collections_open_existing(
         linked.insert(collection.id.clone(), dir_string);
 
         collection.linked = true;
+        collection.can_close = true;
         result.opened.push(collection);
     }
 
@@ -925,6 +928,7 @@ pub async fn collection_relocate(
     save_linked_collections(&app, &linked)?;
 
     collection.linked = true;
+    collection.can_close = true;
     Ok(collection)
 }
 
@@ -1060,6 +1064,7 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                                 scan.index_changed = true;
                             }
                             collection.open_api_spec = None;
+                            collection.can_close = false;
                             scan.collections.push(collection);
                         }
                         Err(message) => scan.errors.push(CollectionLoadError::managed(
@@ -1129,6 +1134,7 @@ fn scan_collections(default_dir: &Path, index: &mut HashMap<String, String>) -> 
                 }
                 seen.insert(collection.id.clone(), path_str);
                 collection.open_api_spec = None;
+                collection.can_close = !link::is_under(default_dir, &path);
                 scan.collections.push(collection);
             }
             Err(message) => scan.errors.push(CollectionLoadError::indexed(
@@ -1173,6 +1179,7 @@ pub async fn collection_get(app: AppHandle, collection_id: String) -> Result<Col
     // Set here rather than in the reader: linkage is store state, and the
     // reader is a pure fn(&Path) with no access to it.
     collection.linked = is_linked_collection(&app, &collection.id)?;
+    collection.can_close = !link::is_under(&get_default_collections_dir(&app)?, &paths.dir);
 
     Ok(collection)
 }
@@ -1889,6 +1896,7 @@ mod convert_on_save {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            can_close: false,
             git_branch: None,
         };
 
@@ -2092,6 +2100,45 @@ mod load_errors {
     }
 
     #[test]
+    fn an_import_in_a_custom_folder_can_be_closed_without_a_linked_record() {
+        let root = TempDir::new().unwrap();
+        let managed = root.path().join("managed");
+        v1_collection(&managed.join("default"), "default");
+        let imported = root.path().join("custom");
+        fs::create_dir(&imported).unwrap();
+        let metadata = imported.join("collection.yaml");
+        let contents = "resonanceFormat: 2\nid: imported\nname: Imported\n";
+        fs::write(&metadata, contents).unwrap();
+        let mut index = HashMap::from([(
+            "imported".to_string(),
+            imported.to_string_lossy().to_string(),
+        )]);
+
+        let scan = scan_collections(&managed, &mut index);
+        let imported_collection = scan
+            .collections
+            .iter()
+            .find(|c| c.id == "imported")
+            .unwrap();
+        let default_collection = scan.collections.iter().find(|c| c.id == "default").unwrap();
+        assert!(!imported_collection.linked);
+        assert_eq!(
+            serde_json::to_value(imported_collection).unwrap()["canClose"],
+            true
+        );
+        assert_eq!(
+            serde_json::to_value(default_collection).unwrap()["canClose"],
+            false
+        );
+
+        // Closing removes the registration; the next scan must leave its files alone.
+        index.remove("imported");
+        let scan = scan_collections(&managed, &mut index);
+        assert!(scan.collections.iter().all(|c| c.id != "imported"));
+        assert_eq!(fs::read_to_string(metadata).unwrap(), contents);
+    }
+
+    #[test]
     fn unreadable_and_duplicate_collections_are_reported_without_hiding_others() {
         let root = TempDir::new().unwrap();
         v1_collection(&root.path().join("a"), "col-a");
@@ -2252,6 +2299,7 @@ mod delete_folder {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            can_close: false,
             git_branch: None,
         }
     }
@@ -2432,6 +2480,7 @@ mod runner_commands {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            can_close: false,
             git_branch: None,
         };
         write_v2_collection_seeded(temp.path(), &incoming, None, &HashMap::new(), None).unwrap();

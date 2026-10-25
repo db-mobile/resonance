@@ -53,6 +53,23 @@ describe('CollectionController close vs delete', () => {
             expect(keys).not.toContain('context_menu.delete_collection');
         });
 
+        test('a collection imported into a custom folder can be closed without deleting it', async () => {
+            const imported = { ...collection(false), canClose: true };
+            controller.handleContextMenu({}, imported);
+            const items = controller.contextMenu.show.mock.calls.at(-1)[1];
+            const close = items.find(item => item.translationKey === 'context_menu.close_collection');
+
+            expect(close).toBeDefined();
+            expect(close.className).toBeUndefined();
+            expect(items.some(item => item.translationKey === 'context_menu.delete_collection')).toBe(true);
+            await close.onClick();
+
+            expect(service.closeCollection).toHaveBeenCalledWith(imported.id);
+            expect(service.deleteCollection).not.toHaveBeenCalled();
+            expect(variableService.cleanupCollectionVariables).not.toHaveBeenCalled();
+            expect(controller.closeTabsForCollection).toHaveBeenCalledWith(imported.id);
+        });
+
         test('Close is not styled as a destructive action', () => {
             const close = itemsFor(true).find(
                 item => item.translationKey === 'context_menu.close_collection'

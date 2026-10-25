@@ -430,22 +430,26 @@ export class CollectionController {
                 translationKey: 'context_menu.show_in_file_manager',
                 iconClass: 'icon-folder',
                 onClick: () => this.handleReveal(collection)
-            },
-            collection.linked
-                ? {
-                    label: 'Close Collection',
-                    translationKey: 'context_menu.close_collection',
-                    iconClass: ContextMenu.createDeleteIcon(),
-                    onClick: () => this.handleClose(collection)
-                }
-                : {
-                    label: 'Delete Collection',
-                    translationKey: 'context_menu.delete_collection',
-                    iconClass: ContextMenu.createDeleteIcon(),
-                    className: 'context-menu-delete',
-                    onClick: () => this.handleDelete(collection)
-                }
+            }
         ];
+
+        if (collection.linked || collection.canClose) {
+            menuItems.push({
+                label: 'Close Collection',
+                translationKey: 'context_menu.close_collection',
+                iconClass: 'icon-x',
+                onClick: () => this.handleClose(collection)
+            });
+        }
+        if (!collection.linked) {
+            menuItems.push({
+                label: 'Delete Collection',
+                translationKey: 'context_menu.delete_collection',
+                iconClass: ContextMenu.createDeleteIcon(),
+                className: 'context-menu-delete',
+                onClick: () => this.handleDelete(collection)
+            });
+        }
 
         this.contextMenu.show(event, menuItems);
     }
