@@ -55,7 +55,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
 # Validate user-provided schemas locally; no HTTP/file retrieval or extra TLS provider.
-jsonschema = { version = "0.59", default-features = false, features = ["idna"] }
+jsonschema = { version = "0.60", default-features = false, features = ["idna"] }
 # Local response queries (no script evaluation or external document retrieval).
 serde_json_path = "0.7"
 sxd-document = "0.3"
