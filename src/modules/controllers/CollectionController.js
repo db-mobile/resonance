@@ -247,6 +247,15 @@ export class CollectionController {
         this.renderer.updateGitStatus(this.gitStatus);
     }
 
+    /** @param {{collectionId: string, endpointId: string}|null} endpoint */
+    highlightEndpoint(endpoint) {
+        if (endpoint?.collectionId && endpoint.endpointId) {
+            this.renderer.setActiveEndpoint(endpoint.collectionId, endpoint.endpointId);
+        } else {
+            this.renderer.clearActiveEndpoint();
+        }
+    }
+
     initializeCollectionsSearch() {
         if (!this.collectionsSearchInput) {
             return;

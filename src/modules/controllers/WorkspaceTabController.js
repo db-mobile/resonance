@@ -385,6 +385,8 @@ export class WorkspaceTabController {
 
     /** @param {Object} tab */
     _updateUIForTabType(tab) {
+        this.collectionRequests?.highlightEndpoint?.(tab.type === 'runner' ? null : (tab.endpoint ?? null));
+
         const mainContentArea = document.getElementById('main-content-area');
         if (!mainContentArea) {return;}
 
