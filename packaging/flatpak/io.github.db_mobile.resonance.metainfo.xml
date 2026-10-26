@@ -116,6 +116,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.5" date="2026-10-26">
+      <description>
+        <p>Interface polish and workflow fixes</p>
+        <ul>
+          <li>Unify controls, icons and status badges, with improved contrast, keyboard focus and layouts</li>
+          <li>Keep the sidebar request highlight in sync with the active tab, including filtered and pinned requests</li>
+          <li>Allow collections stored outside the default directory to be closed without deleting their files</li>
+          <li>Make collection import easier to find in the sidebar toolbar</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.4" date="2026-10-26">
       <description>
         <p>Feature stabilization release</p>

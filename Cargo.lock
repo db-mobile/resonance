@@ -4583,7 +4583,7 @@ dependencies = [
 
 [[package]]
 name = "resonance"
-version = "3.5.4"
+version = "3.5.5"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -4641,7 +4641,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-cli"
-version = "3.5.4"
+version = "3.5.5"
 dependencies = [
  "axum",
  "clap",
@@ -4656,7 +4656,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-collections"
-version = "3.5.4"
+version = "3.5.5"
 dependencies = [
  "resonance-core",
  "serde",
@@ -4670,7 +4670,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-core"
-version = "3.5.4"
+version = "3.5.5"
 dependencies = [
  "axum",
  "base64 0.22.1",
