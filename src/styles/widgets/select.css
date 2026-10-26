@@ -1,5 +1,7 @@
 select.select,
-select.select-base {
+select.select-base,
+.form-select,
+.language-selector {
   appearance: none;
   min-height: var(--control-height);
   padding: 0 calc(var(--space-4) + var(--icon-size)) 0 var(--space-3);
@@ -13,19 +15,23 @@ select.select-base {
 }
 
 select.select:hover,
-select.select-base:hover {
+select.select-base:hover,
+.form-select:hover,
+.language-selector:hover {
   background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
 }
 
 .select-wrap,
-.select-wrapper {
+.select-wrapper,
+.language-selector-container {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
 .select-wrap > .select-arrow,
-.select-wrapper > .select-arrow {
+.select-wrapper > .select-arrow,
+.language-selector-container > .select-arrow {
   position: absolute;
   right: var(--space-2);
   pointer-events: none;
@@ -43,7 +49,8 @@ select.select-base:hover {
 }
 
 select.select.compact,
-select.select-base.compact {
+select.select-base.compact,
+.language-selector {
   min-height: var(--control-height-small);
   font-size: var(--font-size-small);
 }

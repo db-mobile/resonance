@@ -28,6 +28,8 @@
   font-size: var(--font-size-caption);
   background-color: var(--window-bg-color);
   border-top: 1px solid var(--border-color);
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .request-split {
@@ -59,7 +61,9 @@
 .status-bar-right {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .status-bar-item {
@@ -74,9 +78,11 @@
   border-radius: var(--radius-small);
   cursor: pointer;
   transition: background-color var(--transition-fast), opacity var(--transition-fast);
+  min-height: var(--control-height-embedded);
 }
 
-.status-bar-button:hover {
+.status-bar-button:hover,
+.status-bar-button:focus-visible {
   background-color: var(--shade-color);
   opacity: 1;
 }

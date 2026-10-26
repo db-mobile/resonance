@@ -6,6 +6,7 @@
 .manager-header-actions {
   display: flex;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .manager-content {
@@ -34,7 +35,6 @@
   gap: var(--space-2);
   padding: var(--space-5);
   text-align: center;
-  opacity: var(--dim-opacity);
 }
 
 .env-manager-sidebar {
@@ -69,6 +69,7 @@
   padding-top: var(--space-3);
   margin-top: var(--space-2);
   border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .env-manager-sidebar-footer > .btn {
@@ -81,6 +82,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .manager-toolbar .manager-header-actions {
@@ -104,7 +106,7 @@
 }
 
 .env-list-item.is-selected {
-  background-color: color-mix(in srgb, var(--accent-bg-color) 15%, transparent);
+  background-color: var(--selection-bg-color);
 }
 
 .env-list-item-name {
@@ -193,7 +195,7 @@
 }
 
 .var-secret-btn {
-  opacity: 0.4;
+  opacity: var(--dim-opacity);
 }
 
 .var-secret-btn.is-secret {
@@ -204,6 +206,21 @@
 .env-manager-footer {
   margin-top: auto;
   padding-top: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.env-manager-footer > div,
+.env-manager-group-header {
+  flex-wrap: wrap;
+}
+
+.variable-dialog {
+  overflow: hidden;
+}
+
+.variable-dialog > div {
+  flex: 1;
+  min-height: 0;
 }
 
 .env-variable-row,
@@ -258,7 +275,8 @@
   transition: background-color var(--transition-fast), opacity var(--transition-fast);
 }
 
-.btn-delete:hover {
+.btn-delete:hover,
+.btn-delete:focus-visible {
   background-color: color-mix(in srgb, var(--destructive-color) 15%, transparent);
   color: var(--destructive-color);
   opacity: 1;
@@ -299,7 +317,7 @@
 
 .var-reference-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: var(--space-4);
 }
 
@@ -315,6 +333,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .cookie-manager-env-selector {
@@ -338,13 +357,14 @@
 
 .cookie-editor-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: var(--space-3);
 }
 
 .cookie-editor-flags {
   display: flex;
   gap: var(--space-5);
+  flex-wrap: wrap;
 }
 
 .cookie-editor-error {
@@ -356,12 +376,14 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .cookie-manager-footer-group {
   display: flex;
   gap: var(--space-3);
   margin-right: auto;
+  flex-wrap: wrap;
 }
 
 .cookies-table {
@@ -404,6 +426,7 @@
 
 .mock-server-controls {
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .mock-server-port-input {
@@ -612,10 +635,13 @@
   padding: var(--space-1) var(--space-2);
   font-size: var(--font-size-caption);
   opacity: 0.8;
+  min-height: var(--control-height-embedded);
 }
 
 .mock-server-endpoints-toggle:hover,
-.mock-server-edit-response-btn:hover {
+.mock-server-edit-response-btn:hover,
+.mock-server-endpoints-toggle:focus-visible,
+.mock-server-edit-response-btn:focus-visible {
   background-color: var(--shade-color);
   opacity: 1;
 }
@@ -624,4 +650,31 @@
 .cookie-value {
   font-family: var(--font-mono);
   font-size: var(--font-size-caption);
+}
+
+@container dialog (max-width: 600px) {
+  .env-manager-layout,
+  .mock-server-main {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .env-manager-sidebar {
+    flex: 0 0 auto;
+    max-height: 180px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 0 var(--space-3);
+  }
+
+  .env-manager-layout > .u-flex-1,
+  .mock-server-main > div {
+    flex: 1 0 200px;
+    min-width: 0;
+  }
+
+  .mock-server-status-section > div {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
 }

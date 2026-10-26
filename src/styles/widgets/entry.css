@@ -4,14 +4,18 @@ input[type="text"].form-input,
 input[type="url"].form-input,
 input[type="number"].form-input,
 input[type="password"].form-input,
-textarea.form-input {
+textarea.form-input,
+.inspection-expression,
+.inspection-namespaces,
+.binary-file-path,
+.binary-content-type {
   display: inline-flex;
   align-items: center;
   min-height: var(--control-height);
   padding: 0 var(--space-3);
   background-color: var(--view-bg-color);
   color: var(--view-fg-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border-color);
   border-radius: var(--radius-small);
   transition: border-color var(--transition-fast), outline-color var(--transition-fast);
 }
@@ -26,7 +30,11 @@ textarea.form-input {
 .entry:focus,
 .entry:focus-within,
 .input-base:focus,
-.form-input:focus {
+.form-input:focus,
+.inspection-expression:focus,
+.inspection-namespaces:focus,
+.binary-file-path:focus,
+.binary-content-type:focus {
   outline: 2px solid var(--focus-ring-color);
   outline-offset: -2px;
   border-color: transparent;
@@ -34,9 +42,11 @@ textarea.form-input {
 
 .entry::placeholder,
 .input-base::placeholder,
-.form-input::placeholder {
+.form-input::placeholder,
+.binary-file-path::placeholder,
+.binary-content-type::placeholder {
   color: currentColor;
-  opacity: 0.4;
+  opacity: var(--dim-opacity);
 }
 
 .entry.error {
@@ -44,7 +54,7 @@ textarea.form-input {
 }
 
 .entry.error:focus {
-  outline-color: color-mix(in srgb, var(--error-color) 50%, transparent);
+  outline-color: var(--error-color);
 }
 
 .entry.warning {
@@ -52,7 +62,9 @@ textarea.form-input {
 }
 
 .entry.compact,
-.input-base.compact {
+.input-base.compact,
+.binary-file-path,
+.binary-content-type {
   min-height: var(--control-height-small);
   font-size: var(--font-size-small);
 }

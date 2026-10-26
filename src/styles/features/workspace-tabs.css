@@ -75,23 +75,18 @@
 }
 
 .workspace-tab-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
   border-radius: var(--radius-pill);
   opacity: 0;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
 }
 
 .workspace-tab:hover .workspace-tab-close,
-.workspace-tab.active .workspace-tab-close {
+.workspace-tab.active .workspace-tab-close,
+.workspace-tab:focus-within .workspace-tab-close {
   opacity: var(--dim-opacity);
 }
 
-.workspace-tab-close:hover {
+.workspace-tab-close:hover,
+.workspace-tab-close:focus-visible {
   background-color: color-mix(in srgb, currentColor 15%, transparent);
   opacity: 1;
 }

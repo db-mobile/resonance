@@ -2,6 +2,8 @@
 
 Technical overview of Resonance for contributors. For usage documentation, see the [documentation site](https://db-mobile.github.io/resonance/).
 
+For shared controls, visual tokens and presentation conventions, see the [UI style guide](UI_STYLE_GUIDE.md).
+
 ## Project Structure
 
 ```

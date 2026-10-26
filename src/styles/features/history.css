@@ -86,18 +86,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: var(--control-height-embedded);
+  height: var(--control-height-embedded);
+  min-height: var(--control-height-embedded);
   border-radius: var(--radius-small);
   opacity: 0;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
 }
 
-.history-item:hover .history-item-delete {
+.history-item:hover .history-item-delete,
+.history-item:focus-within .history-item-delete {
   opacity: var(--dim-opacity);
 }
 
-.history-item-delete:hover {
+.history-item-delete:hover,
+.history-item-delete:focus-visible {
   background-color: color-mix(in srgb, var(--destructive-color) 15%, transparent);
   color: var(--destructive-color);
   opacity: 1;

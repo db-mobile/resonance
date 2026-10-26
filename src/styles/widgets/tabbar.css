@@ -64,23 +64,18 @@
 }
 
 .tab-box .tab-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
   border-radius: var(--radius-pill);
   opacity: 0;
-  flex-shrink: 0;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
 }
 
 .tab-box:hover .tab-close,
-.tab-box.active .tab-close {
+.tab-box.active .tab-close,
+.tab-box:focus-within .tab-close {
   opacity: var(--dim-opacity);
 }
 
-.tab-box .tab-close:hover {
+.tab-box .tab-close:hover,
+.tab-box .tab-close:focus-visible {
   background-color: color-mix(in srgb, currentColor 15%, transparent);
   opacity: 1;
 }

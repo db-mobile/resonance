@@ -4,20 +4,6 @@
  * and the shared connection status pill.
  */
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  opacity: var(--dim-opacity);
-}
-
 .status-pill::before {
   content: "";
   width: 6px;
@@ -31,31 +17,12 @@
   display: none;
 }
 
-.status-pill[data-state="connecting"] {
-  color: var(--warning-color);
-  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
-  opacity: 1;
-}
-
 .status-pill[data-state="connecting"]::before {
   animation: status-pulse 1.2s ease-in-out infinite;
 }
 
-.status-pill[data-state="connected"],
-.status-pill[data-state="loaded"] {
-  color: var(--success-color);
-  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
-  opacity: 1;
-}
-
 .status-pill[data-state="connected"]::before {
   animation: status-pulse 1.6s ease-in-out infinite;
-}
-
-.status-pill[data-state="error"] {
-  color: var(--error-color);
-  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
-  opacity: 1;
 }
 
 .status-pill.is-receiving {
@@ -91,7 +58,7 @@
 
 .grpc-source-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--space-3);
 }
 
@@ -116,6 +83,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .grpc-source-card-body {
@@ -127,7 +95,8 @@
 .grpc-source-card-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .grpc-field-input {
@@ -163,14 +132,17 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .grpc-selector-label {
-  flex: 0 0 60px;
+  flex: 0 0 auto;
+  min-width: 60px;
 }
 
 .grpc-selector-control {
-  flex: 1;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .grpc-selector-control select {
@@ -192,14 +164,16 @@
 .mqtt-field-row {
   display: flex;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .mqtt-field-row .form-group {
-  flex: 1;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
-.mqtt-field-qos {
-  flex: 0 0 200px;
+.mqtt-field-row .mqtt-field-qos {
+  flex: 0 1 200px;
 }
 
 .mqtt-field-switch {
@@ -314,7 +288,7 @@
 .graphql-explorer-type {
   opacity: var(--dim-opacity);
   font-size: var(--font-size-caption);
-  font-family: "Fira Code", "Courier New", monospace;
+  font-family: var(--font-mono);
 }
 
 .graphql-explorer-arg-tag {

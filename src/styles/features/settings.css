@@ -4,40 +4,6 @@
  */
 
 
-.settings-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-small);
-  background-color: var(--shade-color);
-  width: max-content;
-  flex-shrink: 0;
-}
-
-.settings-tab {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: var(--space-1) var(--space-3);
-  border-radius: calc(var(--radius-small) - 2px);
-  font-weight: 600;
-  font-size: var(--font-size-small);
-  color: inherit;
-  opacity: 0.8;
-}
-
-.settings-tab:hover {
-  background-color: color-mix(in srgb, currentColor 8%, transparent);
-  opacity: 1;
-}
-
-.settings-tab.active {
-  background-color: var(--switcher-active-bg);
-  box-shadow: var(--switcher-active-shadow);
-  opacity: 1;
-}
-
 .settings-content {
   flex: 1;
   min-height: 0;
@@ -167,10 +133,11 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .proxy-field-grow {
-  flex: 1;
+  flex: 1 1 180px;
 }
 
 .proxy-field-port {
@@ -210,6 +177,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+@container dialog (max-width: 600px) {
+  .cert-file-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .cert-file-row > label {
+    grid-column: 1 / -1;
+  }
 }
 
 .cert-file-row {

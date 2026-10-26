@@ -4,7 +4,7 @@ input[type="radio"].radio {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border-color);
   background-color: var(--view-bg-color);
   cursor: pointer;
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
