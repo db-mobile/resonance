@@ -116,6 +116,7 @@ pub(crate) fn save_collection_to_files(
             storage_path: None,
             storage_parent_path,
             linked: false,
+            can_close: false,
             git_branch: None,
         },
         variables,

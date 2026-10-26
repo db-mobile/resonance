@@ -18,6 +18,7 @@
   gap: var(--space-3);
   margin-bottom: var(--space-3);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .status-info-container {
@@ -25,37 +26,9 @@
   align-items: center;
   gap: var(--space-3);
   margin-left: auto;
-}
-
-.status-display {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-3);
-  border-radius: var(--radius-pill);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  background-color: var(--shade-color);
-}
-
-.status-display.status-success {
-  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
-  color: var(--success-color);
-}
-
-.status-display.status-redirect {
-  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
-  color: var(--warning-color);
-}
-
-.status-display.status-client-error,
-.status-display.status-server-error {
-  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
-  color: var(--error-color);
-}
-
-.status-display.status-info {
-  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
-  color: var(--accent-color);
+  min-width: 0;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .response-content {

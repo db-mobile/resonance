@@ -2,6 +2,8 @@
 
 Technical overview of Resonance for contributors. For usage documentation, see the [documentation site](https://db-mobile.github.io/resonance/).
 
+For shared controls, visual tokens and presentation conventions, see the [UI style guide](UI_STYLE_GUIDE.md).
+
 ## Project Structure
 
 ```
@@ -75,6 +77,17 @@ src-tauri/
         ├── tls.rs                # Re-exports core TLS helpers for other desktop protocols
         └── updater.rs            # Auto-update and install-type detection
 ```
+
+## Closing collections
+
+Collections stored outside the app's default collections directory can be closed,
+including imports into a custom folder. The backend derives `canClose` from the
+storage location when listing or fetching collections. This is separate from
+`linked`, which records folders opened in place and protects them from deletion
+and directory renames. Closing unregisters the collection and closes its tabs;
+files, collection variables and keychain credentials remain available when it is
+opened again. Collections in default storage are discovered automatically and
+offer Delete instead of Close.
 
 ## Shared request execution
 

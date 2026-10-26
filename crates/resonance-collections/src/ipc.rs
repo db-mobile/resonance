@@ -43,6 +43,11 @@ pub struct Collection {
     /// state, never something the frontend can assert.
     #[serde(default, skip_deserializing)]
     pub linked: bool,
+    /// True when closing removes the collection from the sidebar: directories
+    /// outside app storage are listed only while registered. Derived on read,
+    /// including for imports into a custom folder; never accepted from IPC.
+    #[serde(default, skip_deserializing)]
+    pub can_close: bool,
     /// Branch of the Git working tree the collection directory sits in, when
     /// it sits in one. Derived on every read, like `linked`: never accepted
     /// from the frontend and never written to disk.
@@ -302,6 +307,7 @@ pub fn to_ipc_collection(
         storage_path: Some(storage_path.to_string()),
         storage_parent_path: None,
         linked,
+        can_close: linked,
         git_branch: None,
     }
 }
@@ -855,6 +861,18 @@ mod tests {
     }
 
     #[test]
+    fn close_capability_is_emitted_but_cannot_be_asserted_by_the_frontend() {
+        let mut collection =
+            to_ipc_collection(&loaded(FolderNode::default()), "/tmp/petstore", false);
+        collection.can_close = true;
+        let wire = serde_json::to_value(collection).unwrap();
+        assert_eq!(wire["canClose"], true);
+
+        let received: Collection = serde_json::from_value(wire).unwrap();
+        assert!(!received.can_close);
+    }
+
+    #[test]
     fn tags_are_projected_overlaid_and_cleared_by_an_empty_list() {
         let mut doc = RequestDoc::new("r1".into(), "X".into());
         doc.tags = vec!["smoke".into()];
@@ -985,6 +1003,7 @@ mod tests {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            can_close: false,
             git_branch: None,
         };
 
@@ -1077,6 +1096,7 @@ mod save_path {
             storage_path: None,
             storage_parent_path: None,
             linked: false,
+            can_close: false,
             git_branch: None,
         }
     }

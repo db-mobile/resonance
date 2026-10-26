@@ -1,4 +1,8 @@
-.view-switcher {
+.view-switcher,
+.preview-mode-buttons,
+.settings-tabs,
+.runner-results-detail-tabs,
+.runner-editor-tabs {
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -8,15 +12,22 @@
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
+  flex-shrink: 0;
 }
 
-.view-switcher > .view-switcher-btn {
+.view-switcher > .view-switcher-btn,
+.preview-mode-btn,
+.settings-tab,
+.runner-results-tab,
+.runner-editor-tab {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: calc(var(--control-height-small) - 6px);
-  padding: var(--space-1) var(--space-3);
-  border-radius: calc(var(--radius-small) - 2px);
+  min-height: var(--switcher-button-height);
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--switcher-button-radius);
   font-weight: 600;
   font-size: var(--font-size-small);
   white-space: nowrap;
@@ -25,12 +36,20 @@
   transition: background-color var(--transition-fast), opacity var(--transition-fast);
 }
 
-.view-switcher > .view-switcher-btn:hover {
+.view-switcher > .view-switcher-btn:hover,
+.preview-mode-btn:hover,
+.settings-tab:hover,
+.runner-results-tab:hover,
+.runner-editor-tab:hover {
   background-color: color-mix(in srgb, currentColor 8%, transparent);
   opacity: 1;
 }
 
-.view-switcher > .view-switcher-btn.active {
+.view-switcher > .view-switcher-btn.active,
+.preview-mode-btn.active,
+.settings-tab.active,
+.runner-results-tab.is-active,
+.runner-editor-tab.is-active {
   background-color: var(--switcher-active-bg);
   box-shadow: var(--switcher-active-shadow);
   opacity: 1;
@@ -43,6 +62,7 @@
 }
 
 .view-switcher.flat > .view-switcher-btn {
+  min-height: var(--control-height-small);
   opacity: var(--dim-opacity);
   border-radius: var(--radius-small);
 }
@@ -57,6 +77,6 @@
   padding: 0 var(--space-1);
   border-radius: var(--radius-pill);
   background-color: color-mix(in srgb, currentColor 15%, transparent);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   text-align: center;
 }

@@ -21,6 +21,8 @@
 .pinned-section {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
 }
 
 .collection-header,
@@ -132,6 +134,7 @@
   display: none;
   flex-direction: column;
   padding-left: var(--space-4);
+  min-width: 0;
 }
 
 .collection-item.expanded > .collection-endpoints,
@@ -151,6 +154,7 @@
   cursor: pointer;
   user-select: none;
   transition: background-color var(--transition-fast);
+  min-width: 0;
 }
 
 .endpoint-item:hover {
@@ -159,7 +163,7 @@
 
 .endpoint-item.active,
 .endpoint-item.is-selected {
-  background-color: color-mix(in srgb, currentColor 12%, transparent);
+  background-color: var(--selection-bg-color);
 }
 
 .endpoint-path {
@@ -177,7 +181,8 @@
   transition: opacity var(--transition-fast);
 }
 
-.endpoint-item:hover .endpoint-pin-btn {
+.endpoint-item:hover .endpoint-pin-btn,
+.endpoint-item:focus-within .endpoint-pin-btn {
   opacity: var(--dim-opacity);
 }
 

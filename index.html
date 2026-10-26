@@ -39,11 +39,6 @@
                         <span class="icon icon-16 icon-menu"></span>
                     </summary>
                     <div class="popover menu primary-menu-popover">
-                        <button id="import-collection-btn" class="menu-item"
-                                data-i18n-title="sidebar.import" data-i18n-aria="sidebar.import">
-                            <span class="icon icon-16 icon-import"></span>
-                            <span data-i18n="sidebar.import">Import Collection</span>
-                        </button>
                         <button id="layout-toggle-btn" class="menu-item" title="Side-by-side layout (Ctrl+\)"
                                 role="menuitemcheckbox" aria-checked="false">
                             <span class="icon icon-16 icon-view-dual"></span>
@@ -121,6 +116,11 @@
             </div>
 
             <div class="sidebar-tools">
+                <button id="import-collection-btn" type="button" class="button flat image-button"
+                        data-i18n-title="sidebar.import" data-i18n-aria="sidebar.import"
+                        title="Import Collection" aria-label="Import Collection">
+                    <span class="icon icon-16 icon-import" aria-hidden="true"></span>
+                </button>
                 <button id="mock-server-btn" type="button" class="button flat image-button"
                         data-i18n-title="toolbar.mockServer" data-i18n-aria="toolbar.mockServer"
                         title="Mock Server" aria-label="Mock Server">

@@ -26,6 +26,9 @@
 
   --control-height: 34px;
   --control-height-small: 28px;
+  --control-height-embedded: 24px;
+  --switcher-button-height: 22px;
+  --switcher-button-radius: 4px;
   --row-height: 48px;
   --icon-size: 16px;
 
@@ -37,7 +40,7 @@
   --transition-fast: 100ms ease-out;
   --transition-base: 200ms ease-out;
 
-  --dim-opacity: 0.55;
+  --dim-opacity: 0.75;
   --disabled-opacity: 0.5;
 
   --window-bg-color: #fafafb;
@@ -95,13 +98,17 @@
   --status-success-color: var(--success-color);
   --status-redirect-color: var(--warning-color);
   --status-error-color: var(--error-color);
-  --dim-fg-color: color-mix(in srgb, currentColor 55%, transparent);
+  --dim-fg-color: color-mix(in srgb, currentColor 75%, transparent);
+  --control-border-color: color-mix(in srgb, currentColor 65%, transparent);
+  --selection-bg-color: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  --protocol-graphql-color: #a2326c;
+  --accent-action-bg-color: color-mix(in srgb, var(--accent-bg-color) 86%, #000000);
 
   --shadow-card: 0 0 0 1px var(--card-shade-color);
   --shadow-popover: 0 1px 5px 1px rgb(0 0 6 / 9%), 0 2px 14px 3px rgb(0 0 6 / 5%);
   --shadow-dialog: 0 2px 8px 2px rgb(0 0 6 / 12%), 0 4px 24px 6px rgb(0 0 6 / 9%);
 
-  --focus-ring-color: color-mix(in srgb, var(--accent-color) 50%, transparent);
+  --focus-ring-color: var(--accent-color);
 
   --switcher-active-bg: #ffffff;
   --switcher-active-shadow: 0 1px 2px rgb(0 0 6 / 10%);
@@ -126,6 +133,7 @@
 
 :root[data-accent="yellow"] {
   --accent-bg-color: #c88800;
+  --accent-action-bg-color: var(--accent-bg-color);
   --accent-fg-color: rgb(0 0 6 / 80%);
 }
 

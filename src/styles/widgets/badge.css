@@ -1,4 +1,8 @@
-.badge {
+.badge,
+.status-badge,
+.status-display,
+.status-pill,
+.runner-results-detail-status {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -6,30 +10,45 @@
   border-radius: var(--radius-pill);
   font-size: var(--font-size-caption);
   font-weight: 700;
+  line-height: 1.4;
   white-space: nowrap;
-}
-
-.badge.neutral {
+  font-variant-numeric: tabular-nums;
+  color: inherit;
   background-color: var(--shade-color);
 }
 
-.badge.success {
-  background-color: color-mix(in srgb, var(--success-color) 12%, transparent);
+.badge.success,
+.status-badge.is-success,
+.runner-results-detail-status.is-success,
+.status-display.status-success,
+.status-pill[data-state="connected"],
+.status-pill[data-state="loaded"] {
+  background-color: color-mix(in srgb, var(--success-color) 8%, transparent);
   color: var(--success-color);
 }
 
-.badge.warning {
-  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+.badge.warning,
+.badge-warning,
+.status-display.status-redirect,
+.status-pill[data-state="connecting"] {
+  background-color: color-mix(in srgb, var(--warning-color) 8%, transparent);
   color: var(--warning-color);
 }
 
-.badge.error {
-  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+.badge.error,
+.status-badge.is-error,
+.runner-results-detail-status.is-error,
+.status-display.status-client-error,
+.status-display.status-server-error,
+.status-pill[data-state="error"] {
+  background-color: color-mix(in srgb, var(--error-color) 8%, transparent);
   color: var(--error-color);
 }
 
-.badge.accent {
-  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+.badge.accent,
+.badge-info,
+.status-display.status-info {
+  background-color: color-mix(in srgb, var(--accent-color) 8%, transparent);
   color: var(--accent-color);
 }
 
@@ -41,7 +60,7 @@
   padding: 1px var(--space-2);
   border-radius: var(--radius-small);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   letter-spacing: 0.02em;
 }

@@ -22,10 +22,12 @@
 .oauth2-field-pair {
   display: flex;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .oauth2-field-pair > .auth-field-group {
-  flex: 1;
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .oauth2-advanced-details {
@@ -57,28 +59,6 @@
 .alert-error {
   background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
   color: var(--error-color);
-}
-
-.badge-info {
-  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
-  color: var(--accent-color);
-}
-
-.badge-warning {
-  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
-  color: var(--warning-color);
-}
-
-.form-select {
-  appearance: none;
-  min-height: var(--control-height);
-  padding: 0 calc(var(--space-4) + var(--icon-size)) 0 var(--space-3);
-  border: none;
-  border-radius: var(--radius-small);
-  background-color: var(--shade-color);
-  color: inherit;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .form-checkbox {

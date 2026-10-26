@@ -33,6 +33,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .runner-header-controls {
@@ -40,6 +41,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .runner-config {
@@ -193,7 +195,7 @@
 }
 
 .runner-endpoint-item {
-  min-height: 28px;
+  min-height: var(--control-height-small);
   padding: 0 var(--space-2);
   border-radius: var(--radius-small);
   font-size: var(--font-size-small);
@@ -212,12 +214,9 @@
 }
 
 .runner-endpoint-add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-small);
+  width: var(--control-height-embedded);
+  height: var(--control-height-embedded);
+  min-height: var(--control-height-embedded);
   opacity: 0;
 }
 
@@ -251,7 +250,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 34px;
+  min-height: var(--control-height);
   padding: 0 var(--space-2);
   border-radius: var(--radius-small);
   background-color: var(--card-bg-color);
@@ -377,6 +376,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .runner-stat {
@@ -433,7 +433,7 @@
 }
 
 .runner-result-item.is-selected {
-  background-color: color-mix(in srgb, var(--accent-bg-color) 15%, transparent);
+  background-color: var(--selection-bg-color);
 }
 
 .runner-result-name {
@@ -515,14 +515,6 @@
 
 .runner-results-detail-name {
   font-weight: 700;
-}
-
-.runner-results-detail-status.is-success {
-  color: var(--success-color);
-}
-
-.runner-results-detail-status.is-error {
-  color: var(--error-color);
 }
 
 .runner-results-detail-status.is-pending,
@@ -615,36 +607,6 @@
 
 .runner-results-skipped .runner-stat-value {
   opacity: var(--dim-opacity);
-}
-
-.runner-results-detail-tabs,
-.runner-editor-tabs {
-  display: flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-small);
-  background-color: var(--shade-color);
-  width: max-content;
-}
-
-.runner-results-tab,
-.runner-editor-tab {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: var(--space-1) var(--space-3);
-  border-radius: calc(var(--radius-small) - 2px);
-  font-weight: 600;
-  font-size: var(--font-size-small);
-  color: inherit;
-  opacity: 0.8;
-}
-
-.runner-results-tab.is-active,
-.runner-editor-tab.is-active {
-  background-color: var(--switcher-active-bg);
-  box-shadow: var(--switcher-active-shadow);
-  opacity: 1;
 }
 
 .runner-results-tab-content,

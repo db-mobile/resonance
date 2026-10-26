@@ -11,6 +11,17 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.request-url-section > .button,
+.method-select-container {
+  flex-shrink: 0;
+}
+
+.request-url-section > .url-input,
+.request-url-section > .url-autocomplete-wrapper {
+  flex: 1 1 180px;
 }
 
 .method-select-container .method-select {
@@ -33,7 +44,7 @@
 .grpc-url-section {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
 }
 
@@ -57,7 +68,7 @@
 .method-pill[data-method="GRPC"] { --protocol-pill-color: var(--method-patch-color); }
 .method-pill[data-method="WS"] { --protocol-pill-color: var(--method-post-color); }
 .method-pill[data-method="SSE"] { --protocol-pill-color: var(--method-put-color); }
-.method-pill[data-method="GRAPHQL"] { --protocol-pill-color: #e10098; }
+.method-pill[data-method="GRAPHQL"] { --protocol-pill-color: var(--protocol-graphql-color); }
 .method-pill[data-method="MQTT"] { --protocol-pill-color: var(--method-get-color); }
 
 .grpc-target-wrapper {
@@ -110,6 +121,20 @@
   flex-shrink: 0;
 }
 
+.panel-header,
+.body-header,
+.mqtt-panel-header {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.body-header > div,
+#graphql-editor-actions,
+#graphql-header-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .body-mode-panel {
   display: none;
   flex-direction: column;
@@ -130,26 +155,7 @@
 .binary-content-type {
   flex: 1;
   min-width: 0;
-  min-height: var(--control-height-small);
-  padding: 0 var(--space-3);
-  background-color: var(--view-bg-color);
-  color: var(--view-fg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-small);
-  font-size: var(--font-size-small);
   font-family: var(--font-mono);
-}
-
-.binary-file-path:focus,
-.binary-content-type:focus {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: -2px;
-  border-color: transparent;
-}
-
-.binary-file-path::placeholder,
-.binary-content-type::placeholder {
-  opacity: 0.4;
 }
 
 .binary-content-type {
