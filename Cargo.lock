@@ -4586,7 +4586,7 @@ name = "resonance"
 version = "3.5.5"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "futures-util",
@@ -4673,7 +4673,7 @@ name = "resonance-core"
 version = "3.5.5"
 dependencies = [
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "boa_engine",
  "bytes",
  "chrono",
