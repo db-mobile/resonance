@@ -10,7 +10,7 @@ import { methodCarriesBody } from './utils/bodyMethods.js';
  * @property {string} [method]
  * @property {string} url
  * @property {Object<string, string>} [headers]
- * @property {string|Object|Array} [body]
+ * @property {string|Object|Array|boolean|number} [body]
  * @property {string} [bodyType]
  */
 
@@ -120,7 +120,7 @@ function hasBody(config) {
     if (isFormDataBody(config) || isUrlencodedBody(config) || isBinaryBody(config)) {
         return true;
     }
-    return Boolean(config.body) && methodCarriesBody(config.method);
+    return config.body != null && config.body !== '' && methodCarriesBody(config.method);
 }
 
 /**
@@ -214,10 +214,11 @@ function validHeaders(headers) {
  */
 function generateCurl(config) {
     const { method, url, headers, body } = config;
+    const methodUpper = (method || 'GET').toUpperCase();
     const curlParts = ['curl'];
 
-    if (method && method !== 'GET') {
-        curlParts.push(`-X ${method}`);
+    if (methodUpper !== 'GET' || hasBody(config)) {
+        curlParts.push(`-X ${methodUpper}`);
     }
 
     const skipContentType = isFormDataBody(config) || isUrlencodedBody(config);
@@ -337,6 +338,9 @@ function generatePythonRequests(config) {
  * @returns {string}
  */
 function generateJavaScriptFetch(config) {
+    if ((config.method || 'GET').toUpperCase() === 'GET' && hasBody(config)) {
+        return '// Fetch does not support GET request bodies. Use the cURL or Node.js snippet to send this request.';
+    }
     const { method, url, headers } = config;
     const headerEntries = validHeaders(headers);
     const lines = [];
@@ -476,6 +480,7 @@ function generateGo(config) {
  */
 function generateNodeJs(config) {
     const { method, url, headers } = config;
+    const bodyInfo = resolveSnippetBody(config);
     const headerEntries = validHeaders(headers);
     const lines = [];
 
@@ -485,6 +490,11 @@ function generateNodeJs(config) {
 
     lines.push(`const ${moduleName} = require('${moduleName}');`);
     lines.push('');
+
+    if (bodyInfo.text !== null) {
+        lines.push(`const payload = \`${escapeJavaScriptString(bodyInfo.text)}\`;`);
+        lines.push('');
+    }
 
     lines.push('const options = {');
     lines.push(`  hostname: '${escapeJsSingleQuoted(urlObj.hostname)}',`);
@@ -503,6 +513,11 @@ function generateNodeJs(config) {
     lines.push('};');
     lines.push('');
 
+    if (bodyInfo.text !== null && !headerEntries.some(([key]) => ['content-length', 'transfer-encoding'].includes(key.toLowerCase()))) {
+        lines.push("options.headers = { ...options.headers, 'Content-Length': Buffer.byteLength(payload) };");
+        lines.push('');
+    }
+
     lines.push(`const req = ${moduleName}.request(options, (res) => {`);
     lines.push('  let data = \'\';');
     lines.push('');
@@ -520,9 +535,8 @@ function generateNodeJs(config) {
     lines.push('});');
     lines.push('');
 
-    const bodyInfo = resolveSnippetBody(config);
     if (bodyInfo.text !== null) {
-        lines.push(`req.write(\`${escapeJavaScriptString(bodyInfo.text)}\`);`);
+        lines.push('req.write(payload);');
     } else if (bodyInfo.comment) {
         lines.push(`// ${bodyInfo.comment}`);
     }

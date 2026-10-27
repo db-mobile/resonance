@@ -3,6 +3,78 @@ use resonance_core::{
     model::*,
 };
 use serde_json::json;
+
+#[tokio::test]
+async fn get_and_delete_bodies_reach_the_server_in_single_requests_and_runs() {
+    use axum::{Json, Router, extract::Request, routing::any};
+    async fn echo(request: Request) -> Json<serde_json::Value> {
+        let method = request.method().to_string();
+        let content_type = request
+            .headers()
+            .get("content-type")
+            .map(|v| v.to_str().unwrap().to_owned());
+        let bytes = axum::body::to_bytes(request.into_body(), 1024)
+            .await
+            .unwrap();
+        Json(
+            json!({"method":method,"contentType":content_type,"body":String::from_utf8(bytes.to_vec()).unwrap()}),
+        )
+    }
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/echo", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, Router::new().fallback(any(echo)))
+            .await
+            .unwrap();
+    });
+    for method in ["GET", "DELETE"] {
+        for (mode, content, expected, content_type) in [
+            (
+                "json",
+                r#"{"id":{{id}}}"#,
+                r#"{"id":7}"#,
+                "application/json",
+            ),
+            ("json", "[{{id}}]", "[7]", "application/json"),
+            ("json", "false", "false", "application/json"),
+            ("json", "0", "0", "application/json"),
+            ("text", " Grüße {{id}}\n", " Grüße 7\n", "text/plain"),
+        ] {
+            let template = json!({"protocol":"http","method":method,"url":url,
+                "body":{"mode":mode,"content":content}});
+            let input = serde_json::from_value(json!({"executionId":"single",
+                "context":{"environment":{"id":7}},"request":template}))
+            .unwrap();
+            let single = execute_request(input, Cancellation::default(), |_| {}).await;
+            let input = serde_json::from_value(json!({"executionId":"run","runnerName":"Bodies",
+                "context":{"environment":{"id":7}},"requests":[template]}))
+            .unwrap();
+            let run = execute_run(input, Cancellation::default(), |_| {}).await;
+            for result in [&single, &run.requests[0]] {
+                assert!(result.sent, "{method} {mode}: {result:?}");
+                let response = result.api_response.as_ref().unwrap();
+                assert_eq!(response.status, Some(200), "{result:?}");
+                assert_eq!(
+                    response.data,
+                    Some(json!({"method":method,"contentType":content_type,"body":expected}))
+                );
+            }
+        }
+    }
+    server.abort();
+}
+
+#[tokio::test]
+async fn invalid_get_json_is_rejected_before_sending() {
+    let input = serde_json::from_value(json!({"executionId":"invalid","context":{},
+        "request":{"method":"GET","url":"http://127.0.0.1:1",
+            "body":{"mode":"json","content":"{"}}}))
+    .unwrap();
+    let result = execute_request(input, Cancellation::default(), |_| {}).await;
+    assert!(!result.sent);
+    assert_eq!(result.execution_error.unwrap().code, "invalidBody");
+}
+
 #[tokio::test]
 async fn pre_script_skip_emits_pinned_deltas_but_no_network_or_local_persistence() {
     let input:RequestInput=serde_json::from_value(json!({"executionId":"one","context":{"environmentId":"env-a"},"request":{"url":"http://127.0.0.1:1","preRequestScript":"pm.environment.set('token','x'); pm.variables.set('local',7); pm.execution.skipRequest();"}})).unwrap();

@@ -58,6 +58,61 @@ fn empty_and_invalid_json_bodies_are_distinct() {
 }
 
 #[test]
+fn get_and_delete_prepare_json_and_text_bodies() {
+    let vars = serde_json::from_value(json!({"id":7})).unwrap();
+    for method in ["GET", "get", "DELETE", "delete", ""] {
+        for (mode, content, expected) in [
+            ("json", r#"{"id":{{id}}}"#, json!({"id":7})),
+            ("json", "[{{id}}]", json!([7])),
+            ("json", "false", json!(false)),
+            ("json", "0", json!(0)),
+            ("json", " \n ", json!(null)),
+            ("text", " {{id}} raw\n", json!(" 7 raw\n")),
+            ("text", "", json!(null)),
+        ] {
+            let request = serde_json::from_value(json!({
+                "method":method,"url":"api.test","body":{"mode":mode,"content":content}
+            }))
+            .unwrap();
+            let prepared = prepare(
+                &request,
+                &ExecutionContext::default(),
+                &vars,
+                &mut VariableProcessor::default(),
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                prepared.request["body"], expected,
+                "{method} {mode} {content}"
+            );
+        }
+    }
+}
+
+#[test]
+fn get_and_delete_reject_invalid_json_but_head_still_ignores_it() {
+    for method in ["GET", "get", "DELETE", "HEAD", "head"] {
+        let request = serde_json::from_value(json!({
+            "method":method,"url":"api.test","body":{"mode":"json","content":"{"}
+        }))
+        .unwrap();
+        let result = prepare(
+            &request,
+            &ExecutionContext::default(),
+            &Variables::new(),
+            &mut VariableProcessor::default(),
+            None,
+        );
+        if method.eq_ignore_ascii_case("HEAD") {
+            assert!(result.unwrap().request["body"].is_null());
+        } else {
+            assert_eq!(result.unwrap_err().code, "invalidBody", "{method}");
+        }
+    }
+}
+
+#[test]
 fn empty_bearer_auth_keeps_editor_and_saved_runner_defaults() {
     let mut template: RequestTemplate = serde_json::from_value(
         json!({"url":"api.test","auth":{"type":"bearer","config":{"token":""}}}),

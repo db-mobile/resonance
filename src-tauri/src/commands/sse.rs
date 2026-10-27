@@ -3,7 +3,7 @@ use reqwest::header::{ACCEPT, CACHE_CONTROL, HeaderMap, HeaderName, HeaderValue}
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use tokio::sync::oneshot;
 
 use super::api_request::ClientCertConfig;
@@ -100,11 +100,17 @@ fn payload(tab_id: &str, url: &str, event_type: &str) -> SseEventPayload {
     }
 }
 
-fn emit(app: &AppHandle, payload: SseEventPayload) {
+fn emit<R: Runtime>(app: &AppHandle<R>, payload: SseEventPayload) {
     let _ = app.emit("sse-event", payload);
 }
 
-fn emit_error(app: &AppHandle, tab_id: &str, url: &str, status: Option<u16>, message: String) {
+fn emit_error<R: Runtime>(
+    app: &AppHandle<R>,
+    tab_id: &str,
+    url: &str,
+    status: Option<u16>,
+    message: String,
+) {
     let mut event = payload(tab_id, url, "error");
     event.status = status;
     event.message = Some(message);
@@ -253,8 +259,8 @@ fn build_header_map(
     Ok(header_map)
 }
 
-fn dispatch(
-    app: &AppHandle,
+fn dispatch<R: Runtime>(
+    app: &AppHandle<R>,
     tab_id: &str,
     url: &str,
     partial: &mut PartialEvent,
@@ -298,8 +304,8 @@ fn give_up_message() -> String {
 
 /// Announce the pending reconnect and wait out the retry delay. Returns false
 /// when the caller asked to shut down while waiting.
-async fn wait_before_retry(
-    app: &AppHandle,
+async fn wait_before_retry<R: Runtime>(
+    app: &AppHandle<R>,
     tab_id: &str,
     url: &str,
     retry_ms: u64,
@@ -318,8 +324,8 @@ async fn wait_before_retry(
 /// Connect, stream, and reconnect until the stream fails fatally or the caller
 /// signals shutdown. Every exit path returns to `run_stream`, which owns the
 /// single terminal `close` emit.
-async fn stream_loop(
-    app: &AppHandle,
+async fn stream_loop<R: Runtime>(
+    app: &AppHandle<R>,
     client: &reqwest::Client,
     target: &StreamTarget,
     shutdown: &mut oneshot::Receiver<()>,
@@ -620,6 +626,10 @@ pub async fn sse_close(state: State<'_, SseState>, tab_id: String) -> Result<Com
 
     Ok(CommandAck::ok())
 }
+
+#[cfg(test)]
+#[path = "sse_body_tests.rs"]
+mod body_tests;
 
 #[cfg(test)]
 mod tests {

@@ -76,9 +76,11 @@ afterEach(() => { document.body.innerHTML = ''; delete window.backendAPI; });
 
 // Body preparation assertions now live in resonance-core's baseline and preparation tests.
 // This boundary verifies every unsaved editor input reaches that executor intact.
-test.each(['json', 'text', 'formdata', 'urlencoded', 'binary'])('captures unsaved %s inputs without frontend substitution', async mode => {
+test.each(['GET', 'DELETE', 'POST'].flatMap(method => ['json', 'text', 'formdata', 'urlencoded', 'binary'].map(mode => [method, mode])))('captures unsaved %s %s inputs without frontend substitution', async (method, mode) => {
     const loaded = await loadApiHandler();
+    document.getElementById('method-select').value = method;
     document.getElementById('body-mode-select').value = mode;
+    loaded.app.requestBodyEditor = { getContent: () => '{"token":"{{token}}"}' };
     loaded.app.requestBodyTextEditor = { getContent: () => '{{token}} raw text' };
     loaded.app.formBodyManager = {
         getFormDataRows: () => [{ key: 'file', type: 'file', filePath: '/{{token}}.bin', enabled: true }],
@@ -87,8 +89,10 @@ test.each(['json', 'text', 'formdata', 'urlencoded', 'binary'])('captures unsave
     };
     await loaded.handleSendRequest();
     const input = window.backendAPI.execution.request.mock.calls[0][0];
+    expect(input.request.method).toBe(method);
     expect(input.request.body.mode).toBe(mode);
     expect(input.request.headers).toEqual({ 'X-Trace': 't1' });
+    if (mode === 'json') { expect(input.request.body.content).toBe('{"token":"{{token}}"}'); }
     if (mode === 'text') { expect(input.request.body.content).toBe('{{token}} raw text'); }
     if (mode === 'binary') { expect(input.request.body.filePath).toBe('/{{token}}.bin'); }
     if (mode === 'formdata') { expect(input.request.body.fields[0].filePath).toBe('/{{token}}.bin'); }
@@ -105,6 +109,24 @@ test('captures unsaved GraphQL query, variables and selected operation', async (
         query: 'query {{operation}} { id }', variables: '{"id":"{{token}}"}', operationName: 'Get'
     });
     loaded.setGraphQLBodyManager(null);
+});
+
+test.each(['GET', 'DELETE'].flatMap(method => ['json', 'text'].map(mode => [method, mode])))('captures %s %s body for code snippets', async (method, mode) => {
+    const loaded = await loadApiHandler();
+    const { CodeSnippetDialog } = await import('../../src/modules/ui/CodeSnippetDialog.js');
+    const show = jest.spyOn(CodeSnippetDialog.prototype, 'show').mockImplementation(() => {});
+    document.getElementById('method-select').value = method;
+    document.getElementById('body-mode-select').value = mode;
+    loaded.app.requestBodyEditor = { getContent: () => '{"id":7}' };
+    loaded.app.requestBodyTextEditor = { getContent: () => ' Grüße 7\n' };
+    try {
+        await loaded.handleGenerateCurl();
+        expect(show).toHaveBeenCalledWith(expect.objectContaining({
+            method, body: mode === 'json' ? { id: 7 } : ' Grüße 7\n'
+        }));
+    } finally {
+        show.mockRestore();
+    }
 });
 
 test('body capture errors are delivered to the shared executor for classification', async () => {

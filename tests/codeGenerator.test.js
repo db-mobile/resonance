@@ -41,10 +41,66 @@ describe('Code Generator', () => {
         });
 
         test('should handle GET requests without -X flag', () => {
-            const getConfig = { ...testConfig, method: 'GET' };
+            const getConfig = { method: 'GET', url: testConfig.url };
             const code = generateCode('curl', getConfig);
             expect(code).toContain('curl');
             expect(code).not.toContain('-X GET');
+        });
+    });
+
+    describe('GET and DELETE bodies', () => {
+        test.each(['GET', 'get', 'DELETE', 'delete'])('%s keeps JSON and text in supported snippets', (method) => {
+            for (const body of [{ marker: 'payload' }, ['payload'], false, 0, 'raw payload']) {
+                for (const { id } of SUPPORTED_LANGUAGES) {
+                    if (id === 'javascript-fetch' && method.toUpperCase() === 'GET') {
+                        continue;
+                    }
+                    const code = generateCode(id, { method, url: testConfig.url, body });
+                    expect(code).toContain(typeof body === 'object' || typeof body === 'string' ? 'payload' : String(body));
+                }
+            }
+        });
+
+        test.each(['GET', 'get', undefined])('cURL preserves %s when sending a body', (method) => {
+            const code = generateCode('curl', { method, url: testConfig.url, body: { id: 7 } });
+            expect(code).toMatch(/-X GET/i);
+            expect(code).toContain('-d');
+        });
+
+        test.each(['formdata', 'urlencoded', 'binary'])('cURL preserves GET with %s', (bodyType) => {
+            const body = bodyType === 'binary' ? { filePath: '/tmp/body.bin' } : [{ key: 'id', value: '7' }];
+            expect(generateCode('curl', { method: 'GET', url: testConfig.url, bodyType, body })).toContain('-X GET');
+        });
+
+        test('Java uses a body-capable builder for GET and DELETE', () => {
+            for (const method of ['GET', 'DELETE']) {
+                const code = generateCode('java', { method, url: testConfig.url, body: { id: 7 } });
+                expect(code).toContain(`.method("${method}", HttpRequest.BodyPublishers.ofString(`);
+            }
+        });
+
+        test('Fetch explains unsupported GET bodies without issuing a different request', () => {
+            const code = generateCode('javascript-fetch', { method: 'GET', url: testConfig.url, body: { id: 7 } });
+            expect(code).toMatch(/Fetch.*GET.*bod/i);
+            expect(code).toContain('cURL');
+            expect(code).toContain('Node.js');
+            expect(code).not.toContain('fetch(');
+            expect(code.split('\n').every(line => line.startsWith('//'))).toBe(true);
+        });
+
+        test('Node.js frames UTF-8 GET bodies', () => {
+            const code = generateCode('nodejs', { method: 'GET', url: testConfig.url, body: 'Grüße' });
+            expect(code).toContain('Content-Length');
+            expect(code).toContain('Buffer.byteLength(');
+        });
+
+        test('Node.js respects case-insensitive explicit framing headers', () => {
+            for (const name of ['content-length', 'TRANSFER-ENCODING']) {
+                const code = generateCode('nodejs', {
+                    method: 'GET', url: testConfig.url, body: 'abc', headers: { [name]: name === 'content-length' ? '3' : 'chunked' }
+                });
+                expect(code).not.toContain('Buffer.byteLength(');
+            }
         });
     });
 

@@ -303,6 +303,27 @@ describe('MQTT passes its whole connection record through', () => {
 });
 
 describe('SSE carries the method and body', () => {
+    test.each(['json', 'text'])('GET forwards a resolved %s body and default content type', async (mode) => {
+        const { handleSendRequest, setRequestMode } = await loadApiHandler({ variables: { id: '7' } });
+        const { app } = await import('../../src/modules/appContext.js');
+        setRequestMode('sse');
+        document.getElementById('sse-url-input').value = 'https://example.com/events';
+        document.getElementById('method-select').value = 'GET';
+        document.getElementById('body-mode-select').value = mode;
+        document.querySelector('.body-mode-panel[data-mode="json"]').innerHTML =
+            '<textarea id="body-input">{"id":"{{id}}"}</textarea>';
+        app.requestBodyTextEditor = { getContent: () => ' Grüße {{id}}\n' };
+
+        await handleSendRequest();
+
+        expect(handlers.sse.mock.calls[0][1]).toMatchObject({
+            'Content-Type': mode === 'json' ? 'application/json' : 'text/plain'
+        });
+        expect(handlers.sse.mock.calls[0][2]).toMatchObject({
+            method: 'GET', body: mode === 'json' ? '{"id":"7"}' : ' Grüße 7\n'
+        });
+    });
+
     test('passes the selected method through', async () => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler();
         setRequestMode('sse');
@@ -315,14 +336,14 @@ describe('SSE carries the method and body', () => {
         expect(handlers.sse.mock.calls[0][2]).toMatchObject({ method: 'POST' });
     });
 
-    test('reports an unparseable JSON body without connecting', async () => {
+    test.each(['GET', 'DELETE', 'POST'])('%s reports an unparseable JSON body without connecting', async (method) => {
         const { handleSendRequest, setRequestMode } = await loadApiHandler();
         const { toast } = await import('../../src/modules/ui/Toast.js');
         const toastError = jest.spyOn(toast, 'error').mockImplementation(() => {});
         setRequestMode('sse');
 
         document.getElementById('sse-url-input').value = 'https://example.com/events';
-        document.getElementById('method-select').value = 'POST';
+        document.getElementById('method-select').value = method;
         document.querySelector('.body-mode-panel[data-mode="json"]').innerHTML =
             '<textarea id="body-input">{ not json</textarea>';
 

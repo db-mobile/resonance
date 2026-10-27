@@ -4,7 +4,7 @@
  */
 
 /** @type {ReadonlySet<string>} */
-const BODYLESS_METHODS = new Set(['GET', 'HEAD']);
+const BODYLESS_METHODS = new Set(['HEAD']);
 
 /** @type {ReadonlySet<string>} */
 const METHOD_INDEPENDENT_BODY_MODES = new Set(['formdata', 'urlencoded', 'binary']);
