@@ -6,7 +6,7 @@ mod window_state;
 
 use commands::{
     api_request::{RequestState, pick_upload_file, save_response_body, send_api_request},
-    app::app_get_version,
+    app::{app_get_version, app_set_window_theme},
     certificates::pick_certificate_file,
     collections::{
         CollectionLoadErrors, collection_close, collection_delete, collection_delete_endpoint_data,
@@ -124,6 +124,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             // App
             app_get_version,
+            app_set_window_theme,
             data_migration_status,
             // Store
             store_get,
