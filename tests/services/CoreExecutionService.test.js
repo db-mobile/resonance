@@ -224,10 +224,13 @@ test('captureRun keeps only queue entries whose live request tags pass the runne
     const { service } = setup();
     const tagsById = { smoke: ['Smoke'], slow: ['smoke', 'slow'], plain: [] };
     service.captureContext = jest.fn(async () => ({ environment: {} }));
-    service.captureTarget = jest.fn(async (collectionId, endpointId) => ({
-        ...target,
-        endpoint: { ...target.endpoint, id: endpointId, tags: tagsById[endpointId] }
-    }));
+    service.pipeline.mockBaseUrlFor = jest.fn(async () => null);
+    service.pipeline.collectionRepository.getExecutionSnapshots = jest.fn(async (refs) => [{
+        collectionId: 'c', collection: target.collection, variables: [],
+        targets: refs.map(({ endpointId }) => ({ ...target, endpointId,
+            endpoint: { ...target.endpoint, id: endpointId, tags: tagsById[endpointId] } }))
+    }]);
+    service.pipeline.variableRepository.hydrateVariablesForCollection = jest.fn(async () => ({}));
     const runner = (tags) => ({
         collectionId: 'c',
         requests: Object.keys(tagsById).map((id) => ({ collectionId: 'c', endpointId: id, name: id })),

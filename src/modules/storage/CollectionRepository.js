@@ -308,9 +308,14 @@ export class CollectionRepository {
      */
     async getAllPersistedEndpointData(collectionId, endpointId) {
         const data = await this._getEndpointData(collectionId, endpointId);
+        return this.hydrateEndpointData(collectionId, endpointId, data);
+    }
+
+    /** Normalize supplied snapshot data without reading the collection again. */
+    async hydrateEndpointData(collectionId, endpointId, data, readSecrets = null) {
         return {
             url: data.url || null,
-            authConfig: await this._hydrateAuthConfig(authSecretScope(collectionId, endpointId), data.authConfig || null),
+            authConfig: await this._hydrateAuthConfig(authSecretScope(collectionId, endpointId), data.authConfig || null, readSecrets),
             pathParams: data.pathParams || [],
             queryParams: data.queryParams || [],
             headers: data.headers || [],
@@ -321,6 +326,30 @@ export class CollectionRepository {
             mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
             responseSchema: data.responseSchema ?? null
         };
+    }
+
+    /** Capture and hydrate selected targets; secret reads are shared only within this call. */
+    async getExecutionSnapshots(targets) {
+        if (targets.length === 0) { return []; }
+        const snapshots = await this.backendAPI.collections.captureExecutionSnapshot(targets);
+        const scopes = new Map();
+        const readSecrets = (scope) => {
+            if (!scopes.has(scope)) { scopes.set(scope, this.secretStore.getScope(scope)); }
+            return scopes.get(scope);
+        };
+        return Promise.all(snapshots.map(async (snapshot) => ({
+            ...snapshot,
+            targets: await Promise.all(snapshot.targets.map(async (target) => ({
+                ...target,
+                persisted: await this.hydrateEndpointData(snapshot.collectionId, target.endpointId, target.persisted, readSecrets),
+                inheritedAuth: await Promise.all(target.inheritedAuth.map(async ({ source, authConfig }) => ({
+                    source,
+                    authConfig: await this._hydrateAuthConfig(source.kind === 'folder'
+                        ? folderAuthSecretScope(snapshot.collectionId, source.folderId)
+                        : collectionAuthSecretScope(snapshot.collectionId), authConfig, readSecrets)
+                })))
+            })))
+        })));
     }
 
     async _saveEndpointData(collectionId, endpointId, data) {
@@ -506,11 +535,11 @@ export class CollectionRepository {
      * @param {Object|null} authConfig
      * @returns {Promise<Object|null>}
      */
-    async _hydrateAuthConfig(scope, authConfig) {
+    async _hydrateAuthConfig(scope, authConfig, readSecrets = null) {
         if (!authConfig || !this.secretStore) {
             return authConfig;
         }
-        const secrets = await this.secretStore.getScope(scope);
+        const secrets = await (readSecrets ? readSecrets(scope) : this.secretStore.getScope(scope));
         return mergeAuthSecrets(authConfig, secrets);
     }
 

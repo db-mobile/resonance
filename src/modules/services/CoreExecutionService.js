@@ -68,7 +68,7 @@ export class CoreExecutionService {
         this.backend = backendAPI;
     }
 
-    async captureContext(collectionIds = []) {
+    async captureContext(collectionIds = [], { collectionVariables = null } = {}) {
         const { environmentRepository, variableRepository, certificates } = this.pipeline;
         const active = await environmentRepository.getActiveEnvironment?.();
         const environmentId = active?.id || null;
@@ -80,7 +80,7 @@ export class CoreExecutionService {
             certificates?.getItems?.() ?? [],
             this.backend.proxySettings?.get?.() ?? {},
             app.cookieController?.service?.getAll(environmentId || 'default') ?? [],
-            Promise.all(
+            collectionVariables ?? Promise.all(
                 [...new Set(collectionIds.filter(Boolean))].map(async (id) => [
                     id,
                     await variableRepository.getVariablesForCollection(id)
@@ -150,25 +150,42 @@ export class CoreExecutionService {
 
     async captureRun(runner) {
         const captured = clone(runner);
-        const contextPromise = this.captureContext(captured.requests.map((r) => r.collectionId)).then(
+        const refs = [...new Map(captured.requests.map(({ collectionId, endpointId }) => [
+            JSON.stringify([collectionId, endpointId]), { collectionId, endpointId }
+        ])).values()];
+        const scriptOverride = app.scriptController?.captureRunScriptOverride(refs) ?? Promise.resolve(null);
+        const snapshotsPromise = Promise.resolve(scriptOverride).then(async (override) => ({
+            snapshots: await this.pipeline.collectionRepository.getExecutionSnapshots(refs), override
+        }));
+        const collectionVariables = snapshotsPromise.then(({ snapshots }) => Promise.all(snapshots.map(async (snapshot) => [
+            snapshot.collectionId,
+            await this.pipeline.variableRepository.hydrateVariablesForCollection(snapshot.collectionId, snapshot.variables).catch(() => ({}))
+        ])));
+        // Context capture may fail before awaiting this branch (e.g. loading
+        // the active environment). Its rejection must still be observed.
+        collectionVariables.catch(() => {});
+        const contextPromise = this.captureContext(captured.requests.map((r) => r.collectionId), { collectionVariables }).then(
             (value) => ({ value }),
             (error) => ({ error })
         );
-        // Capture each saved definition once, while preserving distinct queue entries.
+        // Metadata is shared by the captured targets; only final queue templates are cloned.
         const targets = new Map();
-        for (const entry of captured.requests) {
-            const key = JSON.stringify([entry.collectionId, entry.endpointId]);
-            if (!targets.has(key)) {
-                targets.set(key, this.captureTarget(entry.collectionId, entry.endpointId));
+        const { snapshots, override } = await snapshotsPromise;
+        await Promise.all(snapshots.map(async (snapshot) => {
+            const mockBaseUrl = await this.pipeline.mockBaseUrlFor(snapshot.collectionId);
+            for (const target of snapshot.targets) {
+                const scripts = override?.collectionId === snapshot.collectionId && override.endpointId === target.endpointId
+                    ? override.scripts : target.scripts;
+                targets.set(JSON.stringify([snapshot.collectionId, target.endpointId]), {
+                    ...target, collection: snapshot.collection, scripts, mockBaseUrl
+                });
             }
-        }
+        }));
         const filter = captured.options?.tags;
-        const resolved = await Promise.all(
-            captured.requests.map(async (entry) => ({
-                entry,
-                target: await targets.get(JSON.stringify([entry.collectionId, entry.endpointId]))
-            }))
-        );
+        const resolved = captured.requests.map((entry) => ({
+            entry,
+            target: targets.get(JSON.stringify([entry.collectionId, entry.endpointId]))
+        }));
         const kept = isEmptyTagFilter(filter)
             ? resolved
             : resolved.filter(({ target }) => matchesTagFilter(target?.endpoint?.tags, filter));

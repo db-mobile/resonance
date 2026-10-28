@@ -12,12 +12,18 @@ fn scripts_are_empty(scripts: &ScriptData) -> bool {
 
 /// Read a one-off script entry from the legacy global store.
 fn read_legacy_store_script(app: &AppHandle, key: &str) -> Option<ScriptData> {
-    let store = app.store(STORE_FILE).ok()?;
-    let map: HashMap<String, ScriptData> = store
+    read_legacy_store_scripts(app).get(key).cloned()
+}
+
+/// Read once for a batch capture, without migrating or rewriting script data.
+pub(crate) fn read_legacy_store_scripts(app: &AppHandle) -> HashMap<String, ScriptData> {
+    let Ok(store) = app.store(STORE_FILE) else {
+        return HashMap::new();
+    };
+    store
         .get(SCRIPTS_KEY)
         .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default();
-    map.get(key).cloned()
+        .unwrap_or_default()
 }
 
 /// Remove a single `"{collectionId}_{endpointId}"` entry from the legacy global

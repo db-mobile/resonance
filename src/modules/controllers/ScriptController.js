@@ -61,6 +61,17 @@ export class ScriptController {
         return this.service.getScripts(collectionId, endpointId);
     }
 
+    /** Pin editor content before an awaited save can switch its displayed target. */
+    async captureRunScriptOverride(targets) {
+        const manager = this.scriptManager;
+        const collectionId = manager?.currentCollectionId;
+        const endpointId = manager?.currentEndpointId;
+        const override = targets.some(target => target.collectionId === collectionId && target.endpointId === endpointId)
+            && manager?.getCurrentScripts ? { collectionId, endpointId, scripts: { ...manager.getCurrentScripts() } } : null;
+        if (targets.length) { await manager?.flushPendingSave?.(); }
+        return override;
+    }
+
     /**
      * @param {string} title
      * @param {string} message

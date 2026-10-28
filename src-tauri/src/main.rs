@@ -142,6 +142,7 @@ fn main() {
             send_api_request,
             commands::execution::execute_request,
             commands::execution::execute_run,
+            commands::collections::execution_snapshot::collections_capture_execution_snapshot,
             commands::execution::cancel_execution,
             pick_upload_file,
             save_response_body,

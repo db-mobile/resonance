@@ -1,4 +1,5 @@
 use serde::Serialize;
+pub mod execution_snapshot;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;

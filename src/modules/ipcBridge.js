@@ -93,6 +93,7 @@ if (isTauri) {
             delete: (account) => invoke('secret_delete', { account })
         },
         collections: {
+            captureExecutionSnapshot: (targets) => invoke('collections_capture_execution_snapshot', { targets }),
             list: () => invoke('collections_list'),
             getAll: () => invoke('collections_get_all'),
             loadErrors: () => invoke('collections_load_errors'),
