@@ -261,7 +261,7 @@ export class CollectionRenderer {
     createCollectionHeader(collection) {
         const headerDiv = el('div', 'collection-header u-flex u-items-center');
 
-        const nameDiv = el('div', 'collection-name', collection.name);
+        const nameDiv = el('div', 'collection-name u-truncate', collection.name);
 
         const toggleDiv = el('div', 'collection-toggle', '▶');
 
@@ -362,7 +362,7 @@ export class CollectionRenderer {
 
         const icon = el('span', 'icon icon-12 icon-branch');
 
-        const label = el('span', 'collection-git-branch', branch);
+        const label = el('span', 'collection-git-branch u-truncate', branch);
 
         badge.appendChild(icon);
         badge.appendChild(label);
@@ -552,7 +552,7 @@ export class CollectionRenderer {
 
         const folderHeader = el('div', 'folder-header u-flex u-items-center');
 
-        const folderName = el('div', 'folder-name', folder.name);
+        const folderName = el('div', 'folder-name u-truncate', folder.name);
 
         const folderToggle = el('div', 'folder-toggle', '▶');
 
@@ -603,7 +603,7 @@ export class CollectionRenderer {
         methodSpan.dataset.method = method.toUpperCase();
         methodSpan.textContent = method;
 
-        const pathSpan = el('span', 'endpoint-path');
+        const pathSpan = el('span', 'endpoint-path u-truncate');
         const displayName = endpoint.name || (endpoint.path || '').replace(/^\{\{baseUrl\}\}/, '').split('?')[0] || 'Unnamed Request';
         pathSpan.textContent = displayName;
         const tags = normalizeTags(endpoint.tags);

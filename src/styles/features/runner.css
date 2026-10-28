@@ -145,14 +145,6 @@
   background-color: var(--accent-bg-color);
 }
 
-.runner-section-title {
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: var(--dim-opacity);
-}
-
 .runner-collection-tree {
   flex: 1;
   min-height: 0;
@@ -182,9 +174,6 @@
 .runner-collection-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 600;
 }
 
@@ -208,9 +197,6 @@
 .runner-endpoint-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .runner-endpoint-add-btn {
@@ -275,9 +261,6 @@
 .runner-request-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--font-size-small);
 }
 
@@ -413,12 +396,6 @@
   overflow-y: auto;
 }
 
-.runner-results-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 .runner-result-item {
   display: flex;
   flex-direction: column;
@@ -439,9 +416,6 @@
 .runner-result-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: var(--font-size-small);
 }
 
@@ -505,12 +479,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.runner-results-detail-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .runner-results-detail-name {
@@ -664,12 +632,6 @@
   justify-content: flex-start;
 }
 
-.runner-data-file-btn > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .runner-data-file-btn:hover,
 .runner-data-file-btn:focus-visible {
   text-decoration: underline;
@@ -694,9 +656,6 @@
   font-size: var(--font-size-caption);
   font-weight: 700;
   opacity: var(--dim-opacity);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .runner-file-actions {
@@ -719,12 +678,6 @@
   gap: var(--space-3);
   flex: 1;
   min-height: 0;
-}
-
-.runner-editor-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .runner-editor-section-title {

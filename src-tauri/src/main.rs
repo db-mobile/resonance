@@ -2,6 +2,8 @@
 
 mod commands;
 #[cfg(target_os = "linux")]
+mod gtk_theme;
+#[cfg(target_os = "linux")]
 mod window_state;
 
 use commands::{
@@ -34,7 +36,7 @@ use commands::{
     import_export::{
         collections_pick_import_file, export_openapi, export_postman, import_collection_file,
         import_cookie_file, import_postman_environment, pick_runner_data_file, save_documentation,
-        save_json_export, save_text_export,
+        save_json_export, save_runner_report,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -140,6 +142,7 @@ fn main() {
             send_api_request,
             commands::execution::execute_request,
             commands::execution::execute_run,
+            commands::collections::execution_snapshot::collections_capture_execution_snapshot,
             commands::execution::cancel_execution,
             pick_upload_file,
             save_response_body,
@@ -155,7 +158,7 @@ fn main() {
             export_openapi,
             export_postman,
             save_json_export,
-            save_text_export,
+            save_runner_report,
             pick_runner_data_file,
             save_documentation,
             // gRPC Reflection

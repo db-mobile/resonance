@@ -155,6 +155,27 @@ to every GitHub release.
 
 ## Collection runners
 
+Runner startup uses `backendAPI.collections.captureExecutionSnapshot(targets)`
+(`collections_capture_execution_snapshot`) to capture distinct
+`{collectionId, endpointId}` references in one IPC call. The command runs on the
+native blocking pool and loads each collection once. `snapshot.rs` projects
+selected endpoints, persisted data, scripts and closest-folder-first auth sources
+alongside one compact collection metadata object and its variable entries. It
+never sends the collection tree or sibling OpenAPI document per request. Legacy
+collections retain their metadata and sidecar precedence without conversion;
+legacy global scripts are a read-only fallback.
+
+Repositories hydrate keychain values from the supplied data. Repeated auth secret
+scopes share an in-flight read only for this capture; collection variables bypass
+the shared cache so disk edits appear on the next run. Current script editor
+content is pinned before awaiting its pending save and overlaid on saved scripts.
+Other pending edits keep their existing save behavior. Metadata is shared while
+assembling targets, and final queue templates are cloned independently so
+duplicate visits retain separate overrides. Captures own their loaded values;
+they do not provide an atomic transaction against simultaneous external edits.
+See [runner capture measurements](RUNNER_CAPTURE_PERFORMANCE.md) for the benchmark
+and its limitations.
+
 Saved runners live inside their collection as `runners/<slug>.yaml`, one file per
 runner (`collections/runners.rs` reads and writes them; `collections/model.rs`
 holds `RunnerDoc`). A runner belongs to the collection whose directory holds it

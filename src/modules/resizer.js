@@ -230,146 +230,66 @@ class Resizer {
     }
 }
 
-class HorizontalResizer {
-    constructor() {
-        this.startX = 0;
-        this.startSidebarWidth = 0;
-        this.minWidth = 200;
-        this.maxWidth = 600;
-        this._debouncedSave = debounce((width) => {
-            window.backendAPI.store.set('sidebarWidth', width).catch(() => {});
-        }, 300);
+/** Initialize one of the fixed-width panes; direction follows its anchored edge. */
+async function initWidthResizer({ handleId, paneSelector, storageKey, minWidth, direction, applyWidth, onEnd }) {
+    const handle = document.getElementById(handleId);
+    const pane = document.querySelector(paneSelector);
+    if (!handle || !pane) {return;}
 
-        this.init();
-    }
+    const save = debounce((width) => {
+        window.backendAPI.store.set(storageKey, width).catch(() => {});
+    }, 300);
 
-    init() {
-        this.horizontalResizerHandle = document.getElementById('horizontal-resizer-handle');
-        this.sidebar = document.querySelector('.collections-sidebar');
-
-        if (!this.horizontalResizerHandle || !this.sidebar) {
-            return;
-        }
-
-        this.setupEventListeners();
-        this._restoreWidth();
-    }
-
-    async _restoreWidth() {
-        try {
-            const saved = await window.backendAPI.store.get('sidebarWidth');
-            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
-                this.sidebar.style.width = `${saved}px`;
-                this.sidebar.style.flex = `0 0 ${saved}px`;
-            }
-        } catch {}
-    }
-
-    setupEventListeners() {
-        this.horizontalResizerHandle.addEventListener('mousedown', this.startDrag.bind(this));
-        this.horizontalResizerHandle.addEventListener('selectstart', (e) => e.preventDefault());
-    }
-
-    startDrag(e) {
-        this.startX = e.clientX;
-        this.startSidebarWidth = this.sidebar.offsetWidth;
-
+    handle.addEventListener('mousedown', (event) => {
+        const startX = event.clientX;
+        const startWidth = pane.offsetWidth;
         startDragSession({
-            handle: this.horizontalResizerHandle,
+            handle,
             cursor: 'col-resize',
-            onMove: (event) => this.drag(event),
-            onEnd: () => this._debouncedSave(this.sidebar.offsetWidth)
-        });
-
-        e.preventDefault();
-    }
-
-    drag(e) {
-        const deltaX = e.clientX - this.startX;
-        const newSidebarWidth = this.startSidebarWidth + deltaX;
-
-        if (newSidebarWidth < this.minWidth || newSidebarWidth > this.maxWidth) {
-            return;
-        }
-
-        this.sidebar.style.width = `${newSidebarWidth}px`;
-        this.sidebar.style.flex = `0 0 ${newSidebarWidth}px`;
-
-        e.preventDefault();
-    }
-}
-
-class GraphQLExplorerResizer {
-    constructor() {
-        this.startX = 0;
-        this.startWidth = 0;
-        this.minWidth = 240;
-        this.maxWidth = 600;
-        this._debouncedSave = debounce((width) => {
-            window.backendAPI.store.set('graphqlExplorerWidth', width).catch(() => {});
-        }, 300);
-
-        this.init();
-    }
-
-    init() {
-        this.handle = document.getElementById('graphql-explorer-resizer-handle');
-        this.rail = document.getElementById('graphql-docs-rail');
-
-        if (!this.handle || !this.rail) {
-            return;
-        }
-
-        this.handle.addEventListener('mousedown', this.startDrag.bind(this));
-        this.handle.addEventListener('selectstart', (e) => e.preventDefault());
-        this._restoreWidth();
-    }
-
-    async _restoreWidth() {
-        try {
-            const saved = await window.backendAPI.store.get('graphqlExplorerWidth');
-            if (saved && saved >= this.minWidth && saved <= this.maxWidth) {
-                this.rail.style.flex = `0 0 ${saved}px`;
+            onMove: (move) => {
+                const width = startWidth + direction * (move.clientX - startX);
+                if (width < minWidth || width > 600) {return;}
+                applyWidth(pane, width);
+                move.preventDefault();
+            },
+            onEnd: () => {
+                save(pane.offsetWidth);
+                onEnd?.();
             }
-        } catch {}
-    }
-
-    startDrag(e) {
-        this.startX = e.clientX;
-        this.startWidth = this.rail.offsetWidth;
-
-        startDragSession({
-            handle: this.handle,
-            cursor: 'col-resize',
-            onMove: (event) => this.drag(event),
-            onEnd: () => this.endDrag()
         });
+        event.preventDefault();
+    });
+    handle.addEventListener('selectstart', (event) => event.preventDefault());
 
-        e.preventDefault();
-    }
-
-    drag(e) {
-        const deltaX = e.clientX - this.startX;
-        const newWidth = this.startWidth - deltaX;
-
-        if (newWidth < this.minWidth || newWidth > this.maxWidth) {
-            return;
+    try {
+        const saved = await window.backendAPI.store.get(storageKey);
+        if (saved && saved >= minWidth && saved <= 600) {
+            applyWidth(pane, saved);
         }
-
-        this.rail.style.flex = `0 0 ${newWidth}px`;
-
-        e.preventDefault();
-    }
-
-    endDrag() {
-        this._debouncedSave(this.rail.offsetWidth);
-        app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.();
-    }
+    } catch {}
 }
 
 /** @param {import('./layoutManager.js').LayoutManager|null} [layoutManager] */
 export function initResizer(layoutManager = null) {
     new Resizer(layoutManager);
-    new HorizontalResizer();
-    new GraphQLExplorerResizer();
+    initWidthResizer({
+        handleId: 'horizontal-resizer-handle',
+        paneSelector: '.collections-sidebar',
+        storageKey: 'sidebarWidth',
+        minWidth: 200,
+        direction: 1,
+        applyWidth: (pane, width) => {
+            pane.style.width = `${width}px`;
+            pane.style.flex = `0 0 ${width}px`;
+        }
+    });
+    initWidthResizer({
+        handleId: 'graphql-explorer-resizer-handle',
+        paneSelector: '#graphql-docs-rail',
+        storageKey: 'graphqlExplorerWidth',
+        minWidth: 240,
+        direction: -1,
+        applyWidth: (pane, width) => { pane.style.flex = `0 0 ${width}px`; },
+        onEnd: () => app.graphqlBodyManager?.graphqlEditor?.view?.requestMeasure?.()
+    });
 }

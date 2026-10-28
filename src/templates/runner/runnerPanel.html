@@ -102,7 +102,7 @@
                     <button type="button" class="btn runner-data-file-btn" data-action="pick-data-file"
                             data-i18n-title="runner.pick_data_file" data-i18n-aria="runner.pick_data_file"
                             title="Choose a CSV or JSON file" aria-label="Choose a CSV or JSON file">
-                        <span data-role="data-file-label" data-i18n="runner.no_data_file">None</span>
+                        <span class="u-truncate" data-role="data-file-label" data-i18n="runner.no_data_file">None</span>
                     </button>
                     <button type="button" class="btn btn-icon runner-data-clear-btn is-hidden" data-action="clear-data-file"
                             data-i18n-title="runner.clear_data_file" data-i18n-aria="runner.clear_data_file"
@@ -118,7 +118,7 @@
             <!-- Left Panel: Request Selection -->
             <div class="runner-selection-panel">
                 <div class="runner-panel-header u-flex u-items-center u-justify-between">
-                    <h4 class="runner-section-title" data-i18n="runner.available_requests">Available Requests</h4>
+                    <h4 class="runner-section-title section-eyebrow" data-i18n="runner.available_requests">Available Requests</h4>
                 </div>
                 <div class="runner-collection-tree" data-role="collection-tree">
                     <div class="empty-state-base runner-empty-state">
@@ -133,7 +133,7 @@
             <!-- Center Panel: Selected Requests -->
             <div class="runner-requests-panel">
                 <div class="runner-panel-header u-flex u-items-center u-justify-between">
-                    <h4 class="runner-section-title" data-i18n="runner.selected_requests">Selected Requests</h4>
+                    <h4 class="runner-section-title section-eyebrow" data-i18n="runner.selected_requests">Selected Requests</h4>
                     <span class="runner-request-count" data-role="request-count">0 requests</span>
                 </div>
                 <div class="runner-requests-list" data-role="requests-list">
@@ -169,28 +169,28 @@
     </div>
     <div class="runner-editor-body">
         <div class="runner-editor-tab-content is-active" data-edit-content="params">
-            <div class="runner-editor-section">
+            <div class="runner-editor-section u-flex u-flex-col u-gap-2">
                 <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
                     <h4 class="runner-editor-section-title" data-i18n="runner.path_params">Path Parameters</h4>
                     <button class="btn btn-sm btn-outline" data-action="add-path-param" data-i18n="runner.add_param">+ Add</button>
                 </div>
-                <div class="key-value-list" data-role="path-params-list"></div>
+                <div class="key-value-list u-flex u-flex-col u-gap-2" data-role="path-params-list"></div>
             </div>
-            <div class="runner-editor-section">
+            <div class="runner-editor-section u-flex u-flex-col u-gap-2">
                 <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
                     <h4 class="runner-editor-section-title" data-i18n="runner.query_params">Query Parameters</h4>
                     <button class="btn btn-sm btn-outline" data-action="add-query-param" data-i18n="runner.add_param">+ Add</button>
                 </div>
-                <div class="key-value-list" data-role="query-params-list"></div>
+                <div class="key-value-list u-flex u-flex-col u-gap-2" data-role="query-params-list"></div>
             </div>
         </div>
         <div class="runner-editor-tab-content" data-edit-content="headers">
-            <div class="runner-editor-section">
+            <div class="runner-editor-section u-flex u-flex-col u-gap-2">
                 <div class="runner-editor-section-header u-flex u-items-center u-justify-between">
                     <h4 class="runner-editor-section-title" data-i18n="runner.headers">Headers</h4>
                     <button class="btn btn-sm btn-outline" data-action="add-header" data-i18n="runner.add_header">+ Add</button>
                 </div>
-                <div class="key-value-list" data-role="headers-list"></div>
+                <div class="key-value-list u-flex u-flex-col u-gap-2" data-role="headers-list"></div>
             </div>
         </div>
         <div class="runner-editor-tab-content" data-edit-content="body">
@@ -226,7 +226,7 @@
         </div>
         <div class="u-flex u-flex-1 u-items-center u-gap-2 u-overflow-hidden u-min-w-0">
             <span class="method-pill" data-role="method">GET</span>
-            <span class="runner-request-name" data-role="name">/endpoint</span>
+            <span class="runner-request-name u-truncate" data-role="name">/endpoint</span>
         </div>
         <div class="runner-request-actions u-flex">
             <button class="runner-request-edit-btn" data-action="edit-script" data-i18n-title="runner.edit_request" title="Edit request">
@@ -243,7 +243,7 @@
     <div class="runner-collection-item">
         <div class="runner-collection-header u-flex u-items-center u-gap-2" data-role="collection-header">
             <span class="icon icon-14 icon-chevron-right runner-collection-chevron"></span>
-            <span class="runner-collection-name" data-role="collection-name">Collection Name</span>
+            <span class="runner-collection-name u-truncate" data-role="collection-name">Collection Name</span>
             <button class="runner-endpoint-add-btn" data-action="add-all" data-i18n-title="runner.add_all" data-i18n-aria="runner.add_all" title="Add all requests" aria-label="Add all requests">
                 <span class="icon icon-14 icon-plus"></span>
             </button>
@@ -256,7 +256,7 @@
 <template id="tpl-runner-endpoint-item">
     <div class="runner-endpoint-item u-flex u-items-center u-gap-2" data-role="endpoint">
         <span class="method-pill" data-role="method">GET</span>
-        <span class="runner-endpoint-name" data-role="name">/endpoint</span>
+        <span class="runner-endpoint-name u-truncate" data-role="name">/endpoint</span>
         <button class="runner-endpoint-add-btn" data-action="add" title="Add to runner">
             <span class="icon icon-14 icon-plus"></span>
         </button>
@@ -274,7 +274,7 @@
     <div class="runner-results-container">
         <div class="runner-results-header u-flex u-items-center u-justify-between">
             <div class="u-flex u-items-center u-gap-2 u-min-w-0">
-                <h4 class="runner-section-title" data-i18n="runner.results">Results</h4>
+                <h4 class="runner-section-title section-eyebrow" data-i18n="runner.results">Results</h4>
                 <span class="runner-results-source is-hidden" data-role="results-source"></span>
             </div>
             <div class="runner-results-summary" data-role="summary">
@@ -317,11 +317,11 @@
         <div class="runner-run-notice is-hidden" data-role="run-notice" role="status" aria-live="polite"></div>
         <div class="runner-results-body u-flex u-flex-1 u-overflow-hidden u-min-h-0">
             <div class="runner-results-list-panel">
-                <div class="runner-results-list" data-role="results-list">
+                <div class="runner-results-list u-flex u-flex-col u-gap-1" data-role="results-list">
                 </div>
             </div>
             <div class="runner-results-detail-panel is-hidden" data-role="detail-panel">
-                <div class="runner-results-detail-header">
+                <div class="runner-results-detail-header u-flex u-flex-col u-gap-1">
                     <div class="runner-results-detail-info u-flex u-items-center u-gap-2">
                         <span class="method-pill" data-role="detail-method">GET</span>
                         <span class="runner-results-detail-name" data-role="detail-name">/endpoint</span>
@@ -397,7 +397,7 @@
         <div class="runner-result-header u-flex u-items-center u-gap-2">
             <span class="runner-result-status" data-role="status-icon">●</span>
             <span class="method-pill" data-role="method">GET</span>
-            <span class="runner-result-name" data-role="name">/endpoint</span>
+            <span class="runner-result-name u-truncate" data-role="name">/endpoint</span>
             <span class="runner-result-status-code" data-role="status-code">200</span>
             <span class="runner-result-time" data-role="time">0ms</span>
         </div>

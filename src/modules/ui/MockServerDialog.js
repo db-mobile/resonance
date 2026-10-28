@@ -163,6 +163,7 @@ export class MockServerDialog extends BaseModal {
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
+            checkbox.className = 'switch';
             checkbox.checked = isEnabled;
             checkbox.dataset.collectionId = collection.id;
             checkbox.addEventListener('change', (e) => {
@@ -170,12 +171,9 @@ export class MockServerDialog extends BaseModal {
                 e.stopPropagation();
             });
 
-            const toggleTrack = el('span', 'toggle-track');
-
             const labelText = el('span', 'mock-server-collection-label', `${collection.name} (${httpEndpoints.length} ${translate('mock_server.endpoints', 'endpoints')})`);
 
             toggleLabel.appendChild(checkbox);
-            toggleLabel.appendChild(toggleTrack);
             toggleLabel.appendChild(labelText);
             headerDiv.appendChild(toggleLabel);
             collectionDiv.appendChild(headerDiv);

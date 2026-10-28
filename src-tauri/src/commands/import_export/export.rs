@@ -5,7 +5,7 @@ use super::storage::is_http_method;
 use super::{Collection, Endpoint, Folder, VariableEntry};
 use crate::commands::collections as storage_collections;
 use crate::commands::scripts::ScriptData;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 use tauri::AppHandle;
 
@@ -54,9 +54,9 @@ pub(crate) fn load_collection_for_export(
     })
 }
 
-/// Populate the transient `scripts`/`graphql_data` fields so they can be
-/// serialized on export. An endpoint appears in both the flat list and its
-/// folder, so both occurrences are filled from the same stored payload.
+/// Project each request's saved state onto its export shape. An endpoint
+/// appears in both the flat list and its folder, so both occurrences are
+/// filled from the same stored payload.
 fn attach_endpoint_data(
     data: &HashMap<String, storage_collections::EndpointData>,
     endpoints: &mut [Endpoint],
@@ -64,8 +64,7 @@ fn attach_endpoint_data(
 ) {
     let fill = |endpoint: &mut Endpoint| {
         if let Some(stored) = data.get(&endpoint.id) {
-            endpoint.scripts = stored.scripts.clone();
-            endpoint.graphql_data = stored.graphql_data.clone();
+            apply_live_state(endpoint, stored);
         }
     };
 
@@ -77,6 +76,256 @@ fn attach_endpoint_data(
         for endpoint in folder.endpoints.iter_mut() {
             fill(endpoint);
         }
+    }
+}
+
+/// A request body as the exporters see it: the user's saved state first, the
+/// imported spec's example second.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum LiveBody {
+    Raw(String),
+    Form {
+        urlencoded: bool,
+        rows: Vec<FormRow>,
+    },
+    Binary {
+        file_path: String,
+        content_type: String,
+    },
+}
+
+/// One form field; `file_path` marks a file part.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FormRow {
+    pub key: String,
+    pub value: String,
+    pub file_path: Option<String>,
+    pub enabled: bool,
+}
+
+/// Overlay a request's saved state on its export shape: scripts, GraphQL
+/// body, auth, absolute URL, parameter rows, body and response schema. Saved
+/// rows replace the spec bucket of the same location, keeping the spec's
+/// schema and description for names that still match.
+pub(crate) fn apply_live_state(
+    endpoint: &mut Endpoint,
+    stored: &storage_collections::EndpointData,
+) {
+    endpoint.scripts = stored.scripts.clone();
+    endpoint.graphql_data = stored.graphql_data.clone();
+    if let Some(auth) = stored.auth_config.as_ref().filter(|a| !a.is_null()) {
+        endpoint.security = Some(auth.clone());
+    }
+    endpoint.url = stored.url.clone().filter(|u| !u.trim().is_empty());
+    endpoint.parameters = merge_live_params(endpoint.parameters.take(), stored);
+    endpoint.live_body = live_body(stored);
+    endpoint.response_schema = stored.response_schema.clone().filter(|s| !s.is_null());
+}
+
+fn merge_live_params(
+    spec: Option<Value>,
+    stored: &storage_collections::EndpointData,
+) -> Option<Value> {
+    let mut groups = spec
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+    let buckets = [
+        ("path", &stored.path_params),
+        ("query", &stored.query_params),
+        ("header", &stored.headers),
+    ];
+    for (location, rows) in buckets {
+        if rows.is_empty() {
+            continue;
+        }
+        let existing = groups
+            .get(location)
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let mut merged = Map::new();
+        for row in rows {
+            let Some(key) = row
+                .get("key")
+                .and_then(Value::as_str)
+                .filter(|k| !k.is_empty())
+            else {
+                continue;
+            };
+            let mut entry = existing
+                .get(key)
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default();
+            entry.insert(
+                "example".to_string(),
+                Value::String(value_text(row.get("value"))),
+            );
+            if row.get("enabled").and_then(Value::as_bool) == Some(false) {
+                entry.insert("disabled".to_string(), Value::Bool(true));
+            } else {
+                entry.remove("disabled");
+            }
+            merged.insert(key.to_string(), Value::Object(entry));
+        }
+        groups.insert(location.to_string(), Value::Object(merged));
+    }
+    let empty = groups
+        .values()
+        .all(|group| group.as_object().is_none_or(Map::is_empty));
+    if empty {
+        None
+    } else {
+        Some(Value::Object(groups))
+    }
+}
+
+/// Scalar row values as text; hand-written YAML may carry numbers or booleans.
+fn value_text(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Number(n)) => n.to_string(),
+        Some(Value::Bool(b)) => b.to_string(),
+        _ => String::new(),
+    }
+}
+
+fn live_body(stored: &storage_collections::EndpointData) -> Option<LiveBody> {
+    if let Some(form) = stored.form_body_data.as_ref().and_then(Value::as_object) {
+        match form.get("mode").and_then(Value::as_str) {
+            Some("text") => {
+                return form
+                    .get("content")
+                    .and_then(Value::as_str)
+                    .filter(|c| !c.trim().is_empty())
+                    .map(|c| LiveBody::Raw(c.to_string()));
+            }
+            Some(mode @ ("formdata" | "urlencoded")) => {
+                let rows = form_rows(form.get("fields"));
+                return (!rows.is_empty()).then_some(LiveBody::Form {
+                    urlencoded: mode == "urlencoded",
+                    rows,
+                });
+            }
+            Some("binary") => {
+                let file_path = value_text(form.get("filePath"));
+                if file_path.is_empty() {
+                    return None;
+                }
+                return Some(LiveBody::Binary {
+                    file_path,
+                    content_type: value_text(form.get("contentType")),
+                });
+            }
+            _ => {}
+        }
+    }
+    stored
+        .modified_body
+        .as_ref()
+        .filter(|b| !b.trim().is_empty())
+        .map(|b| LiveBody::Raw(b.clone()))
+}
+
+/// Form fields from either the saved row list (`[{key, value, type,
+/// filePath, enabled}]`) or an importer's `{key: value}` map.
+fn form_rows(fields: Option<&Value>) -> Vec<FormRow> {
+    match fields {
+        Some(Value::Array(rows)) => rows
+            .iter()
+            .filter_map(|row| {
+                let key = row.get("key").and_then(Value::as_str)?.to_string();
+                if key.is_empty() {
+                    return None;
+                }
+                let is_file = row.get("type").and_then(Value::as_str) == Some("file");
+                Some(FormRow {
+                    key,
+                    value: value_text(row.get("value")),
+                    file_path: is_file.then(|| value_text(row.get("filePath"))),
+                    enabled: row.get("enabled").and_then(Value::as_bool) != Some(false),
+                })
+            })
+            .collect(),
+        Some(Value::Object(map)) => map
+            .iter()
+            .map(|(key, value)| FormRow {
+                key: key.clone(),
+                value: value_text(Some(value)),
+                file_path: None,
+                enabled: true,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The body an exporter should write: saved state wins over the spec example.
+fn effective_body(endpoint: &Endpoint) -> Option<LiveBody> {
+    if let Some(live) = &endpoint.live_body {
+        return Some(live.clone());
+    }
+    let body = endpoint.request_body.as_ref()?;
+    if let Some(kind @ ("formdata" | "urlencoded")) = body.get("type").and_then(Value::as_str) {
+        let rows = form_rows(body.get("fields"));
+        return (!rows.is_empty()).then_some(LiveBody::Form {
+            urlencoded: kind == "urlencoded",
+            rows,
+        });
+    }
+    body.get("example")
+        .and_then(Value::as_str)
+        .filter(|e| !e.trim().is_empty())
+        .map(|e| LiveBody::Raw(e.to_string()))
+}
+
+/// One parameter of a request, flattened from the grouped parameter maps.
+struct ParamRow {
+    name: String,
+    value: String,
+    disabled: bool,
+    description: Option<String>,
+}
+
+fn param_rows(endpoint: &Endpoint, location: &str) -> Vec<ParamRow> {
+    endpoint
+        .parameters
+        .as_ref()
+        .and_then(|p| p.get(location))
+        .and_then(Value::as_object)
+        .map(|group| {
+            group
+                .iter()
+                .map(|(name, param)| ParamRow {
+                    name: name.clone(),
+                    value: value_text(param.get("example")),
+                    disabled: param.get("disabled").and_then(Value::as_bool) == Some(true),
+                    description: param
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .filter(|d| !d.is_empty())
+                        .map(str::to_string),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn is_absolute_url(text: &str) -> bool {
+    text.contains("://")
+}
+
+/// OpenAPI path keys are paths; a request that addresses an absolute URL
+/// contributes only its path component.
+fn openapi_path(endpoint: &Endpoint) -> String {
+    let source = endpoint.url.as_deref().unwrap_or(&endpoint.path);
+    match source.split_once("://") {
+        Some((_, rest)) => rest
+            .find('/')
+            .and_then(|start| rest[start..].split('?').next())
+            .unwrap_or("/")
+            .to_string(),
+        None => source.to_string(),
     }
 }
 
@@ -119,21 +368,19 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
             }
         }
 
-        if let Some(body) = endpoint
-            .request_body
-            .as_ref()
-            .and_then(request_body_to_openapi)
-        {
+        if let Some(body) = request_body_to_openapi(endpoint) {
             operation["requestBody"] = body;
         }
 
         if let Some(responses) = &endpoint.responses {
             operation["responses"] =
-                serde_json::to_value(responses).unwrap_or(Value::Object(serde_json::Map::new()));
+                serde_json::to_value(responses).unwrap_or(Value::Object(Map::new()));
+        } else if let Some(schema) = &endpoint.response_schema {
+            operation["responses"]["200"]["content"]["application/json"]["schema"] = schema.clone();
         }
 
         paths
-            .entry(endpoint.path.clone())
+            .entry(openapi_path(endpoint))
             .or_default()
             .insert(method, operation);
     }
@@ -173,86 +420,125 @@ fn parameters_to_openapi(params: &Value) -> Vec<Value> {
         .into_iter()
         .filter_map(|location| Some((location, params.get(location)?.as_object()?)))
         .flat_map(|(location, group)| {
-            group.iter().map(move |(name, param)| {
-                let required = location == "path"
-                    || param.get("required").and_then(Value::as_bool) == Some(true);
-                let mut parameter = serde_json::json!({
-                    "name": name,
-                    "in": location,
-                    "required": required,
-                    "schema": param
-                        .get("schema")
-                        .cloned()
-                        .unwrap_or_else(|| serde_json::json!({ "type": "string" })),
-                });
-                if let Some(description) = param.get("description") {
-                    parameter["description"] = description.clone();
-                }
-                if let Some(example) = param.get("example").filter(|e| e.as_str() != Some("")) {
-                    parameter["example"] = example.clone();
-                }
-                parameter
-            })
+            group
+                .iter()
+                .filter(|(_, param)| param.get("disabled").and_then(Value::as_bool) != Some(true))
+                .map(move |(name, param)| {
+                    let required = location == "path"
+                        || param.get("required").and_then(Value::as_bool) == Some(true);
+                    let mut parameter = serde_json::json!({
+                        "name": name,
+                        "in": location,
+                        "required": required,
+                        "schema": param
+                            .get("schema")
+                            .cloned()
+                            .unwrap_or_else(|| serde_json::json!({ "type": "string" })),
+                    });
+                    if let Some(description) = param.get("description") {
+                        parameter["description"] = description.clone();
+                    }
+                    if let Some(example) = param.get("example").filter(|e| e.as_str() != Some("")) {
+                        parameter["example"] = example.clone();
+                    }
+                    parameter
+                })
         })
         .collect()
 }
 
-/// Converts the app's `{ example, schema? }` body into an OpenAPI
-/// `requestBody`; a non-JSON example is exported as `text/plain`.
-fn request_body_to_openapi(body: &Value) -> Option<Value> {
-    let example = body
-        .get("example")
-        .and_then(Value::as_str)
-        .filter(|e| !e.trim().is_empty());
-    let parsed = example.and_then(|e| serde_json::from_str::<Value>(e).ok());
-    let schema = body.get("schema");
-
-    if schema.is_none() && parsed.is_none() {
-        return example
-            .map(|text| serde_json::json!({ "content": { "text/plain": { "example": text } } }));
+/// Converts the request body into an OpenAPI `requestBody`. A raw body that
+/// is not JSON is exported as `text/plain`; a form body becomes an object
+/// schema under its media type; a binary body is a `format: binary` string.
+fn request_body_to_openapi(endpoint: &Endpoint) -> Option<Value> {
+    let schema = endpoint
+        .request_body
+        .as_ref()
+        .and_then(|b| b.get("schema"))
+        .cloned();
+    match effective_body(endpoint) {
+        Some(LiveBody::Raw(text)) => {
+            let parsed = serde_json::from_str::<Value>(&text).ok();
+            if schema.is_none() && parsed.is_none() {
+                return Some(
+                    serde_json::json!({ "content": { "text/plain": { "example": text } } }),
+                );
+            }
+            let mut media = Map::new();
+            if let Some(schema) = schema {
+                media.insert("schema".to_string(), schema);
+            }
+            if let Some(parsed) = parsed {
+                media.insert("example".to_string(), parsed);
+            }
+            Some(serde_json::json!({ "content": { "application/json": media } }))
+        }
+        Some(LiveBody::Form { urlencoded, rows }) => {
+            let mut properties = Map::new();
+            let mut example = Map::new();
+            for row in rows.iter().filter(|row| row.enabled) {
+                if row.file_path.is_some() {
+                    properties.insert(
+                        row.key.clone(),
+                        serde_json::json!({ "type": "string", "format": "binary" }),
+                    );
+                } else {
+                    properties.insert(row.key.clone(), serde_json::json!({ "type": "string" }));
+                    example.insert(row.key.clone(), Value::String(row.value.clone()));
+                }
+            }
+            if properties.is_empty() {
+                return None;
+            }
+            let media_type = if urlencoded {
+                "application/x-www-form-urlencoded"
+            } else {
+                "multipart/form-data"
+            };
+            let mut media =
+                serde_json::json!({ "schema": { "type": "object", "properties": properties } });
+            if !example.is_empty() {
+                media["example"] = Value::Object(example);
+            }
+            Some(serde_json::json!({ "content": { media_type: media } }))
+        }
+        Some(LiveBody::Binary { content_type, .. }) => {
+            let media_type = if content_type.is_empty() {
+                "application/octet-stream".to_string()
+            } else {
+                content_type
+            };
+            Some(serde_json::json!({
+                "content": { media_type: { "schema": { "type": "string", "format": "binary" } } }
+            }))
+        }
+        None => schema.map(
+            |schema| serde_json::json!({ "content": { "application/json": { "schema": schema } } }),
+        ),
     }
-
-    let mut media = serde_json::Map::new();
-    if let Some(schema) = schema {
-        media.insert("schema".to_string(), schema.clone());
-    }
-    if let Some(parsed) = parsed {
-        media.insert("example".to_string(), parsed);
-    }
-    Some(serde_json::json!({ "content": { "application/json": media } }))
 }
 
 fn endpoint_to_postman_item(collection: &Collection, endpoint: &Endpoint) -> Value {
-    let url = if collection.base_url.is_some() {
-        format!("{{{{baseUrl}}}}{}", endpoint.path)
-    } else {
-        endpoint.path.clone()
-    };
-
     let mut request = serde_json::json!({
         "method": endpoint.method,
-        "url": url
+        "url": postman_url(collection, endpoint)
     });
 
-    let graphql_body = endpoint
-        .graphql_data
+    if let Some(description) = endpoint
+        .description
         .as_ref()
-        .filter(|g| g.get("mode").and_then(|m| m.as_str()) == Some("graphql"));
-    if let Some(graphql) = graphql_body {
-        request["body"] = serde_json::json!({
-            "mode": "graphql",
-            "graphql": {
-                "query": graphql.get("query").and_then(|q| q.as_str()).unwrap_or(""),
-                "variables": graphql.get("variables").and_then(|v| v.as_str()).unwrap_or("")
-            }
-        });
-    } else if let Some(body) = &endpoint.request_body
-        && let Some(example) = body.get("example").and_then(|v| v.as_str())
+        .filter(|d| !d.trim().is_empty())
     {
-        request["body"] = serde_json::json!({
-            "mode": "raw",
-            "raw": example
-        });
+        request["description"] = Value::String(description.clone());
+    }
+
+    let headers = headers_to_postman(endpoint);
+    if !headers.is_empty() {
+        request["header"] = Value::Array(headers);
+    }
+
+    if let Some(body) = body_to_postman(endpoint) {
+        request["body"] = body;
     }
 
     if let Some(auth) = endpoint_auth_to_postman(endpoint) {
@@ -270,6 +556,167 @@ fn endpoint_to_postman_item(collection: &Collection, endpoint: &Endpoint) -> Val
     }
 
     item
+}
+
+/// Postman's structured `url`: `raw` plus the split host/path, the query rows
+/// and the path variables. `{{name}}` path placeholders become Postman's
+/// `:name` so they round-trip as path variables rather than literal text.
+fn postman_url(collection: &Collection, endpoint: &Endpoint) -> Value {
+    let mut base = match endpoint.url.as_deref() {
+        Some(url) => url.to_string(),
+        None if is_absolute_url(&endpoint.path) || collection.base_url.is_none() => {
+            endpoint.path.clone()
+        }
+        None => format!("{{{{baseUrl}}}}{}", endpoint.path),
+    };
+    let path_vars = param_rows(endpoint, "path");
+    for row in &path_vars {
+        base = base.replace(&format!("{{{{{}}}}}", row.name), &format!(":{}", row.name));
+    }
+
+    let query_rows = param_rows(endpoint, "query");
+    let query_string: Vec<String> = query_rows
+        .iter()
+        .filter(|row| !row.disabled)
+        .map(|row| {
+            if row.value.is_empty() {
+                row.name.clone()
+            } else {
+                format!("{}={}", row.name, row.value)
+            }
+        })
+        .collect();
+    let raw = if query_string.is_empty() {
+        base.clone()
+    } else {
+        let separator = if base.contains('?') { "&" } else { "?" };
+        format!("{}{}{}", base, separator, query_string.join("&"))
+    };
+
+    let mut url = Map::new();
+    url.insert("raw".to_string(), Value::String(raw));
+
+    let (protocol, rest) = match base.split_once("://") {
+        Some((protocol, rest)) => (Some(protocol), rest),
+        None => (None, base.as_str()),
+    };
+    if let Some(protocol) = protocol {
+        url.insert("protocol".to_string(), Value::String(protocol.to_string()));
+    }
+    let rest = rest.split('?').next().unwrap_or(rest);
+    let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
+    if !host.is_empty() {
+        url.insert(
+            "host".to_string(),
+            serde_json::json!(host.split('.').collect::<Vec<_>>()),
+        );
+    }
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    if !segments.is_empty() {
+        url.insert("path".to_string(), serde_json::json!(segments));
+    }
+
+    if !query_rows.is_empty() {
+        let query: Vec<Value> = query_rows
+            .iter()
+            .map(|row| {
+                let mut entry = serde_json::json!({ "key": row.name, "value": row.value });
+                if row.disabled {
+                    entry["disabled"] = Value::Bool(true);
+                }
+                if let Some(description) = &row.description {
+                    entry["description"] = Value::String(description.clone());
+                }
+                entry
+            })
+            .collect();
+        url.insert("query".to_string(), Value::Array(query));
+    }
+    if !path_vars.is_empty() {
+        let variables: Vec<Value> = path_vars
+            .iter()
+            .map(|row| {
+                let mut entry = serde_json::json!({ "key": row.name, "value": row.value });
+                if let Some(description) = &row.description {
+                    entry["description"] = Value::String(description.clone());
+                }
+                entry
+            })
+            .collect();
+        url.insert("variable".to_string(), Value::Array(variables));
+    }
+
+    Value::Object(url)
+}
+
+fn headers_to_postman(endpoint: &Endpoint) -> Vec<Value> {
+    param_rows(endpoint, "header")
+        .into_iter()
+        .map(|row| {
+            let mut entry =
+                serde_json::json!({ "key": row.name, "value": row.value, "type": "text" });
+            if row.disabled {
+                entry["disabled"] = Value::Bool(true);
+            }
+            if let Some(description) = row.description {
+                entry["description"] = Value::String(description);
+            }
+            entry
+        })
+        .collect()
+}
+
+fn body_to_postman(endpoint: &Endpoint) -> Option<Value> {
+    let graphql_body = endpoint
+        .graphql_data
+        .as_ref()
+        .filter(|g| g.get("mode").and_then(|m| m.as_str()) == Some("graphql"));
+    if let Some(graphql) = graphql_body {
+        return Some(serde_json::json!({
+            "mode": "graphql",
+            "graphql": {
+                "query": graphql.get("query").and_then(|q| q.as_str()).unwrap_or(""),
+                "variables": graphql.get("variables").and_then(|v| v.as_str()).unwrap_or("")
+            }
+        }));
+    }
+
+    match effective_body(endpoint)? {
+        LiveBody::Raw(text) => {
+            let mut body = serde_json::json!({ "mode": "raw", "raw": text });
+            if serde_json::from_str::<Value>(&text).is_ok() {
+                body["options"] = serde_json::json!({ "raw": { "language": "json" } });
+            }
+            Some(body)
+        }
+        LiveBody::Form { urlencoded, rows } => {
+            let mode = if urlencoded { "urlencoded" } else { "formdata" };
+            let entries: Vec<Value> = rows
+                .iter()
+                .map(|row| {
+                    let mut entry = serde_json::json!({ "key": row.key });
+                    match &row.file_path {
+                        Some(file_path) => {
+                            entry["type"] = Value::String("file".to_string());
+                            entry["src"] = Value::String(file_path.clone());
+                        }
+                        None => {
+                            entry["type"] = Value::String("text".to_string());
+                            entry["value"] = Value::String(row.value.clone());
+                        }
+                    }
+                    if !row.enabled {
+                        entry["disabled"] = Value::Bool(true);
+                    }
+                    entry
+                })
+                .collect();
+            Some(serde_json::json!({ "mode": mode, mode: entries }))
+        }
+        LiveBody::Binary { file_path, .. } => {
+            Some(serde_json::json!({ "mode": "file", "file": { "src": file_path } }))
+        }
+    }
 }
 
 /// Serialize the endpoint's scripts into Postman `event[]` entries. Inherited
@@ -301,13 +748,14 @@ fn endpoint_events_to_postman(endpoint: &Endpoint) -> Vec<Value> {
 }
 
 fn endpoint_auth_to_postman(endpoint: &Endpoint) -> Option<Value> {
-    auth_to_postman(endpoint.security.as_ref()?)
+    scoped_auth_to_postman(endpoint.security.as_ref())
 }
 
-/// Maps a folder's auth config to Postman's folder `auth`. Unlike the
-/// collection root, an explicit folder "none" is meaningful (it opts the
-/// folder's requests out of collection auth) and round-trips as `noauth`.
-fn folder_auth_to_postman(auth_config: Option<&Value>) -> Option<Value> {
+/// Maps a request's or folder's auth config to Postman `auth`. Unlike the
+/// collection root, an explicit "none" is meaningful at these scopes (it opts
+/// out of the inherited auth) and round-trips as `noauth`; "inherit" is
+/// Postman's default and is omitted.
+fn scoped_auth_to_postman(auth_config: Option<&Value>) -> Option<Value> {
     let cfg = auth_config?;
     match cfg.get("type").and_then(|v| v.as_str()) {
         None | Some("inherit") => None,
@@ -330,7 +778,7 @@ fn auth_to_postman(security: &Value) -> Option<Value> {
 
     match auth_type {
         "bearer" => {
-            let token = get("token")?;
+            let token = get("token").unwrap_or("");
             Some(serde_json::json!({
                 "type": "bearer",
                 "bearer": [{ "key": "token", "value": token, "type": "string" }]
@@ -469,7 +917,7 @@ pub(crate) fn collection_to_postman(collection: &Collection) -> (Value, Vec<Stri
 
         if !folder_items.is_empty() {
             let segments: Vec<&str> = folder.name.split(" / ").collect();
-            let folder_auth = folder_auth_to_postman(folder.auth_config.as_ref());
+            let folder_auth = scoped_auth_to_postman(folder.auth_config.as_ref());
             insert_into_item_tree(&mut items, &segments, folder_items, folder_auth.as_ref());
         }
     }
@@ -562,6 +1010,46 @@ mod tests {
             security: None,
             scripts: None,
             graphql_data: None,
+            url: None,
+            live_body: None,
+            response_schema: None,
+        }
+    }
+
+    fn stored(data: Value) -> storage_collections::EndpointData {
+        let mut stored = storage_collections::EndpointData::default();
+        let rows = |key: &str| {
+            data.get(key)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
+        stored.path_params = rows("pathParams");
+        stored.query_params = rows("queryParams");
+        stored.headers = rows("headers");
+        stored.modified_body = data
+            .get("modifiedBody")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        stored.form_body_data = data.get("formBodyData").cloned();
+        stored.auth_config = data.get("authConfig").cloned();
+        stored.url = data.get("url").and_then(Value::as_str).map(str::to_string);
+        stored.response_schema = data.get("responseSchema").cloned();
+        stored.scripts = data.get("scripts").cloned();
+        stored.graphql_data = data.get("graphqlData").cloned();
+        stored
+    }
+
+    fn single(endpoint: Endpoint, base_url: Option<&str>) -> Collection {
+        Collection {
+            id: "col".to_string(),
+            name: "Live".to_string(),
+            description: None,
+            base_url: base_url.map(str::to_string),
+            endpoints: vec![endpoint],
+            folders: Vec::new(),
+            variables: None,
+            auth_config: None,
         }
     }
 
@@ -881,5 +1369,293 @@ mod tests {
             spec["tags"],
             serde_json::json!([{ "name": "Pets" }, { "name": "smoke" }])
         );
+    }
+
+    #[test]
+    fn saved_rows_body_auth_and_schema_override_the_spec_in_both_exports() {
+        let mut create = endpoint("Create Item", "POST");
+        create.path = "/items/{{id}}".to_string();
+        create.description = Some("Creates one item".to_string());
+        create.parameters = Some(serde_json::json!({
+            "path": { "id": { "example": "1", "description": "Item id" } },
+            "query": { "page": { "example": "1" } },
+            "header": { "X-Trace": { "example": "spec", "description": "Trace id" } }
+        }));
+        create.request_body = Some(serde_json::json!({
+            "example": "{\"name\": \"spec\"}",
+            "schema": { "type": "object" }
+        }));
+        apply_live_state(
+            &mut create,
+            &stored(serde_json::json!({
+                "pathParams": [{ "key": "id", "value": "7" }],
+                "queryParams": [
+                    { "key": "page", "value": "2", "enabled": true },
+                    { "key": "verbose", "value": "", "enabled": true }
+                ],
+                "headers": [
+                    { "key": "X-Trace", "value": "live", "enabled": true },
+                    { "key": "X-Off", "value": "x", "enabled": false }
+                ],
+                "modifiedBody": "{\"name\": \"live\"}",
+                "authConfig": { "type": "bearer", "config": { "token": "{{token}}" } },
+                "responseSchema": { "type": "object", "required": ["id"] }
+            })),
+        );
+        let collection = single(create, Some("https://api.example.com"));
+
+        let (postman, skipped) = collection_to_postman(&collection);
+        assert!(skipped.is_empty());
+        let request = &postman["item"][0]["request"];
+        assert_eq!(request["description"], "Creates one item");
+        assert_eq!(
+            request["url"]["raw"],
+            "{{baseUrl}}/items/:id?page=2&verbose"
+        );
+        assert_eq!(request["url"]["host"], serde_json::json!(["{{baseUrl}}"]));
+        assert_eq!(request["url"]["path"], serde_json::json!(["items", ":id"]));
+        assert_eq!(
+            request["url"]["variable"],
+            serde_json::json!([{ "key": "id", "value": "7", "description": "Item id" }])
+        );
+        assert_eq!(
+            request["url"]["query"],
+            serde_json::json!([
+                { "key": "page", "value": "2" },
+                { "key": "verbose", "value": "" }
+            ])
+        );
+        assert_eq!(
+            request["header"],
+            serde_json::json!([
+                { "key": "X-Trace", "value": "live", "type": "text", "description": "Trace id" },
+                { "key": "X-Off", "value": "x", "type": "text", "disabled": true }
+            ])
+        );
+        assert_eq!(request["body"]["mode"], "raw");
+        assert_eq!(request["body"]["raw"], "{\"name\": \"live\"}");
+        assert_eq!(request["body"]["options"]["raw"]["language"], "json");
+        assert_eq!(request["auth"]["type"], "bearer");
+        assert_eq!(request["auth"]["bearer"][0]["value"], "{{token}}");
+
+        let reimported = parse_postman_collection(postman).unwrap();
+        let params = reimported.endpoints[0].parameters.as_ref().unwrap();
+        assert_eq!(params["path"]["id"]["example"], "7");
+        assert_eq!(params["query"]["page"]["example"], "2");
+        assert_eq!(params["header"]["X-Trace"]["example"], "live");
+        assert!(params["header"].get("X-Off").is_none());
+        assert_eq!(
+            reimported.endpoints[0].security.as_ref().unwrap()["config"]["token"],
+            "{{token}}"
+        );
+
+        let (spec, _) = collection_to_openapi(&collection);
+        let post = &spec["paths"]["/items/{{id}}"]["post"];
+        assert_eq!(
+            post["parameters"],
+            serde_json::json!([
+                { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Item id", "example": "7" },
+                { "name": "page", "in": "query", "required": false, "schema": { "type": "string" }, "example": "2" },
+                { "name": "verbose", "in": "query", "required": false, "schema": { "type": "string" } },
+                { "name": "X-Trace", "in": "header", "required": false, "schema": { "type": "string" }, "description": "Trace id", "example": "live" }
+            ])
+        );
+        assert_eq!(
+            post["requestBody"]["content"]["application/json"],
+            serde_json::json!({ "schema": { "type": "object" }, "example": { "name": "live" } })
+        );
+        assert_eq!(
+            post["responses"]["200"]["content"]["application/json"]["schema"],
+            serde_json::json!({ "type": "object", "required": ["id"] })
+        );
+    }
+
+    #[test]
+    fn form_text_binary_and_imported_form_bodies_export_in_both_formats() {
+        let mut multipart = endpoint("Upload", "POST");
+        apply_live_state(
+            &mut multipart,
+            &stored(serde_json::json!({
+                "formBodyData": {
+                    "mode": "formdata",
+                    "fields": [
+                        { "key": "avatar", "value": "", "type": "file", "filePath": "/tmp/a.png", "enabled": true },
+                        { "key": "name", "value": "ada", "type": "text", "enabled": true },
+                        { "key": "old", "value": "x", "type": "text", "enabled": false }
+                    ]
+                }
+            })),
+        );
+        let mut urlencoded = endpoint("Token", "POST");
+        apply_live_state(
+            &mut urlencoded,
+            &stored(serde_json::json!({
+                "formBodyData": {
+                    "mode": "urlencoded",
+                    "fields": [{ "key": "grant_type", "value": "client_credentials" }]
+                }
+            })),
+        );
+        let mut text = endpoint("Note", "PUT");
+        apply_live_state(
+            &mut text,
+            &stored(serde_json::json!({
+                "formBodyData": { "mode": "text", "content": "hello" },
+                "modifiedBody": "{\"stale\": true}"
+            })),
+        );
+        let mut binary = endpoint("Blob", "PUT");
+        apply_live_state(
+            &mut binary,
+            &stored(serde_json::json!({
+                "formBodyData": { "mode": "binary", "filePath": "/tmp/b.bin", "contentType": "image/png" }
+            })),
+        );
+        let mut imported = endpoint("Imported", "POST");
+        imported.request_body =
+            Some(serde_json::json!({ "type": "formdata", "fields": { "a": "1" } }));
+
+        let collection = Collection {
+            id: "col".to_string(),
+            name: "Bodies".to_string(),
+            description: None,
+            base_url: None,
+            endpoints: vec![multipart, urlencoded, text, binary, imported],
+            folders: Vec::new(),
+            variables: None,
+            auth_config: None,
+        };
+
+        let (postman, _) = collection_to_postman(&collection);
+        let body = |name: &str| {
+            postman["item"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|i| i["name"] == name)
+                .unwrap()["request"]["body"]
+                .clone()
+        };
+        assert_eq!(
+            body("Upload"),
+            serde_json::json!({
+                "mode": "formdata",
+                "formdata": [
+                    { "key": "avatar", "type": "file", "src": "/tmp/a.png" },
+                    { "key": "name", "type": "text", "value": "ada" },
+                    { "key": "old", "type": "text", "value": "x", "disabled": true }
+                ]
+            })
+        );
+        assert_eq!(body("Token")["mode"], "urlencoded");
+        assert_eq!(body("Token")["urlencoded"][0]["key"], "grant_type");
+        assert_eq!(
+            body("Note"),
+            serde_json::json!({ "mode": "raw", "raw": "hello" })
+        );
+        assert_eq!(
+            body("Blob"),
+            serde_json::json!({ "mode": "file", "file": { "src": "/tmp/b.bin" } })
+        );
+        assert_eq!(body("Imported")["formdata"][0]["value"], "1");
+
+        let (spec, _) = collection_to_openapi(&collection);
+        assert_eq!(
+            spec["paths"]["/upload"]["post"]["requestBody"]["content"]["multipart/form-data"],
+            serde_json::json!({
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "avatar": { "type": "string", "format": "binary" },
+                        "name": { "type": "string" }
+                    }
+                },
+                "example": { "name": "ada" }
+            })
+        );
+        assert!(
+            spec["paths"]["/token"]["post"]["requestBody"]["content"]
+                .get("application/x-www-form-urlencoded")
+                .is_some()
+        );
+        assert_eq!(
+            spec["paths"]["/note"]["put"]["requestBody"]["content"]["text/plain"]["example"],
+            "hello"
+        );
+        assert_eq!(
+            spec["paths"]["/blob"]["put"]["requestBody"]["content"]["image/png"]["schema"],
+            serde_json::json!({ "type": "string", "format": "binary" })
+        );
+    }
+
+    #[test]
+    fn absolute_urls_are_not_prefixed_and_openapi_keeps_only_their_path() {
+        let mut graphql = endpoint("GraphQL", "POST");
+        graphql.path = "https://api.example.com/graphql".to_string();
+        let mut overridden = endpoint("Things", "GET");
+        overridden.path = "/things".to_string();
+        apply_live_state(
+            &mut overridden,
+            &stored(serde_json::json!({ "url": "https://other.example.com/v2/things?x=1" })),
+        );
+        let collection = Collection {
+            id: "col".to_string(),
+            name: "Urls".to_string(),
+            description: None,
+            base_url: Some("https://api.example.com".to_string()),
+            endpoints: vec![graphql, overridden],
+            folders: Vec::new(),
+            variables: None,
+            auth_config: None,
+        };
+
+        let (postman, _) = collection_to_postman(&collection);
+        let graphql_url = &postman["item"][0]["request"]["url"];
+        assert_eq!(graphql_url["raw"], "https://api.example.com/graphql");
+        assert_eq!(graphql_url["protocol"], "https");
+        assert_eq!(
+            graphql_url["host"],
+            serde_json::json!(["api", "example", "com"])
+        );
+        assert_eq!(graphql_url["path"], serde_json::json!(["graphql"]));
+        let things_url = &postman["item"][1]["request"]["url"];
+        assert_eq!(things_url["raw"], "https://other.example.com/v2/things?x=1");
+        assert_eq!(things_url["path"], serde_json::json!(["v2", "things"]));
+
+        let (spec, _) = collection_to_openapi(&collection);
+        assert!(spec["paths"].get("/graphql").is_some());
+        assert!(spec["paths"].get("/v2/things").is_some());
+    }
+
+    #[test]
+    fn request_auth_none_exports_as_noauth_and_inherit_is_omitted() {
+        let mut opted_out = endpoint("Public", "GET");
+        opted_out.security = Some(serde_json::json!({ "type": "none", "config": {} }));
+        let mut inherited = endpoint("Inherited", "GET");
+        inherited.security = Some(serde_json::json!({ "type": "inherit", "config": {} }));
+        let mut blank_bearer = endpoint("Blank", "GET");
+        blank_bearer.security =
+            Some(serde_json::json!({ "type": "bearer", "config": { "token": "" } }));
+
+        assert_eq!(
+            endpoint_auth_to_postman(&opted_out),
+            Some(serde_json::json!({ "type": "noauth" }))
+        );
+        assert_eq!(endpoint_auth_to_postman(&inherited), None);
+        assert_eq!(
+            endpoint_auth_to_postman(&blank_bearer).unwrap()["bearer"][0]["value"],
+            ""
+        );
+    }
+
+    #[test]
+    fn saved_state_without_rows_keeps_the_spec_parameters() {
+        let mut get = endpoint("Get", "GET");
+        get.parameters = Some(serde_json::json!({ "query": { "q": { "example": "spec" } } }));
+        apply_live_state(&mut get, &stored(serde_json::json!({})));
+
+        assert_eq!(get.parameters.unwrap()["query"]["q"]["example"], "spec");
+        assert_eq!(get.live_body, None);
+        assert_eq!(get.security, None);
     }
 }

@@ -141,7 +141,7 @@ function isDrawable(value) {
  * @returns {HTMLElement}
  */
 function buildSummary(timings, size) {
-    const summary = el('div', 'performance-summary');
+    const summary = el('div', 'performance-summary u-flex u-flex-col u-gap-4');
 
     const summaryTitle = document.createElement('h4');
     summaryTitle.textContent = 'Summary';
@@ -189,7 +189,7 @@ function buildBreakdown(timings) {
     breakdownTitle.textContent = 'Timing Breakdown';
     breakdown.appendChild(breakdownTitle);
 
-    const timingBars = el('div', 'timing-bars');
+    const timingBars = el('div', 'timing-bars u-flex u-flex-col u-gap-2');
 
     const waterfall = el('div', 'timing-waterfall');
     waterfall.setAttribute('aria-label', 'Request timing waterfall');

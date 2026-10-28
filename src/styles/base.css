@@ -89,6 +89,12 @@ body {
   overflow-y: auto;
 }
 
+.u-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .u-overflow-hidden {
   overflow: hidden;
 }
@@ -117,20 +123,8 @@ body {
   gap: var(--space-7);
 }
 
-.u-mb-4 {
-  margin-bottom: var(--space-4);
-}
-
 .u-items-start {
   align-items: flex-start;
-}
-
-.u-justify-end {
-  justify-content: flex-end;
-}
-
-.u-flex-wrap {
-  flex-wrap: wrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

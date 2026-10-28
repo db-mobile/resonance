@@ -1,4 +1,4 @@
-import { summarizeRun, toJsonReport, toJunitXml, reportFileName, MAX_SUMMARY_REQUESTS } from '../../src/modules/utils/runnerReport.js';
+import { summarizeRun, reportFileName, MAX_SUMMARY_REQUESTS } from '../../src/modules/utils/runnerReport.js';
 
 const results = {
     runnerId: 'r1',
@@ -49,49 +49,7 @@ describe('summarizeRun', () => {
     });
 });
 
-describe('toJunitXml', () => {
-    test('reports an execution limit even when an earlier request also failed', () => {
-        const summary = summarizeRun({ ...results, plannedRequests: 4, sentRequests: 4,
-            error: 'Execution limit reached', terminationReason: 'executionLimit' });
-        const report = toJunitXml(summary);
-        expect(report).toContain('name="Runner execution"');
-        expect(report).toContain('message="Execution limit reached"');
-        expect(report).toContain('message="dns error"');
-    });
-    const xml = toJunitXml(summarizeRun(results));
-
-    test('writes one suite per request and one case per assertion', () => {
-        expect(xml).toContain('<testsuites name="Smoke &lt;&amp;&gt;" tests="4" failures="2" errors="0" skipped="1" time="1.000"');
-        expect(xml).toContain('<testsuite name="GET List" tests="1" failures="0"');
-        expect(xml).toContain('<testcase name="is 200"');
-    });
-
-    test('reports failed assertions, request errors and skips', () => {
-        expect(xml).toContain('<failure type="AssertionFailure" message="returns &quot;id&quot;"/>');
-        expect(xml).toMatch(/<testcase name="Response status"[^>]*>\s*<failure type="AssertionFailure" message="dns error"\/>/);
-        expect(xml).toMatch(/<testcase name="Request"[^>]*>\s*<skipped message="Skipped due to previous error"\/>/);
-    });
-
-    test('prefixes suites with the iteration when there are several', () => {
-        const multi = toJunitXml(summarizeRun({ ...results, iterations: 2, requests: [{ ...results.requests[0], iteration: 2 }] }));
-
-        expect(multi).toContain('<testsuite name="Iteration 2 › GET List"');
-    });
-
-    test('strips characters XML 1.0 cannot carry', () => {
-        const odd = toJunitXml(summarizeRun({ ...results, requests: [{ ...results.requests[2], error: 'bad\u0001byte' }] }));
-
-        expect(odd).toContain('message="badbyte"');
-    });
-});
-
-describe('toJsonReport / reportFileName', () => {
-    test('the JSON report is the summary itself', () => {
-        const summary = summarizeRun(results);
-
-        expect(JSON.parse(toJsonReport(summary))).toEqual(summary);
-    });
-
+describe('reportFileName', () => {
     test('file names are slugged and timestamped', () => {
         expect(reportFileName({ runnerName: 'My API / pets', startedAt: new Date(2026, 8, 22, 9, 7).getTime() }, 'xml'))
             .toBe('my-api-pets-20260922-0907.xml');

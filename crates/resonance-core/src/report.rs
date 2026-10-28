@@ -1,7 +1,6 @@
 //! Run summaries and their JSON / JUnit XML reports, with no bodies, headers
-//! or logs. A port of the desktop's `runnerReport.js`; the output is byte for
-//! byte what that module writes, pinned by the shared fixtures under
-//! `tests/fixtures/report`.
+//! or logs. The CLI and desktop share these formatters, with output pinned
+//! by the shared fixtures under `tests/fixtures/report`.
 use crate::results::{RequestResult, RequestStatus, RunResult, TerminationReason};
 use crate::scripts::execution::ExecutionControl;
 use serde::{Deserialize, Serialize};

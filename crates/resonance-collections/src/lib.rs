@@ -15,6 +15,7 @@ pub mod model;
 pub mod read;
 pub mod runners;
 pub mod secrets;
+pub mod snapshot;
 pub mod startup;
 pub mod variables;
 pub mod write;

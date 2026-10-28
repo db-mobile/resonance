@@ -148,12 +148,6 @@
   color: var(--method-patch-color);
 }
 
-.performance-summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -224,12 +218,6 @@
 
 .waterfall-segment {
   height: 100%;
-}
-
-.timing-bars {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .timing-bar-container {

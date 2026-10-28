@@ -99,20 +99,27 @@ export class VariableRepository {
 
         try {
             const raw = await this._getRawEntries(collectionId);
-            const result = this._arrayToObject(raw);
-            if (this.secretStore) {
-                const secrets = await this.secretStore.getScope(this.secretScope(collectionId));
-                for (const entry of raw) {
-                    if (entry && entry.secret && entry.key && Object.prototype.hasOwnProperty.call(secrets, entry.key)) {
-                        result[entry.key] = secrets[entry.key];
-                    }
-                }
-            }
+            const result = await this.hydrateVariablesForCollection(collectionId, raw);
             this._cache.set(collectionId, result);
             return result;
         } catch (error) {
             return {};
         }
+    }
+
+    /** Hydrate a run-local snapshot without consulting or changing the shared cache. */
+    async hydrateVariablesForCollection(collectionId, entries) {
+        const raw = this._objectToArray(entries);
+        const result = this._arrayToObject(raw);
+        if (this.secretStore) {
+            const secrets = await this.secretStore.getScope(this.secretScope(collectionId));
+            for (const entry of raw) {
+                if (entry && entry.secret && entry.key && Object.prototype.hasOwnProperty.call(secrets, entry.key)) {
+                    result[entry.key] = secrets[entry.key];
+                }
+            }
+        }
+        return result;
     }
 
     /**

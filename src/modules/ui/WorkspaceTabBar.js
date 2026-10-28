@@ -81,7 +81,7 @@ export class WorkspaceTabBar {
         const tabEl = el('div', `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`);
         tabEl.dataset.tabId = tab.id;
 
-        const nameEl = el('span', 'workspace-tab-name', tab.name);
+        const nameEl = el('span', 'workspace-tab-name u-truncate', tab.name);
         nameEl.title = tab.name;
 
         if (tab.isModified) {
