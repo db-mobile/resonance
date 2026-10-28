@@ -12,5 +12,10 @@ pub fn app_set_window_theme(window: Window, theme: String) -> Result<(), String>
         "light" => Some(Theme::Light),
         _ => None,
     };
-    window.set_theme(theme).map_err(|error| error.to_string())
+    window.set_theme(theme).map_err(|error| error.to_string())?;
+    #[cfg(target_os = "linux")]
+    window
+        .run_on_main_thread(crate::gtk_theme::ensure_loadable)
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }

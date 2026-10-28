@@ -2,6 +2,8 @@
 
 mod commands;
 #[cfg(target_os = "linux")]
+mod gtk_theme;
+#[cfg(target_os = "linux")]
 mod window_state;
 
 use commands::{
