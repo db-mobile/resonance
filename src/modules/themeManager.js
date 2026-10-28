@@ -107,6 +107,7 @@ export class ThemeManager {
             await this.loadThemeCSS(theme);
             document.documentElement.setAttribute('data-theme', theme);
             this.currentTheme = theme;
+            await this.syncWindowTheme(theme);
             window.dispatchEvent(new CustomEvent('resonance:theme-changed', { detail: { theme } }));
         } catch (error) {
             if (theme !== 'system') {
@@ -122,6 +123,13 @@ export class ThemeManager {
         
         await this.applyTheme(theme);
         await this.saveTheme(theme);
+    }
+
+    async syncWindowTheme(theme) {
+        const effective = theme === 'system' ? this.getSystemTheme() : theme;
+        try {
+            await window.backendAPI.app.setWindowTheme(effective);
+        } catch {}
     }
 
     setupSystemThemeListener() {

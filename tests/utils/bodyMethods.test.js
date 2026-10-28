@@ -3,11 +3,11 @@ import { generateCode } from '../../src/modules/codeGenerator.js';
 import { captureRunnerEntry } from '../../src/modules/services/CoreExecutionService.js';
 
 describe('methodCarriesBody', () => {
-    test.each(['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'delete', 'PROPFIND'])('%s sends the body', (method) => {
+    test.each(['GET', 'get', undefined, 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'delete', 'PROPFIND'])('%s sends the body', (method) => {
         expect(methodCarriesBody(method)).toBe(true);
     });
 
-    test.each(['GET', 'HEAD', 'get', undefined])('%s does not', (method) => {
+    test.each(['HEAD', 'head'])('%s does not', (method) => {
         expect(methodCarriesBody(method)).toBe(false);
     });
 });
@@ -17,17 +17,18 @@ describe('requestSendsBody', () => {
         expect(requestSendsBody('GET', bodyMode)).toBe(true);
     });
 
-    test('a json or text body follows the method', () => {
-        expect(requestSendsBody('GET', 'json')).toBe(false);
+    test('GET sends JSON and text while HEAD remains unchanged', () => {
+        expect(requestSendsBody('GET', 'json')).toBe(true);
+        expect(requestSendsBody('GET', 'text')).toBe(true);
         expect(requestSendsBody('HEAD', 'text')).toBe(false);
         expect(requestSendsBody('POST', 'json')).toBe(true);
     });
 });
 
-describe('DELETE requests keep their body', () => {
+describe.each(['GET', 'DELETE'])('%s requests keep their body', (method) => {
     test('in generated code', () => {
         const snippet = generateCode('curl', {
-            method: 'DELETE',
+            method,
             url: 'https://api.test/items',
             headers: { 'Content-Type': 'application/json' },
             body: '{"ids":[1,2]}'
@@ -36,9 +37,9 @@ describe('DELETE requests keep their body', () => {
     });
 
     test('in the collection runner', () => {
-        const request = captureRunnerEntry({}, { collection: { id: 'c' }, endpoint: { id: 'e', method: 'DELETE' },
+        const request = captureRunnerEntry({}, { collection: { id: 'c' }, endpoint: { id: 'e', method },
             persisted: { modifiedBody: '{"ids":[1]}' }, inheritedAuth: [], scripts: {} });
-        expect(request.method).toBe('DELETE');
+        expect(request.method).toBe(method);
         expect(request.body.content).toBe('{"ids":[1]}');
 
     });

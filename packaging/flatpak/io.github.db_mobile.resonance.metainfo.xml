@@ -116,6 +116,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.6" date="2026-10-28">
+      <description>
+        <p>Request handling and theme fixes</p>
+        <ul>
+          <li>Allow GET request bodies in HTTP, Server-Sent Events, the CLI and generated code</li>
+          <li>Keep the native window theme in sync with the selected app theme</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.5" date="2026-10-26">
       <description>
         <p>Interface polish and workflow fixes</p>

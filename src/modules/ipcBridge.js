@@ -14,6 +14,7 @@ if (isTauri) {
     api = {
         app: {
             getVersion: () => invoke('app_get_version'),
+            setWindowTheme: (theme) => invoke('app_set_window_theme', { theme }),
             migrationStatus: () => invoke('data_migration_status')
         },
         logger: {

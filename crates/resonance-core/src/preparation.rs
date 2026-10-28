@@ -323,7 +323,7 @@ fn body(
                 json!({"filePath":processor.text(&template.file_path,vars),"contentType":template.content_type}),
             )
         }
-        _ if matches!(method.to_uppercase().as_str(), "GET" | "HEAD") => Ok(Value::Null),
+        _ if method.eq_ignore_ascii_case("HEAD") => Ok(Value::Null),
         "text" => Ok(if template.content.is_empty() {
             Value::Null
         } else {

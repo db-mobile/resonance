@@ -55,7 +55,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
 # Validate user-provided schemas locally; no HTTP/file retrieval or extra TLS provider.
-jsonschema = { version = "0.59", default-features = false, features = ["idna"] }
+jsonschema = { version = "0.60", default-features = false, features = ["idna"] }
 # Local response queries (no script evaluation or external document retrieval).
 serde_json_path = "0.7"
 sxd-document = "0.3"
@@ -104,7 +104,7 @@ keyring = { version = "3", default-features = false, features = ["sync-secret-se
 # (which flags the app as using a non-portal service on Flathub). `native_crypto` is the
 # RustCrypto backend (the `openssl_crypto` feature is the OpenSSL one) — keep it that way
 # to match the project's OpenSSL-free tree; verify with `cargo tree -i openssl-sys`.
-oo7 = { version = "0.3", default-features = false, features = ["tokio", "native_crypto"] }
+oo7 = { version = "0.5", default-features = false, features = ["tokio", "native_crypto"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
