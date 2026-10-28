@@ -100,7 +100,7 @@ export class EnvironmentManager extends BaseModal {
         }
 
         const nameSpan = document.createElement('span');
-        nameSpan.className = 'env-list-item-name';
+        nameSpan.className = 'env-list-item-name u-truncate';
         nameSpan.textContent = environment.name;
 
         item.appendChild(colorIndicator);

@@ -95,7 +95,6 @@
   width: 560px;
 }
 
-.modal-dialog--lg,
 .modal-dialog--code-snippet,
 .modal-dialog--var-reference,
 .modal-dialog--script-editor,
@@ -121,7 +120,6 @@
   height: min(760px, 100%);
 }
 
-.modal-dialog--wide,
 .modal-dialog--environment-manager,
 .modal-dialog--variable-manager,
 .modal-dialog--cookie-manager {

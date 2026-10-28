@@ -50,12 +50,6 @@
   }
 }
 
-.grpc-source-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 .grpc-source-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
@@ -84,12 +78,6 @@
   justify-content: space-between;
   gap: var(--space-2);
   flex-wrap: wrap;
-}
-
-.grpc-source-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .grpc-source-card-actions {

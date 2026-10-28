@@ -72,11 +72,3 @@
   box-shadow: none;
 }
 
-.view-switcher-badge {
-  min-width: 16px;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  background-color: color-mix(in srgb, currentColor 15%, transparent);
-  font-size: var(--font-size-caption);
-  text-align: center;
-}

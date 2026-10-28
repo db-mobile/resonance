@@ -22,12 +22,6 @@
   display: flex;
 }
 
-.settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 .settings-section > h3 {
   font-size: var(--font-size-heading);
   font-weight: 700;
@@ -122,13 +116,6 @@
   opacity: var(--dim-opacity);
 }
 
-.proxy-settings-content,
-.proxy-manual-settings {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
 .proxy-row {
   display: flex;
   align-items: flex-end;
@@ -155,12 +142,6 @@
 
 .proxy-test-result:empty {
   display: none;
-}
-
-.certs-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .cert-entry {

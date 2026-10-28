@@ -18,19 +18,6 @@
   padding: var(--space-2) var(--space-4);
 }
 
-.row.activatable {
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.row.activatable:hover {
-  background-color: var(--shade-color);
-}
-
-.row.activatable:active {
-  background-color: color-mix(in srgb, currentColor 10%, var(--shade-color));
-}
-
 .row .row-content {
   flex: 1;
   min-width: 0;

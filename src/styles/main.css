@@ -12,14 +12,12 @@
 @import url("widgets/select.css");
 @import url("widgets/boxed-list.css");
 @import url("widgets/view-switcher.css");
-@import url("widgets/tabbar.css");
 @import url("widgets/toolbar.css");
 @import url("widgets/popover.css");
 @import url("widgets/dialog.css");
 @import url("widgets/toast.css");
 @import url("widgets/badge.css");
 @import url("widgets/spinner.css");
-@import url("widgets/progress.css");
 @import url("widgets/statuspage.css");
 
 @import url("layout/shell.css");

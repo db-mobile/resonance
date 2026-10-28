@@ -3,12 +3,6 @@
  * Row markup comes from keyValueManager and is part of the JS contract.
  */
 
-.key-value-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 .key-value-row {
   display: flex;
   align-items: center;

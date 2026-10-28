@@ -10,7 +10,6 @@
   --headerbar-shade-color: rgb(0 0 6 / 36%);
   --sidebar-bg-color: #303030;
   --sidebar-fg-color: #ffffff;
-  --sidebar-backdrop-color: #2a2a2a;
   --sidebar-shade-color: rgb(0 0 6 / 25%);
   --card-bg-color: rgb(255 255 255 / 8%);
   --card-fg-color: #ffffff;
@@ -28,13 +27,8 @@
   --destructive-fg-color: #ffffff;
   --destructive-color: #ff938c;
   --success-bg-color: #26a269;
-  --success-fg-color: #ffffff;
   --success-color: #78e9ab;
-  --warning-bg-color: #cd9309;
-  --warning-fg-color: rgb(0 0 6 / 80%);
   --warning-color: #ffc252;
-  --error-bg-color: #c01c28;
-  --error-fg-color: #ffffff;
   --error-color: #ff938c;
 
   --method-get-color: #78e9ab;

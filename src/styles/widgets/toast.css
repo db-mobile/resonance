@@ -37,17 +37,10 @@
   transform: translateY(0);
 }
 
-.toast .toast-message,
 .toast .toast__message {
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.toast .toast-action {
-  color: var(--accent-color);
-  font-weight: 600;
-  flex-shrink: 0;
 }
 
 .toast.toast--error {

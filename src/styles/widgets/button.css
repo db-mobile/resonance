@@ -85,26 +85,6 @@
   background-color: color-mix(in srgb, currentColor 15%, var(--shade-color));
 }
 
-.button.pill,
-.btn-pill {
-  border-radius: var(--radius-pill);
-  padding: 0 var(--space-5);
-}
-
-.button.circular {
-  width: var(--control-height);
-  min-width: var(--control-height);
-  padding: 0;
-  border-radius: var(--radius-pill);
-}
-
-.button.circular.small {
-  width: var(--control-height-small);
-  min-width: var(--control-height-small);
-  min-height: var(--control-height-small);
-  padding: 0;
-}
-
 .button.small,
 .btn-sm {
   min-height: var(--control-height-small);
@@ -120,11 +100,8 @@
 }
 
 .btn-icon,
-.btn-icon-bordered,
 .copy-btn,
 .workspace-tab-close,
-.tab-box .tab-close,
-.toast-close,
 .toast__close,
 .dialog-close-btn,
 .runner-endpoint-add-btn,
@@ -145,11 +122,8 @@
 }
 
 .btn-icon:hover,
-.btn-icon-bordered:hover,
 .btn-icon:focus-visible,
-.btn-icon-bordered:focus-visible,
 .copy-btn:is(:hover, :focus-visible),
-.toast-close:is(:hover, :focus-visible),
 .toast__close:is(:hover, :focus-visible),
 .runner-endpoint-add-btn:is(:hover, :focus-visible) {
   background-color: var(--shade-color);

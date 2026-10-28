@@ -19,8 +19,7 @@
 
             <div class="form-group">
                 <label class="toggle-switch">
-                    <input type="checkbox" id="doc-include-examples">
-                    <span class="toggle-track"></span>
+                    <input type="checkbox" class="switch" id="doc-include-examples">
                     <span data-i18n="docs.include_examples">Include example data</span>
                 </label>
                 <p class="form-hint" data-i18n="docs.include_examples_help">Include your saved parameter values and request bodies</p>
@@ -28,7 +27,7 @@
 
             <div class="form-group">
                 <label class="form-label" data-i18n="docs.code_samples">Code Samples</label>
-                <div class="doc-language-list" id="language-checkboxes">
+                <div class="doc-language-list u-flex u-flex-col u-gap-2" id="language-checkboxes">
                     <!-- Populated dynamically -->
                 </div>
             </div>
@@ -43,8 +42,7 @@
 
 <template id="tpl-language-checkbox">
     <label class="doc-language-item toggle-switch">
-        <input type="checkbox" data-lang-id="">
-        <span class="toggle-track"></span>
+        <input type="checkbox" class="switch" data-lang-id="">
         <span class="doc-language-text">
             <span class="doc-language-name"></span>
             <span class="doc-language-desc"></span>

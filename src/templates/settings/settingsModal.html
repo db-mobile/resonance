@@ -176,11 +176,11 @@
 </template>
 
 <template id="tpl-certs-section">
-    <div class="settings-section certs-settings-section">
+    <div class="settings-section certs-settings-section u-flex u-flex-col u-gap-2">
         <h3 data-i18n="settings.certs_title">Client Certificates (mTLS)</h3>
         <p class="form-input-hint" data-i18n="settings.certs_description">Present a client certificate and/or trust a custom CA for requests to a matching host. Files are read from disk at request time; only their paths are stored.</p>
 
-        <div class="certs-list" data-role="certs-list"></div>
+        <div class="certs-list u-flex u-flex-col u-gap-3" data-role="certs-list"></div>
 
         <div class="certs-empty is-hidden" data-role="certs-empty">
             <p class="form-input-hint" data-i18n="settings.certs_empty">No certificates configured.</p>
@@ -200,8 +200,7 @@
                 <input type="text" class="input-base" name="certHost" placeholder="api.example.com" autocomplete="off">
             </div>
             <label class="toggle-switch cert-enabled-toggle">
-                <input type="checkbox" name="certEnabled" checked>
-                <span class="toggle-track"></span>
+                <input type="checkbox" class="switch" name="certEnabled" checked>
                 <span data-i18n="settings.certs_enabled">Enabled</span>
             </label>
             <button type="button" class="btn btn-icon cert-remove-btn" data-role="cert-remove" aria-label="Remove" data-i18n-aria="settings.certs_remove">
@@ -259,26 +258,24 @@
 </template>
 
 <template id="tpl-proxy-section">
-    <div class="settings-section proxy-settings-section">
+    <div class="settings-section proxy-settings-section u-flex u-flex-col u-gap-2">
         <div class="settings-section-header u-flex">
             <label class="toggle-switch">
-                <input type="checkbox" name="proxyEnabled">
-                <span class="toggle-track"></span>
+                <input type="checkbox" class="switch" name="proxyEnabled">
                 <span data-i18n="settings.proxy_enabled">Enable Proxy</span>
             </label>
         </div>
 
-        <div class="proxy-settings-content is-hidden">
+        <div class="proxy-settings-content u-flex u-flex-col u-gap-4 is-hidden">
             <div class="proxy-row u-flex">
                 <label class="toggle-switch proxy-system-toggle">
-                    <input type="checkbox" name="proxyUseSystem">
-                    <span class="toggle-track"></span>
+                    <input type="checkbox" class="switch" name="proxyUseSystem">
                     <span data-i18n="settings.proxy_use_system">Use System Proxy</span>
                 </label>
                 <p class="proxy-field-help" data-i18n="settings.proxy_use_system_help">Automatically detect and use system proxy settings</p>
             </div>
 
-            <div class="proxy-manual-settings">
+            <div class="proxy-manual-settings u-flex u-flex-col u-gap-4">
                 <div class="proxy-row u-flex">
                     <div class="form-group proxy-field-with-arrow">
                         <label class="form-label" data-i18n="settings.proxy_type">Type</label>
@@ -307,8 +304,7 @@
 
                 <div class="proxy-row u-flex">
                     <label class="toggle-switch">
-                        <input type="checkbox" name="proxyAuthEnabled">
-                        <span class="toggle-track"></span>
+                        <input type="checkbox" class="switch" name="proxyAuthEnabled">
                         <span data-i18n="settings.proxy_auth">Authentication</span>
                     </label>
                 </div>

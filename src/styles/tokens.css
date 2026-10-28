@@ -8,8 +8,6 @@
   --font-size-heading: 14px;
   --font-size-title-4: 16px;
   --font-size-title-3: 18px;
-  --font-size-title-2: 20px;
-  --font-size-title-1: 24px;
 
   --space-1: 3px;
   --space-2: 6px;
@@ -52,7 +50,6 @@
   --headerbar-shade-color: rgb(0 0 6 / 12%);
   --sidebar-bg-color: #ebebed;
   --sidebar-fg-color: rgb(0 0 6 / 80%);
-  --sidebar-backdrop-color: #f2f2f4;
   --sidebar-shade-color: rgb(0 0 6 / 7%);
   --card-bg-color: #ffffff;
   --card-fg-color: rgb(0 0 6 / 80%);
@@ -74,13 +71,8 @@
   --destructive-fg-color: #ffffff;
   --destructive-color: #c30000;
   --success-bg-color: #2ec27e;
-  --success-fg-color: #ffffff;
   --success-color: #007c3d;
-  --warning-bg-color: #e5a50a;
-  --warning-fg-color: rgb(0 0 6 / 80%);
   --warning-color: #905400;
-  --error-bg-color: #e01b24;
-  --error-fg-color: #ffffff;
   --error-color: #c30000;
 
   --method-get-color: #15772e;
@@ -112,8 +104,6 @@
 
   --switcher-active-bg: #ffffff;
   --switcher-active-shadow: 0 1px 2px rgb(0 0 6 / 10%);
-
-  --accent: var(--accent-bg-color);
 }
 
 :root[data-accent="blue"] {

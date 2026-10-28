@@ -389,7 +389,7 @@ export class RunnerResultsPanel {
      */
     _createIterationHeader(iteration) {
         const header = document.createElement('div');
-        header.className = 'runner-results-iteration';
+        header.className = 'runner-results-iteration u-truncate';
         const label = this.iterationLabels?.[iteration];
         header.textContent = translate('runner.iteration_label', 'Iteration {{number}}', { number: iteration + 1 })
             + (label ? ` · ${label}` : '');
