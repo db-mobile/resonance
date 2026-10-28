@@ -318,16 +318,34 @@ describe('RunnerController', () => {
             expect(controller.historyRepository.record).not.toHaveBeenCalled();
         });
 
-        test('exports a JUnit report through the save dialog', async () => {
+        test.each(['json', 'junit'])('exports %s through the native report command', async (format) => {
             mockBackendAPI.runner.saveReport = jest.fn().mockResolvedValue({ success: true, filePath: '/tmp/r.xml' });
+            const summary = { runnerName: 'Smoke', startedAt: 0, iterations: 1, totalTime: 0, requests: [] };
 
-            await controller._exportReport('junit', { runnerName: 'Smoke', startedAt: 0, iterations: 1, totalTime: 0, requests: [] });
+            await controller._exportReport(format, summary);
 
-            const [fileName, content, filterName, extensions] = mockBackendAPI.runner.saveReport.mock.calls[0];
-            expect(fileName).toMatch(/^smoke-\d{8}-\d{4}\.xml$/);
-            expect(content).toContain('<testsuites name="Smoke"');
-            expect(filterName).toBe('JUnit XML');
-            expect(extensions).toEqual(['xml']);
+            const extension = format === 'junit' ? 'xml' : 'json';
+            expect(mockBackendAPI.runner.saveReport).toHaveBeenCalledWith(
+                expect.stringMatching(new RegExp(`^smoke-\\d{8}-\\d{4}\\.${extension}$`)), format, summary
+            );
+            expect(toast.success).toHaveBeenCalledWith('Report saved to /tmp/r.xml');
+        });
+
+        test('cancelling report export does not show a success or error', async () => {
+            mockBackendAPI.runner.saveReport = jest.fn().mockResolvedValue({ cancelled: true });
+
+            await controller._exportReport('json', { requests: [] });
+
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.error).not.toHaveBeenCalled();
+        });
+
+        test('report failures are shown to the user', async () => {
+            mockBackendAPI.runner.saveReport = jest.fn().mockRejectedValue(new Error('Disk full'));
+
+            await controller._exportReport('json', { requests: [] });
+
+            expect(toast.error).toHaveBeenCalledWith('Could not save the report: Disk full');
         });
 
         test('deleting a runner removes it from its collection and deletes its history', async () => {

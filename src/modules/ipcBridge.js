@@ -130,8 +130,9 @@ if (isTauri) {
             saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })
         },
         runner: {
-            saveReport: (defaultFileName, content, filterName, extensions) =>
-                invoke('save_text_export', { defaultFileName, content, filterName, extensions }),
+            /** @param {string} defaultFileName @param {'json'|'junit'} format @param {Object} summary */
+            saveReport: (defaultFileName, format, summary) =>
+                invoke('save_runner_report', { defaultFileName, format, summary }),
             pickDataFile: () => invoke('pick_runner_data_file')
         },
         cookies: {

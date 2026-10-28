@@ -16,7 +16,7 @@ import { translate, translateCount } from '../utils/translate.js';
 import { resolveRequestLinks } from '../utils/runnerRequestLinks.js';
 import { parseDataFile } from '../utils/dataFile.js';
 import { isAbsolutePath, toCollectionRelativePath } from '../utils/dataFilePath.js';
-import { summarizeRun, toJsonReport, toJunitXml, reportFileName } from '../utils/runnerReport.js';
+import { summarizeRun, reportFileName } from '../utils/runnerReport.js';
 import { RunnerHistoryRepository } from '../storage/RunnerHistoryRepository.js';
 
 export class RunnerController {
@@ -386,9 +386,8 @@ export class RunnerController {
         try {
             const result = await this.backendAPI.runner.saveReport(
                 reportFileName(summary, extension),
-                junit ? toJunitXml(summary) : toJsonReport(summary),
-                junit ? 'JUnit XML' : 'JSON',
-                [extension]
+                format,
+                summary
             );
             if (result?.success) {
                 toast.success(translate('runner.report_saved', 'Report saved to {{path}}', { path: result.filePath }));

@@ -17,6 +17,7 @@ mod har;
 mod insomnia;
 mod openapi;
 mod postman;
+mod runner_report;
 mod storage;
 mod swagger2;
 
@@ -531,15 +532,19 @@ pub async fn save_documentation(
 }
 
 #[tauri::command]
-pub async fn save_text_export(
+pub async fn save_runner_report(
     app: AppHandle,
     default_file_name: String,
-    content: String,
-    filter_name: String,
-    extensions: Vec<String>,
+    format: String,
+    summary: Value,
 ) -> Result<Value, String> {
-    let extensions: Vec<&str> = extensions.iter().map(String::as_str).collect();
-    let Some(path) = pick_save_path(&app, default_file_name, &filter_name, &extensions).await?
+    let content = runner_report::render(&format, &summary)?;
+    let (filter_name, extension) = if format == "junit" {
+        ("JUnit XML", "xml")
+    } else {
+        ("JSON", "json")
+    };
+    let Some(path) = pick_save_path(&app, default_file_name, filter_name, &[extension]).await?
     else {
         return Ok(cancelled_export());
     };

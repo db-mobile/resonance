@@ -1,5 +1,5 @@
 /**
- * @fileoverview Collection-runner run summaries and their JSON / JUnit XML reports; no bodies, headers or logs
+ * @fileoverview Collection-runner summaries and export filenames; no bodies, headers or logs
  * @module utils/runnerReport
  */
 
@@ -45,120 +45,6 @@ export function summarizeRun(results) {
         truncated: Boolean(results.truncated) || requests.length > MAX_SUMMARY_REQUESTS,
         requests: requests.slice(0, MAX_SUMMARY_REQUESTS)
     };
-}
-
-/**
- * @param {Object} summary
- * @returns {string}
- */
-export function toJsonReport(summary) {
-    return `${JSON.stringify(summary, null, 2)}\n`;
-}
-
-/**
- * @param {*} value
- * @returns {string}
- */
-function xml(value) {
-    return String(value ?? '')
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-}
-
-/**
- * @param {number|null} ms
- * @returns {string}
- */
-function seconds(ms) {
-    return ((ms || 0) / 1000).toFixed(3);
-}
-
-/**
- * @param {Object} request
- * @returns {Array<{name: string, failure: string|null, skipped: string|null}>}
- */
-function testCasesFor(request) {
-    if (request.status === 'skipped') {
-        return [{ name: 'Request', failure: null, skipped: request.error || '' }];
-    }
-
-    const cases = request.tests.map(test => ({
-        name: test.name,
-        failure: test.passed ? null : test.name,
-        skipped: null
-    }));
-    const failedTest = request.tests.some(test => !test.passed);
-
-    if (cases.length === 0) {
-        cases.push({
-            name: 'Response status',
-            failure: request.status === 'success' ? null : request.error || String(request.statusCode ?? ''),
-            skipped: null
-        });
-    } else if (request.status !== 'success' && !failedTest) {
-        cases.push({ name: 'Request', failure: request.error || '', skipped: null });
-    }
-    return cases;
-}
-
-/**
- * @param {Object} summary
- * @returns {string}
- */
-export function toJunitXml(summary) {
-    const requests = [...summary.requests];
-    if (summary.error && !requests.some(request => request.status === 'error' && request.error === summary.error)) {
-        requests.push({ name: 'Runner execution', method: '', status: 'error', error: summary.error, tests: [] });
-    }
-    const scored = requests.map(request => {
-        const cases = testCasesFor(request);
-        return {
-            request,
-            cases,
-            failures: cases.filter(testCase => testCase.failure !== null).length,
-            skipped: cases.filter(testCase => testCase.skipped !== null).length
-        };
-    });
-
-    const suites = scored.map(({ request, cases, failures, skipped }) => {
-        const label = `${request.method} ${request.name}${request.attempt ? ` · Attempt ${request.attempt}` : ''}`.trim();
-        const name = summary.iterations > 1 ? `Iteration ${request.iteration} › ${label}` : label;
-        const caseTime = seconds(cases.length > 0 ? (request.time || 0) / cases.length : 0);
-
-        const body = cases.map(testCase => {
-            const open = `    <testcase name="${xml(testCase.name)}" classname="${xml(`${summary.runnerName}.${label}`)}" time="${caseTime}"`;
-            if (testCase.failure !== null) {
-                return `${open}>\n      <failure type="AssertionFailure" message="${xml(testCase.failure)}"/>\n    </testcase>`;
-            }
-            if (testCase.skipped !== null) {
-                return `${open}>\n      <skipped message="${xml(testCase.skipped)}"/>\n    </testcase>`;
-            }
-            return `${open}/>`;
-        }).join('\n');
-
-        return `  <testsuite name="${xml(name)}" tests="${cases.length}" failures="${failures}" errors="0" skipped="${skipped}" time="${seconds(request.time)}">\n${body}\n  </testsuite>`;
-    });
-
-    const totals = scored.reduce((acc, { cases, failures, skipped }) => {
-        acc.tests += cases.length;
-        acc.failures += failures;
-        acc.skipped += skipped;
-        return acc;
-    }, { tests: 0, failures: 0, skipped: 0 });
-
-    const timestamp = summary.startedAt ? ` timestamp="${new Date(summary.startedAt).toISOString()}"` : '';
-    return [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        `<testsuites name="${xml(summary.runnerName)}" tests="${totals.tests}" failures="${totals.failures}" errors="0" skipped="${totals.skipped}" time="${seconds(summary.totalTime)}"${timestamp}>`,
-        ...suites,
-        '</testsuites>',
-        ''
-    ].join('\n');
 }
 
 /**
