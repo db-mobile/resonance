@@ -195,6 +195,9 @@ fn build_endpoint(
         security: None,
         scripts: None,
         graphql_data: None,
+        url: None,
+        live_body: None,
+        response_schema: None,
     }
 }
 

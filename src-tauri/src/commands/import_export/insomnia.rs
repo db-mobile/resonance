@@ -399,6 +399,9 @@ fn convert_request(request: &Value) -> Endpoint {
         security: convert_auth(request.get("authentication")),
         scripts: convert_scripts(request),
         graphql_data,
+        url: None,
+        live_body: None,
+        response_schema: None,
     }
 }
 

@@ -306,6 +306,9 @@ fn parse_postman_request(
         security,
         scripts,
         graphql_data,
+        url: None,
+        live_body: None,
+        response_schema: None,
     })
 }
 

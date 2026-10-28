@@ -74,7 +74,11 @@ pub struct Folder {
 pub struct Endpoint {
     pub id: String,
     pub name: String,
+    /// Defaulted so one request file without a method or path cannot fail the
+    /// deserialization of the whole list (and silently empty an export).
+    #[serde(default)]
     pub method: String,
+    #[serde(default)]
     pub path: String,
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -94,6 +98,17 @@ pub struct Endpoint {
     /// to the endpoint's data file, never serialized into collection.json.
     #[serde(skip_serializing, default)]
     pub graphql_data: Option<Value>,
+    /// Export-only: the absolute URL a request addresses instead of a path
+    /// under the collection's base URL. Filled from the request's live state.
+    #[serde(skip)]
+    pub url: Option<String>,
+    /// Export-only: the body the user last saved (JSON, text, form or binary),
+    /// which takes precedence over the spec's `requestBody` example.
+    #[serde(skip)]
+    pub live_body: Option<export::LiveBody>,
+    /// Export-only: the response schema the user defined for validation.
+    #[serde(skip)]
+    pub response_schema: Option<Value>,
 }
 
 /// An environment carried inside an Insomnia export or read from a Postman
@@ -730,6 +745,20 @@ mod tests {
             detect(json!({ "name": "Prod", "values": [] })),
             ImportFormat::PostmanEnvironment
         );
+    }
+
+    #[test]
+    fn endpoints_without_a_method_or_path_still_deserialize() {
+        let endpoints: Vec<Endpoint> = serde_json::from_value(json!([
+            { "id": "a", "name": "Fresh gRPC" },
+            { "id": "b", "name": "List", "method": "GET", "path": "/b" }
+        ]))
+        .unwrap();
+
+        assert_eq!(endpoints.len(), 2);
+        assert_eq!(endpoints[0].method, "");
+        assert_eq!(endpoints[0].path, "");
+        assert_eq!(endpoints[1].path, "/b");
     }
 
     #[test]
