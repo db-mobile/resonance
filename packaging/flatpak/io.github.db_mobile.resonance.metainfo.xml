@@ -1098,9 +1098,11 @@
   <supports>
     <control>pointing</control>
     <control>keyboard</control>
+    <control>touch</control>
   </supports>
 
   <requires>
+    <display_length compare="ge">1000</display_length>
     <internet>always</internet>
   </requires>
 </component>
