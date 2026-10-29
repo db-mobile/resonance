@@ -7,6 +7,7 @@ function makeRepository() {
         saveGrpcData: jest.fn().mockResolvedValue(undefined),
         saveGraphQLData: jest.fn().mockResolvedValue(undefined),
         saveMqttData: jest.fn().mockResolvedValue(undefined),
+        saveWebSocketData: jest.fn().mockResolvedValue(undefined),
         savePersistedPathParams: jest.fn().mockResolvedValue(undefined),
         savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
         savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
@@ -45,6 +46,20 @@ describe('writeNewEndpointSidecars', () => {
         expect(repository.savePersistedUrl).toHaveBeenNthCalledWith(2, 'c1', 'e2', 'mqtt://b');
         expect(repository.saveMqttData).toHaveBeenCalledWith('c1', 'e2', expect.objectContaining({ username: '' }));
         expect(repository.saveMqttData.mock.calls[0][2]).not.toHaveProperty('password');
+        expect(repository.saveWebSocketData).toHaveBeenCalledWith('c1', 'e1', { protocols: [], messages: [] });
+    });
+
+    test('a websocket request writes its normalised sub-protocols and saved messages', async () => {
+        const repository = makeRepository();
+
+        await writeNewEndpointSidecars(repository, 'c1', 'e1', getProtocol('websocket'), {
+            url: 'wss://x', protocols: ' chat, superchat ', messages: [{ id: 'm1', name: 'Ping', mode: 'text', content: 'ping' }]
+        });
+
+        expect(repository.saveWebSocketData).toHaveBeenCalledWith('c1', 'e1', {
+            protocols: ['chat', 'superchat'], messages: [{ id: 'm1', name: 'Ping', mode: 'text', content: 'ping' }]
+        });
+        expect(repository.saveMqttData).not.toHaveBeenCalled();
     });
 
     test('grpc and graphql write their protocol records with defaults', async () => {

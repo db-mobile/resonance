@@ -78,6 +78,7 @@ export class CollectionEndpointLoaderService {
             persistedFormBodyData: allowed.formBodyData,
             persistedGraphQLData: allowed.graphqlData,
             persistedMqttData: allowed.mqttData,
+            persistedWebSocketData: allowed.websocketData,
             grpcData: allowed.grpcData
         };
 

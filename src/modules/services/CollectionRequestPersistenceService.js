@@ -126,9 +126,11 @@ export class CollectionRequestPersistenceService {
      */
     async saveWebSocketRequest(collectionId, endpointId) {
         const form = this.formReader.read(getProtocol('websocket'));
-        await this.writeSidecarUpdates(collectionId, endpointId, this.collectSidecarUpdates({
+        const updates = this.collectSidecarUpdates({
             url: form.url, queryParams: form.queryParams, headers: form.headers, bodyState: form.bodyState
-        }));
+        });
+        updates.websocketData = this.formReader.readWebSocketData();
+        await this.writeSidecarUpdates(collectionId, endpointId, updates);
     }
 
     /**

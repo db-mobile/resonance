@@ -15,6 +15,7 @@ export const ALL_BODY_MODES = [
 /** @type {string[]} */
 export const ALL_REQUEST_TABS = [
     'path-params',
+    'websocket',
     'query-params',
     'headers',
     'body',

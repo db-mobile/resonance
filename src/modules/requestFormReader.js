@@ -7,6 +7,7 @@ import { getProtocol } from './protocols/protocolRegistry.js';
 import { parseKeyValuePairs, parseKeyValueRows } from './keyValueManager.js';
 import { captureFormBody, getRequestBodyContent, setRequestBodyContent } from './requestBodyHelper.js';
 import { readMqttForm } from './mqtt/mqttFields.js';
+import { readWebSocketForm } from './websocket/websocketFields.js';
 
 /**
  * @typedef {Object} RequestFormSnapshot
@@ -124,6 +125,11 @@ export class RequestFormReader {
     /** @returns {Object} */
     readMqttData() {
         return readMqttForm();
+    }
+
+    /** @returns {import('./websocket/websocketFields.js').WebSocketData} */
+    readWebSocketData() {
+        return readWebSocketForm();
     }
 
     /** @returns {Object|null} */

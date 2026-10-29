@@ -14,6 +14,7 @@ import { captureFormBody, setRequestBodyContent, getRequestBodyContent } from '.
 import { setRequestMode, RequestMode, getCurrentMode } from './requestModeManager.js';
 import { getProtocol, resolveProtocolId } from './protocols/protocolRegistry.js';
 import { readMqttForm, writeMqttForm } from './mqtt/mqttFields.js';
+import { readWebSocketForm, writeWebSocketForm } from './websocket/websocketFields.js';
 
 /** @type {Object<string, string>} */
 const CAPTURE_BY_PROTOCOL = Object.freeze({
@@ -141,6 +142,7 @@ export class WorkspaceTabStateManager {
                 url: websocketUrlInput?.value || this.dom.urlInput?.value || '',
                 method: 'WS',
                 ...this._captureStreamKeyValues(),
+                ...readWebSocketForm(),
                 body: captureFormBody(document.getElementById('body-mode-select')?.value) ?? {
                     mode: 'json',
                     content: getRequestBodyContent() || ''
@@ -435,6 +437,7 @@ export class WorkspaceTabStateManager {
         setRequestMode(RequestMode.WEBSOCKET);
 
         this._restoreUrlInputs('websocket', request.url);
+        writeWebSocketForm(request);
         if (request.body?.mode === 'text') {
             this.graphqlBodyManager?.switchMode('text');
             app.requestBodyTextEditor?.setContent(request.body.content || '');

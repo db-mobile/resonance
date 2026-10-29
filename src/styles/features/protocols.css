@@ -168,6 +168,28 @@
   align-self: flex-start;
 }
 
+.websocket-cards {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.websocket-card {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.websocket-field-hint {
+  margin: 0;
+}
+
+.websocket-messages-list .row {
+  padding-inline: var(--space-3);
+}
+
+.websocket-message-mode {
+  text-transform: uppercase;
+}
+
 .graphql-body-container {
   gap: var(--space-2);
 }

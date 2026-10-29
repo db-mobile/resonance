@@ -38,6 +38,7 @@ import { handleWebSocketConnect, handleWebSocketCancel, handleWebSocketSend, isW
 import { handleSseCancel, handleSseConnect, isSseLive } from './sseHandler.js';
 import { handleMqttCancel, handleMqttSend } from './mqttHandler.js';
 import { readMqttForm } from './mqtt/mqttFields.js';
+import { readWebSocketForm } from './websocket/websocketFields.js';
 import {
     handleGraphQLSubscriptionStart,
     handleGraphQLSubscriptionCancel,
@@ -283,31 +284,37 @@ export async function handleWebSocketConnectionAction() {
         endpoint: getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null,
         authConfig: clone(app.authManager?.getAuthConfig?.())
     };
+    const { protocols } = readWebSocketForm();
     const tabId = await tab;
     if (getWebSocketState(tabId) !== 'closed') { return handleWebSocketCancel(tabId); }
     scheduleEndpointSave();
     return handleWebSocketConnect({
-        tabId, url: request.url,
+        tabId, url: request.url, protocols,
         prepare: async () => {
             const prepared = await resolveRequestPipeline({ ...request, useAuth: true });
             if (!prepared.ok) { throw new Error(prepared.error); }
-            return prepared;
+            const resolved = protocols.map((protocol) => prepared.processor.processTemplate(protocol, prepared.variables));
+            return { ...prepared, protocols: resolved };
         }
     });
 }
 
-async function sendWebSocketMessage() {
+/** Send any text on the active tab's open socket with `{{variables}}` resolved; the composer is never read. */
+export async function sendWebSocketText(message) {
     const tab = getActiveTabId();
-    const message = getWebSocketBodyContent() || '';
     const endpoint = getCurrentEndpoint() ? { ...getCurrentEndpoint() } : null;
     const tabId = await tab;
-    scheduleEndpointSave();
     return handleWebSocketSend(message, tabId, async (body) => {
         const { variables, processor } = await getRequestPipeline().requestBuilder.resolveVariables(endpoint, {});
         const processed = processor.processTemplate(body, variables);
         warnUnresolvedVariables(processor, { body: processed });
         return processed;
     });
+}
+
+async function sendWebSocketMessage() {
+    scheduleEndpointSave();
+    return sendWebSocketText(getWebSocketBodyContent() || '');
 }
 
 /** @type {StreamingSend} */

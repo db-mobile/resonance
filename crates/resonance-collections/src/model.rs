@@ -233,6 +233,9 @@ pub struct RequestDoc {
     pub grpc: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mqtt: Option<Value>,
+    /// WebSocket extras: offered sub-protocols and saved message presets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub websocket: Option<Value>,
     #[serde(default, skip_serializing_if = "Scripts::is_empty")]
     pub scripts: Scripts,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -266,6 +269,7 @@ impl RequestDoc {
             body: None,
             grpc: None,
             mqtt: None,
+            websocket: None,
             scripts: Scripts::default(),
             response_schema: None,
             spec: Spec::default(),

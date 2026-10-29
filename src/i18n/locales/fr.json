@@ -256,7 +256,8 @@
     "response_body": "Corps",
     "response_headers": "En-têtes",
     "schema": "Schéma",
-    "mqtt": "MQTT"
+    "mqtt": "MQTT",
+    "websocket": "WebSocket"
   },
   "schema": {
     "title": "Schéma de Réponse",
@@ -662,6 +663,25 @@
     "will_qos": "QoS du testament",
     "will_retain": "Conserver le testament",
     "clean_session_needs_client_id": "Une session persistante (session propre désactivée) nécessite un ID client fixe"
+  },
+  "websocket": {
+    "title": "WebSocket",
+    "section_connection": "Connexion",
+    "protocols_label": "Sous-protocoles",
+    "protocols_placeholder": "graphql-transport-ws, chat",
+    "protocols_aria": "Sous-protocoles WebSocket",
+    "protocols_hint": "Séparés par des virgules, par ordre de préférence. Envoyés dans Sec-WebSocket-Protocol ; le choix du serveur apparaît dans la transcription.",
+    "section_messages": "Messages enregistrés",
+    "save_current": "Enregistrer le message actuel",
+    "save_message_title": "Enregistrer le message",
+    "save_message_label": "Nom :",
+    "save_message_confirm": "Enregistrer",
+    "default_message_name": "Message {{n}}",
+    "nothing_to_save": "Saisissez d'abord un message dans l'onglet Body",
+    "no_messages": "Aucun message enregistré. Rédigez-en un dans l'onglet Body et enregistrez-le ici.",
+    "load": "Charger",
+    "send": "Envoyer",
+    "delete": "Supprimer"
   },
   "folder": {
     "new_title": "Nouveau dossier",

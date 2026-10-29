@@ -45,7 +45,16 @@ pub struct ReadRunners {
 }
 
 /// Top-level keys only a request document carries.
-const REQUEST_KEYS: &[&str] = &["method", "protocol", "path", "url", "body", "grpc", "mqtt"];
+const REQUEST_KEYS: &[&str] = &[
+    "method",
+    "protocol",
+    "path",
+    "url",
+    "body",
+    "grpc",
+    "mqtt",
+    "websocket",
+];
 
 /// The directory holding a collection's runner files.
 pub fn runners_dir(dir: &Path) -> PathBuf {

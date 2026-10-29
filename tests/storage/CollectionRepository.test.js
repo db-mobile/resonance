@@ -54,6 +54,7 @@ describe('CollectionRepository', () => {
                 formBodyData: null,
                 grpcData: { service: 'UserService', method: 'GetUser' },
                 mqttData: null,
+                websocketData: null,
                 responseSchema: null
             });
             expect(mockBackendAPI.collections.getEndpointData).toHaveBeenCalledWith('collection_1', 'endpoint_1');
@@ -76,6 +77,7 @@ describe('CollectionRepository', () => {
                 formBodyData: null,
                 grpcData: null,
                 mqttData: null,
+                websocketData: null,
                 responseSchema: null
             });
         });
@@ -99,6 +101,7 @@ describe('CollectionRepository', () => {
                 formBodyData: null,
                 grpcData: null,
                 mqttData: null,
+                websocketData: null,
                 responseSchema: null
             });
         });
@@ -119,6 +122,7 @@ describe('CollectionRepository', () => {
                 formBodyData: null,
                 grpcData: null,
                 mqttData: null,
+                websocketData: null,
                 responseSchema: null
             });
         });

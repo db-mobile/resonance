@@ -52,7 +52,7 @@ async function loadHarness() {
 const EXPECTED_REQUEST_KEYS = {
     grpc: ['grpc', 'protocol'],
     sse: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url'],
-    websocket: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url'],
+    websocket: ['authConfig', 'authType', 'body', 'headers', 'messages', 'method', 'pathParams', 'protocol', 'protocols', 'queryParams', 'url'],
     mqtt: ['authConfig', 'authType', 'body', 'broker', 'cleanSession', 'clientId', 'keepAlive', 'method', 'password', 'protocol', 'publishTopic', 'qos', 'retain', 'subscribeTopic', 'username', 'willPayload', 'willQos', 'willRetain', 'willTopic'],
     graphql: ['authConfig', 'authType', 'headers', 'method', 'operationName', 'protocol', 'query', 'url', 'variables'],
     http: ['authConfig', 'authType', 'body', 'headers', 'method', 'pathParams', 'protocol', 'queryParams', 'url']
@@ -181,6 +181,18 @@ describe('captureCurrentState shape per protocol', () => {
         expect(app.captureGrpcState).toHaveBeenCalled();
         expect(state.request.grpc).toEqual({ target: 'localhost:50051' });
         expect(state).not.toHaveProperty('activeResponseTab');
+    });
+
+    test('WebSocket captures its sub-protocols and the preset list', async () => {
+        const { manager, setRequestMode, app } = await loadHarness();
+        setRequestMode('websocket');
+        document.body.insertAdjacentHTML('beforeend', '<input id="websocket-protocols-input" value=" chat, superchat ">');
+        app.websocketPresets = { getMessages: () => [{ id: 'm1', name: 'Ping', mode: 'json', content: '{}' }] };
+        try {
+            const { request } = await manager.captureCurrentState();
+            expect(request.protocols).toEqual(['chat', 'superchat']);
+            expect(request.messages).toEqual([{ id: 'm1', name: 'Ping', mode: 'json', content: '{}' }]);
+        } finally { delete app.websocketPresets; }
     });
 
     test('WebSocket captures its selected Text mode and exact content', async () => {

@@ -8,6 +8,7 @@ import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { buildEndpointUrl } from '../collections/endpointUrl.js';
 import { normalizeMqttData } from '../mqtt/mqttFields.js';
+import { normalizeWebSocketData } from '../websocket/websocketFields.js';
 
 /**
  * @param {Object} headers
@@ -396,6 +397,7 @@ export class WorkspaceTabEndpointLoaderService {
             pathParams: {},
             queryParams,
             headers,
+            ...normalizeWebSocketData(endpoint.persistedWebSocketData),
             body: endpoint.persistedFormBodyData?.mode === 'text' ? {
                 mode: 'text',
                 content: endpoint.persistedFormBodyData.content || ''

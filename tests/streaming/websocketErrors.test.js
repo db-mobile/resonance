@@ -139,6 +139,29 @@ describe('WebSocket connection lifecycle', () => {
         expect(getWebSocketState('tab-1')).toBe('open');
     });
 
+    test('offered sub-protocols reach Connect and the server choice is shown in the transcript', async () => {
+        await connect({ protocols: ['chat', '', 'superchat'] });
+
+        expect(connection.protocols).toEqual(['chat', 'superchat']);
+        await emit('open', { protocol: 'superchat' });
+        expect(await transcript()).toContain(`CONNECTED ${url} [superchat]`);
+    });
+
+    test('a prepared request can resolve the protocol list', async () => {
+        await connect({ prepare: async () => ({ url, headers: {}, protocols: ['graphql-transport-ws'] }) });
+
+        expect(connection.protocols).toEqual(['graphql-transport-ws']);
+    });
+
+    test('an open event without a protocol keeps the plain CONNECTED line', async () => {
+        await connect();
+        await emit('open');
+
+        const text = await transcript();
+        expect(text).toContain(`CONNECTED ${url}`);
+        expect(text).not.toMatch(/CONNECTED \S+ \[/);
+    });
+
     test('the existing no-timeout choice reaches Connect as no handshake deadline', async () => {
         resolveRequestSettings.mockResolvedValueOnce({ timeout: null });
         await connect();

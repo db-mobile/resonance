@@ -52,7 +52,7 @@ const EXPECTED = {
         selectorVisible: true
     },
     [RequestMode.WEBSOCKET]: {
-        tabs: ['query-params', 'headers', 'body'],
+        tabs: ['websocket', 'query-params', 'headers', 'body'],
         defaultTab: 'body',
         methodSelect: false,
         sharedUrlBar: false,

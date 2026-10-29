@@ -27,7 +27,8 @@ describe('protocol savers skip the sidebar refresh', () => {
                 hasBody: jest.fn(() => false),
                 readGraphQLData: jest.fn(() => null),
                 readGrpcState: jest.fn(() => ({ fullMethod: 'pkg.Svc/Method' })),
-                readMqttData: jest.fn(() => ({}))
+                readMqttData: jest.fn(() => ({})),
+                readWebSocketData: jest.fn(() => ({ protocols: [], messages: [] }))
             }
         });
     });
@@ -36,6 +37,9 @@ describe('protocol savers skip the sidebar refresh', () => {
         await service.saveWebSocketRequest('c1', 'e1');
 
         expect(refreshCollections).not.toHaveBeenCalled();
+        expect(repository.updateEndpointFields).toHaveBeenCalledWith('c1', 'e1', expect.objectContaining({
+            websocketData: { protocols: [], messages: [] }
+        }));
     });
 
     test('the GraphQL saver never refreshes the tree', async () => {

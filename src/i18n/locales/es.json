@@ -256,7 +256,8 @@
     "response_body": "Cuerpo",
     "response_headers": "Encabezados",
     "schema": "Esquema",
-    "mqtt": "MQTT"
+    "mqtt": "MQTT",
+    "websocket": "WebSocket"
   },
   "schema": {
     "title": "Esquema de Respuesta",
@@ -662,6 +663,25 @@
     "will_qos": "QoS del testamento",
     "will_retain": "Retener testamento",
     "clean_session_needs_client_id": "Una sesión persistente (sesión limpia desactivada) necesita un ID de cliente fijo"
+  },
+  "websocket": {
+    "title": "WebSocket",
+    "section_connection": "Conexión",
+    "protocols_label": "Subprotocolos",
+    "protocols_placeholder": "graphql-transport-ws, chat",
+    "protocols_aria": "Subprotocolos WebSocket",
+    "protocols_hint": "Separados por comas, en orden de preferencia. Se envían como Sec-WebSocket-Protocol; la elección del servidor aparece en la transcripción.",
+    "section_messages": "Mensajes guardados",
+    "save_current": "Guardar mensaje actual",
+    "save_message_title": "Guardar mensaje",
+    "save_message_label": "Nombre:",
+    "save_message_confirm": "Guardar",
+    "default_message_name": "Mensaje {{n}}",
+    "nothing_to_save": "Escribe primero un mensaje en la pestaña Body",
+    "no_messages": "Aún no hay mensajes guardados. Redacta uno en la pestaña Body y guárdalo aquí.",
+    "load": "Cargar",
+    "send": "Enviar",
+    "delete": "Eliminar"
   },
   "folder": {
     "new_title": "Nueva carpeta",

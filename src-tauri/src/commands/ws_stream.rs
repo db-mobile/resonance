@@ -41,6 +41,7 @@ pub(crate) struct WsConnection {
     connection_id: Option<String>,
     url: String,
     headers: HashMap<String, String>,
+    protocols: Vec<String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
     open: bool,
@@ -55,6 +56,7 @@ impl WsConnection {
         &self,
         url: &str,
         headers: &HashMap<String, String>,
+        protocols: &[String],
         verify_ssl: bool,
         client_cert: &Option<ClientCertConfig>,
     ) -> bool {
@@ -63,6 +65,7 @@ impl WsConnection {
             && !self.sender.is_closed()
             && self.url == url
             && self.headers == *headers
+            && self.protocols == protocols
             && self.verify_ssl == verify_ssl
             && self.client_cert == *client_cert
     }
@@ -76,6 +79,9 @@ pub struct WsSendRequest {
     pub url: String,
     #[serde(default)]
     pub headers: Option<HashMap<String, String>>,
+    /// Sub-protocols offered in `Sec-WebSocket-Protocol`, in preference order.
+    #[serde(default)]
+    pub protocols: Option<Vec<String>>,
     #[serde(default)]
     pub message: Option<String>,
     #[serde(default)]
@@ -117,6 +123,9 @@ struct WsEventPayload {
     code: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
+    /// The sub-protocol the server selected during the handshake.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    protocol: Option<String>,
 }
 impl WsEventPayload {
     fn new(tab_id: &str, url: &str, event_type: &str) -> Self {
@@ -128,12 +137,14 @@ impl WsEventPayload {
             message: None,
             code: None,
             reason: None,
+            protocol: None,
         }
     }
-    fn open(tab_id: &str, url: &str) -> Self {
+    fn open(tab_id: &str, url: &str, protocol: Option<String>) -> Self {
         Self {
             code: Some(101),
             reason: Some("Switching Protocols".into()),
+            protocol,
             ..Self::new(tab_id, url, "open")
         }
     }
@@ -216,14 +227,26 @@ fn target_authority(
         uri.port_u16().unwrap_or(if secure { 443 } else { 80 }),
     ))
 }
+/// Reads the sub-protocol the server agreed to from the handshake response.
+fn selected_subprotocol(
+    response: &tokio_tungstenite::tungstenite::handshake::client::Response,
+) -> Option<String> {
+    response
+        .headers()
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+}
+
 async fn establish_connection(
     channel: &'static WsChannel,
     url: String,
     headers: HashMap<String, String>,
+    protocols: Vec<String>,
     verify_ssl: bool,
     client_cert: Option<ClientCertConfig>,
     proxy: WsProxyAction,
-) -> Result<Socket, String> {
+) -> Result<(Socket, Option<String>), String> {
     let mut request = url.clone().into_client_request().map_err(|error| {
         format!(
             "Failed to build {} request: {}",
@@ -249,11 +272,25 @@ async fn establish_connection(
             })?;
         request.headers_mut().insert(header_name, header_value);
     }
-    if let Some(subprotocol) = channel.subprotocol {
-        request.headers_mut().insert(
-            "Sec-WebSocket-Protocol",
-            tokio_tungstenite::tungstenite::http::HeaderValue::from_static(subprotocol),
-        );
+    // An explicit list from the request wins over the channel's static
+    // sub-protocol and over any header row the user typed by hand.
+    let offered = if protocols.is_empty() {
+        channel.subprotocol.map(str::to_string)
+    } else {
+        Some(protocols.join(", "))
+    };
+    if let Some(offered) = offered {
+        let header_value = offered
+            .parse::<tokio_tungstenite::tungstenite::http::HeaderValue>()
+            .map_err(|error| {
+                format!(
+                    "Invalid {}sub-protocol list '{}': {}",
+                    channel.header_error_qualifier, offered, error
+                )
+            })?;
+        request
+            .headers_mut()
+            .insert("Sec-WebSocket-Protocol", header_value);
     }
 
     // Only `wss://` needs a TLS connector. Building one for a plaintext socket
@@ -277,18 +314,18 @@ async fn establish_connection(
             channel.request_label
         )),
         WsProxyAction::Direct => {
-            let (stream, _) = connect_async_tls_with_config(request, None, false, connector)
+            let (stream, response) = connect_async_tls_with_config(request, None, false, connector)
                 .await
                 .map_err(|error| format!("Failed to connect: {}", error))?;
-            Ok(Box::new(stream) as Socket)
+            Ok((Box::new(stream) as Socket, selected_subprotocol(&response)))
         }
         WsProxyAction::Tunnel(endpoint) => {
             let (host, port) = target_authority(request.uri(), is_secure)?;
             let tunnel = connect_through_proxy(&endpoint, &host, port).await?;
-            let (stream, _) = client_async_tls_with_config(request, tunnel, None, connector)
+            let (stream, response) = client_async_tls_with_config(request, tunnel, None, connector)
                 .await
                 .map_err(|error| format!("Failed to connect through proxy: {}", error))?;
-            Ok(Box::new(stream) as Socket)
+            Ok((Box::new(stream) as Socket, selected_subprotocol(&response)))
         }
     }
 }
@@ -312,6 +349,7 @@ async fn start<R: Runtime>(
     let (ready, ready_rx) = oneshot::channel();
     let generation = connections.next_generation();
     let headers = request.headers.unwrap_or_default();
+    let protocols = request.protocols.unwrap_or_default();
     let verify_ssl = request.verify_ssl != Some(false);
     let context = Lifecycle {
         app,
@@ -337,6 +375,7 @@ async fn start<R: Runtime>(
                     connection_id,
                     url: request.url.clone(),
                     headers: headers.clone(),
+                    protocols: protocols.clone(),
                     verify_ssl,
                     client_cert: request.client_cert.clone(),
                     open: false,
@@ -350,6 +389,7 @@ async fn start<R: Runtime>(
             channel,
             request.url,
             headers,
+            protocols,
             verify_ssl,
             request.client_cert,
             proxy,
@@ -362,7 +402,7 @@ async fn start<R: Runtime>(
                 None => dial.await,
             }
         };
-        let socket = tokio::select! {
+        let (socket, protocol) = tokio::select! {
             biased;
             _ = async { let _ = stopped.wait_for(|value| *value).await; } => {
                 context.emit(WsEventPayload::new(&context.tab_id, &context.url, "cancelled"), true).await;
@@ -370,7 +410,7 @@ async fn start<R: Runtime>(
                 return;
             }
             result = handshake => match result {
-                Ok(socket) => socket,
+                Ok(connected) => connected,
                 Err(error) => {
                     context.error(error.clone(), true).await;
                     let _ = ready.send(Err(error));
@@ -398,7 +438,7 @@ async fn start<R: Runtime>(
                 return;
             }
             entry.value.open = true;
-            let mut payload = WsEventPayload::open(&context.tab_id, &context.url);
+            let mut payload = WsEventPayload::open(&context.tab_id, &context.url, protocol);
             payload.connection_id = context.connection_id.clone();
             emit_event(&context.app, channel, payload);
         }
@@ -557,6 +597,7 @@ pub(crate) async fn send<R: Runtime>(
                 entry.value.is_reusable_for(
                     &request.url,
                     &request.headers.clone().unwrap_or_default(),
+                    request.protocols.as_deref().unwrap_or_default(),
                     request.verify_ssl != Some(false),
                     &request.client_cert,
                 )
@@ -633,6 +674,21 @@ mod tests {
         assert_eq!(cert.ca_path.as_deref(), Some("/certs/ca.pem"));
     }
 
+    #[test]
+    fn deserializes_a_send_request_with_protocols() {
+        let request: WsSendRequest = serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1",
+            "url": "wss://example.com/socket",
+            "protocols": ["chat", "superchat"]
+        }))
+        .expect("expected the request to deserialize");
+
+        assert_eq!(
+            request.protocols,
+            Some(vec!["chat".to_string(), "superchat".to_string()])
+        );
+    }
+
     /// A payload from before the TLS fields existed must still deserialize, and
     /// an absent `verifySsl` has to mean verification stays on.
     #[test]
@@ -645,6 +701,7 @@ mod tests {
 
         assert_eq!(request.verify_ssl, None);
         assert!(request.client_cert.is_none());
+        assert!(request.protocols.is_none());
         assert!(request.verify_ssl != Some(false));
     }
 
@@ -786,6 +843,7 @@ mod tests {
             tab_id: "tab-1".to_string(),
             url: format!("ws://{addr}/socket"),
             headers: Some(HashMap::from([("X-Auth".to_string(), auth.to_string())])),
+            protocols: None,
             message: None,
             verify_ssl: None,
             client_cert: None,

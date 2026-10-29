@@ -23,7 +23,8 @@ const PERSISTED_DATA_KINDS = [
     'graphqlData',
     'formBodyData',
     'grpcData',
-    'mqttData'
+    'mqttData',
+    'websocketData'
 ];
 
 describe('protocolRegistry', () => {
@@ -175,6 +176,20 @@ describe('protocolRegistry', () => {
             const text = { mode: 'text', content: '  message\n' };
             expect(projectPersistedData(descriptor, { formBodyData: text }).formBodyData).toEqual(text);
             expect(projectPersistedData(descriptor, storedData).formBodyData).toBeNull();
+        });
+
+        test('only WebSocket keeps its sub-protocols and saved messages', () => {
+            const websocketData = { protocols: ['chat'], messages: [{ id: 'm1', name: 'Ping', mode: 'json', content: '{}' }] };
+            expect(projectPersistedData(getProtocol('websocket'), { websocketData }).websocketData).toEqual(websocketData);
+            expect(projectPersistedData(getProtocol('sse'), { websocketData }).websocketData).toBeNull();
+            expect(projectPersistedData(getProtocol('http'), { websocketData }).websocketData).toBeNull();
+        });
+
+        test('the WebSocket tab comes first and its sidecars include the WebSocket record', () => {
+            const descriptor = getProtocol('websocket');
+            expect(descriptor.requestTabs).toEqual(['websocket', 'query-params', 'headers', 'body']);
+            expect(descriptor.defaultTab).toBe('body');
+            expect(descriptor.createSidecars).toEqual(['url', 'websocketData']);
         });
     });
 });
