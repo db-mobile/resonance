@@ -1101,9 +1101,9 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 
 [[package]]
 name = "ctutils"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe3e9d21d39e6f39ff46e03d5b621424f88ee23d8a1672c6bfc9ccc7f2da4f6a"
+checksum = "a2376ffd6f96d8a9db59875b4b6b0237d6900b5baf64279714e05493ce64828a"
 dependencies = [
  "cmov",
 ]
@@ -4633,7 +4633,7 @@ dependencies = [
 
 [[package]]
 name = "resonance"
-version = "3.5.7"
+version = "3.5.8"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -4691,7 +4691,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-cli"
-version = "3.5.7"
+version = "3.5.8"
 dependencies = [
  "axum",
  "clap",
@@ -4706,7 +4706,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-collections"
-version = "3.5.7"
+version = "3.5.8"
 dependencies = [
  "resonance-core",
  "serde",
@@ -4720,7 +4720,7 @@ dependencies = [
 
 [[package]]
 name = "resonance-core"
-version = "3.5.7"
+version = "3.5.8"
 dependencies = [
  "axum",
  "base64 0.23.1",

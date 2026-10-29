@@ -116,6 +116,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.5.8" date="2026-10-29">
+      <description>
+        <p>HTTP method support and WebSocket improvements</p>
+        <ul>
+          <li>Add HEAD and OPTIONS HTTP methods</li>
+          <li>Negotiate WebSocket subprotocols and show the server's selection in the transcript</li>
+          <li>Save named WebSocket message presets with requests and send them with variables resolved</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.7" date="2026-10-29">
       <description>
         <p>Collection export fixes and runner performance improvements</p>
