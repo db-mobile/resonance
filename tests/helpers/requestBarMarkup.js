@@ -15,6 +15,7 @@ export const ALL_BODY_MODES = [
 /** @type {string[]} */
 export const ALL_REQUEST_TABS = [
     'path-params',
+    'websocket',
     'query-params',
     'headers',
     'body',
@@ -84,6 +85,8 @@ export function requestBarMarkup() {
                         <option value="PUT">PUT</option>
                         <option value="DELETE">DELETE</option>
                         <option value="PATCH">PATCH</option>
+                        <option value="HEAD">HEAD</option>
+                        <option value="OPTIONS">OPTIONS</option>
                     </select>
                 </div>
                 <div id="grpc-url-section" class="grpc-url-section" style="display: none;">

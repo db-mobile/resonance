@@ -82,6 +82,20 @@ describe('CollectionRequestPersistenceService protocol routing', () => {
         } finally { delete app.requestBodyTextEditor; }
     });
 
+    test('WebSocket persists its sub-protocols and saved messages in the same write', async () => {
+        collection.endpoints.push({ id: 'ws1', protocol: 'websocket', path: 'wss://example.test' });
+        document.body.insertAdjacentHTML('beforeend', '<input id="websocket-protocols-input" value="chat, superchat">');
+        const messages = [{ id: 'm1', name: 'Ping', mode: 'json', content: '{"type":"ping"}' }];
+        app.websocketPresets = { getMessages: () => messages };
+        try {
+            await service.saveAllRequestModifications('c1', 'ws1');
+            expect(repository.updateEndpointFields).toHaveBeenCalledWith('c1', 'ws1', expect.objectContaining({
+                websocketData: { protocols: ['chat', 'superchat'], messages }
+            }));
+            expect(repository.updateEndpointFields).toHaveBeenCalledTimes(1);
+        } finally { delete app.websocketPresets; }
+    });
+
     test('an SSE endpoint persists its authentication, unlike a websocket one', async () => {
         collection.endpoints.push({
             id: 'ws1',

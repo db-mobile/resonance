@@ -14,6 +14,7 @@ import { clearWebSocketState } from '../websocketHandler.js';
 import { clearSseState } from '../sseHandler.js';
 import { clearMqttState } from '../mqttHandler.js';
 import { MQTT_DEFAULTS } from '../mqtt/mqttFields.js';
+import { normalizeWebSocketData } from '../websocket/websocketFields.js';
 import { clearStreamState } from '../grpcStreamHandler.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
@@ -71,7 +72,10 @@ function streamTabRequest(protocol, method) {
 
 /** @type {ReadonlyMap<string, {name: string, request: function(): Object}>} */
 const NEW_TAB_DEFAULTS = new Map([
-    ['websocket', { name: 'New WebSocket', request: () => streamTabRequest('websocket', 'WS') }],
+    ['websocket', {
+        name: 'New WebSocket',
+        request: () => ({ ...streamTabRequest('websocket', 'WS'), ...normalizeWebSocketData(null) })
+    }],
     ['sse', { name: 'New SSE', request: () => streamTabRequest('sse', 'GET') }],
     ['grpc', {
         name: 'New gRPC',

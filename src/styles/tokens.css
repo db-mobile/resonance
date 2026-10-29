@@ -80,12 +80,16 @@
   --method-put-color: #b62200;
   --method-delete-color: #c00023;
   --method-patch-color: #8939a4;
+  --method-head-color: #007184;
+  --method-options-color: #526678;
 
   --method-get-bg: color-mix(in srgb, var(--method-get-color) 12%, transparent);
   --method-post-bg: color-mix(in srgb, var(--method-post-color) 12%, transparent);
   --method-put-bg: color-mix(in srgb, var(--method-put-color) 12%, transparent);
   --method-delete-bg: color-mix(in srgb, var(--method-delete-color) 12%, transparent);
   --method-patch-bg: color-mix(in srgb, var(--method-patch-color) 12%, transparent);
+  --method-head-bg: color-mix(in srgb, var(--method-head-color) 12%, transparent);
+  --method-options-bg: color-mix(in srgb, var(--method-options-color) 12%, transparent);
 
   --status-success-color: var(--success-color);
   --status-redirect-color: var(--warning-color);

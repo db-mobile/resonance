@@ -5,6 +5,7 @@
 
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { normalizeMqttData } from '../mqtt/mqttFields.js';
+import { normalizeWebSocketData } from '../websocket/websocketFields.js';
 
 /**
  * @param {Object|Array|null|undefined} pathParams
@@ -59,6 +60,10 @@ export async function writeNewEndpointSidecars(repository, collectionId, endpoin
     if (createSidecars.includes('mqttData')) {
         const { password: _password, ...mqttData } = normalizeMqttData(requestData);
         await repository.saveMqttData(collectionId, endpointId, mqttData);
+    }
+
+    if (createSidecars.includes('websocketData')) {
+        await repository.saveWebSocketData(collectionId, endpointId, normalizeWebSocketData(requestData));
     }
 
     const pathParams = pathParamEntries(requestData.pathParams);

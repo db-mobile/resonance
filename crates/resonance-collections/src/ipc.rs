@@ -82,6 +82,8 @@ pub struct EndpointData {
     #[serde(default)]
     pub mqtt_data: Option<Value>,
     #[serde(default)]
+    pub websocket_data: Option<Value>,
+    #[serde(default)]
     pub response_schema: Option<Value>,
 }
 
@@ -159,6 +161,7 @@ pub fn request_to_endpoint_data(doc: &RequestDoc) -> EndpointData {
         response_schema: doc.response_schema.clone(),
         grpc_data: doc.grpc.clone(),
         mqtt_data: doc.mqtt.clone(),
+        websocket_data: doc.websocket.clone(),
         ..Default::default()
     };
 
@@ -615,6 +618,7 @@ pub fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
     doc.params.headers = data.headers.clone();
     doc.grpc = data.grpc_data.clone().filter(|v| !v.is_null());
     doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
+    doc.websocket = data.websocket_data.clone().filter(|v| !v.is_null());
     doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
     doc.scripts = super::legacy::scripts_from_v1(data.scripts.as_ref());
     doc.body = super::legacy::body_from_v1(data);
@@ -1477,6 +1481,10 @@ mod save_path {
             modified_body: Some("{\"a\": 1}".into()),
             auth_config: Some(json!({"type": "bearer", "config": {"token": ""}})),
             scripts: Some(json!({"preRequestScript": "pre();", "testScript": "test();"})),
+            websocket_data: Some(json!({
+                "protocols": ["chat", "superchat"],
+                "messages": [{"id": "m1", "name": "Ping", "mode": "text", "content": "ping"}]
+            })),
             ..Default::default()
         };
 
@@ -1489,6 +1497,23 @@ mod save_path {
         assert_eq!(projected.modified_body, data.modified_body);
         assert_eq!(projected.auth_config, data.auth_config);
         assert_eq!(projected.scripts.unwrap()["testScript"], "test();");
+        assert_eq!(projected.websocket_data, data.websocket_data);
+    }
+
+    #[test]
+    fn a_null_websocket_blob_clears_the_stored_one() {
+        let mut doc = RequestDoc::new("r1".into(), "X".into());
+        doc.websocket = Some(json!({"protocols": ["chat"], "messages": []}));
+
+        apply_endpoint_data(
+            &mut doc,
+            &EndpointData {
+                websocket_data: Some(Value::Null),
+                ..Default::default()
+            },
+        );
+
+        assert!(doc.websocket.is_none());
     }
 
     #[test]

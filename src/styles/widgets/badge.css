@@ -52,27 +52,3 @@
   color: var(--accent-color);
 }
 
-.method-get {
-  background-color: var(--method-get-bg);
-  color: var(--method-get-color);
-}
-
-.method-post {
-  background-color: var(--method-post-bg);
-  color: var(--method-post-color);
-}
-
-.method-put {
-  background-color: var(--method-put-bg);
-  color: var(--method-put-color);
-}
-
-.method-delete {
-  background-color: var(--method-delete-bg);
-  color: var(--method-delete-color);
-}
-
-.method-patch {
-  background-color: var(--method-patch-bg);
-  color: var(--method-patch-color);
-}

@@ -12,6 +12,7 @@ import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
 import { fileNameFromPath } from '../utils/fileName.js';
 import { translate } from '../utils/translate.js';
 import { normalizeMqttData } from '../mqtt/mqttFields.js';
+import { normalizeWebSocketData } from '../websocket/websocketFields.js';
 
 const NEW_DIALOGS_TEMPLATE = './src/templates/collections/newDialogs.html';
 const DOC_OPTIONS_TEMPLATE = './src/templates/docs/docOptionsDialog.html';
@@ -292,6 +293,10 @@ export class CollectionDialogs {
         if (descriptor.createSidecars.includes('mqttData')) {
             const { password: _password, ...mqttData } = normalizeMqttData(requestData);
             Object.assign(endpointData, mqttData);
+        }
+
+        if (descriptor.createSidecars.includes('websocketData')) {
+            Object.assign(endpointData, normalizeWebSocketData(requestData));
         }
 
         if (address) {

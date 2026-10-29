@@ -44,6 +44,7 @@ import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { runnerFeature } from './modules/runner.feature.js';
 import { graphqlBodyFeature } from './modules/graphqlBody.feature.js';
 import { formBodyFeature } from './modules/formBody.feature.js';
+import { websocketFeature } from './modules/websocket.feature.js';
 import { settingsFeature } from './modules/settings.feature.js';
 import { StatusDisplayAdapter } from './modules/interfaces/IStatusDisplay.js';
 import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
@@ -80,6 +81,7 @@ const featureRegistry = new FeatureRegistry({
 featureRegistry
     .register(graphqlBodyFeature)
     .register(formBodyFeature)
+    .register(websocketFeature)
     .register(environmentFeature)
     .register(proxyFeature)
     .register(certificateFeature)

@@ -324,6 +324,7 @@ export class CollectionRepository {
             formBodyData: data.formBodyData || null,
             grpcData: data.grpcData || null,
             mqttData: await this._hydrateMqttData(collectionId, endpointId, data.mqttData || null),
+            websocketData: data.websocketData || null,
             responseSchema: data.responseSchema ?? null
         };
     }
@@ -930,6 +931,16 @@ export class CollectionRepository {
 
     async saveGrpcData(collectionId, endpointId, data) {
         return this._writeSidecar(collectionId, endpointId, 'grpcData', data, 'gRPC data');
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {Object|null} data
+     * @returns {Promise<void>}
+     */
+    async saveWebSocketData(collectionId, endpointId, data) {
+        return this._writeSidecar(collectionId, endpointId, 'websocketData', data, 'WebSocket data');
     }
 
     /**

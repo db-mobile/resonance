@@ -15,6 +15,7 @@ function markup() {
         <button id="websocket-connect-btn" style="display: none;">Connect</button>
         <button id="cancel-request-btn" style="display: none;">Cancel</button>
         <input id="websocket-url-input">
+        <input id="websocket-protocols-input">
         <div id="headers-list"><input><button>Remove</button></div>
         <div id="query-params-list"><input type="checkbox"><input></div>
         <button id="add-header-btn">Add header</button>
@@ -119,6 +120,7 @@ describe('sendControls', () => {
         expect(connection.disabled).toBe(state === 'closing');
         expect(sendBtn().disabled).toBe(sendDisabled);
         expect(document.getElementById('websocket-url-input').readOnly).toBe(locked);
+        expect(document.getElementById('websocket-protocols-input').readOnly).toBe(locked);
         for (const input of document.querySelectorAll('#headers-list input, #headers-list button, #query-params-list input, #add-header-btn, #add-query-param-btn')) {
             expect(input.disabled).toBe(locked);
         }

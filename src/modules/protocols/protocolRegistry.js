@@ -25,6 +25,7 @@ export const RequestMode = {
  * @property {boolean} graphqlData
  * @property {boolean} grpcData
  * @property {boolean} mqttData
+ * @property {boolean} websocketData
  */
 
 /**
@@ -100,6 +101,7 @@ function capabilities(overrides) {
         graphqlData: false,
         grpcData: false,
         mqttData: false,
+        websocketData: false,
         ...overrides
     };
 }
@@ -210,7 +212,7 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: false,
         pathPlaceholder: 'wss://echo.websocket.org',
-        requestTabs: Object.freeze(['query-params', 'headers', 'body']),
+        requestTabs: Object.freeze(['websocket', 'query-params', 'headers', 'body']),
         defaultTab: 'body',
         bodyModes: Object.freeze(['json', 'text']),
         responseTabSet: 'none',
@@ -219,9 +221,10 @@ export const PROTOCOLS = Object.freeze({
             queryParams: true,
             headers: true,
             modifiedBody: true,
-            formBodyData: true
+            formBodyData: true,
+            websocketData: true
         })),
-        createSidecars: Object.freeze(['url']),
+        createSidecars: Object.freeze(['url', 'websocketData']),
         liveControl: 'cancel',
         ui: Object.freeze({
             urlSection: Object.freeze({

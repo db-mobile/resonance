@@ -14,7 +14,8 @@ describe('CollectionService.addRequestToCollection protocol handling', () => {
             savePersistedUrl: jest.fn().mockResolvedValue(undefined),
             saveGrpcData: jest.fn().mockResolvedValue(undefined),
             saveGraphQLData: jest.fn().mockResolvedValue(undefined),
-            saveMqttData: jest.fn().mockResolvedValue(undefined)
+            saveMqttData: jest.fn().mockResolvedValue(undefined),
+            saveWebSocketData: jest.fn().mockResolvedValue(undefined)
         };
         service = new CollectionService(repository, {}, { update: jest.fn() });
     });
@@ -129,6 +130,7 @@ describe('CollectionService.addRequestToCollection protocol handling', () => {
             endpoint.id,
             'wss://echo.websocket.org'
         );
+        expect(repository.saveWebSocketData).toHaveBeenCalledWith('c1', endpoint.id, { protocols: [], messages: [] });
     });
 
     test('a graphql request keeps its previous stored shape', async () => {

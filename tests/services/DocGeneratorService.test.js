@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { DocGeneratorService } from '../../src/modules/services/DocGeneratorService.js';
 
 // Mock the codeGenerator module
@@ -289,6 +291,28 @@ describe('DocGeneratorService', () => {
             expect(global.fetch).toHaveBeenCalledWith('./src/templates/docs/docTemplate.html');
             expect(html).toContain('<title>Test API - API Documentation</title>');
             expect(html).toContain('<h1>Test API</h1>');
+        });
+
+        test('should mark HEAD and OPTIONS endpoints with their method class', async () => {
+            const collection = {
+                ...mockCollection,
+                endpoints: [
+                    { id: 'ep-head', name: 'Probe', method: 'HEAD', path: '/users' },
+                    { id: 'ep-options', name: 'Allow', method: 'OPTIONS', path: '/users' }
+                ]
+            };
+            const html = await service.generateHtml(collection);
+
+            expect(html).toContain('class="method method-head"');
+            expect(html).toContain('class="method method-options"');
+        });
+
+        test('the shipped template styles every method the generator emits', () => {
+            const template = fs.readFileSync(path.join(process.cwd(), 'src/templates/docs/docTemplate.html'), 'utf8');
+
+            for (const method of ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']) {
+                expect(template).toContain(`.method-${method} {`);
+            }
         });
 
         test('should include description when present', async () => {

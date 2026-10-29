@@ -50,7 +50,7 @@ async function handleBackendEvent({ payload = {} }) {
     if (eventType === 'open') {
         if (current.state !== 'connecting' || attempt.stopRequested) { return; }
         session.transition(tabId, current, { state: 'open' });
-        await session.append(tabId, `CONNECTED ${current.url}`);
+        await session.append(tabId, `CONNECTED ${current.url}${payload.protocol ? ` [${payload.protocol}]` : ''}`);
         if (owns(tabId, attempt)) { await session.updateStatus(tabId, 'WebSocket connected', 101); }
     } else if (eventType === 'message') {
         if (current.state !== 'open' || attempt.stopRequested) { return; }
@@ -78,7 +78,7 @@ export const initWebSocketHandler = createBackendEventListener(
 );
 
 /** Start preparation immediately so Cancel can invalidate work before any IPC call. */
-export async function handleWebSocketConnect({ tabId, url, headers = {}, prepare }) {
+export async function handleWebSocketConnect({ tabId, url, headers = {}, protocols = [], prepare }) {
     if (!tabId) { tabId = await getActiveTabId(); }
     if (isWebSocketLive(tabId)) { return; }
     const previous = session.get(tabId);
@@ -88,7 +88,7 @@ export async function handleWebSocketConnect({ tabId, url, headers = {}, prepare
     try {
         await initWebSocketHandler();
         if (!window.backendAPI?.websocket) { throw new Error('WebSocket backend is not available'); }
-        const prepared = prepare ? await prepare() : { url, headers };
+        const prepared = prepare ? await prepare() : { url, headers, protocols };
         if (!owns(tabId, attempt) || attempt.stopRequested) { return; }
         const normalizedUrl = normalizeWsUrl(prepared.url?.trim());
         if (!normalizedUrl) { throw new Error('WebSocket URL is required'); }
@@ -101,8 +101,10 @@ export async function handleWebSocketConnect({ tabId, url, headers = {}, prepare
         if (!owns(tabId, attempt) || attempt.stopRequested) { return; }
         await session.updateStatus(tabId, 'WebSocket connecting...', null);
         if (!owns(tabId, attempt) || attempt.stopRequested) { return; }
+        const offered = Array.isArray(prepared.protocols) ? prepared.protocols.filter(Boolean) : [];
         attempt.registration = window.backendAPI.websocket.connect({
             tabId, connectionId, url: normalizedUrl, headers: prepared.headers || {},
+            ...(offered.length ? { protocols: offered } : {}),
             ...tls, connectTimeoutMs: settings.timeout
         });
         await attempt.registration;

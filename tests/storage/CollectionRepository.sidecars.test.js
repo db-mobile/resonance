@@ -66,6 +66,13 @@ describe('CollectionRepository endpoint sidecar accessors', () => {
             label: 'Failed to save MQTT data'
         },
         {
+            field: 'websocketData',
+            setter: 'saveWebSocketData',
+            empty: null,
+            stored: { protocols: ['chat'], messages: [] },
+            label: 'Failed to save WebSocket data'
+        },
+        {
             field: 'responseSchema',
             getter: 'getResponseSchema',
             setter: 'saveResponseSchema',

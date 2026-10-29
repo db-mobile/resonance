@@ -162,6 +162,19 @@ describe('HistoryService credential redaction', () => {
     });
 });
 
+describe('HistoryService method colours', () => {
+    const color = (method) => HistoryService.prototype.getMethodColor.call(null, method);
+
+    it('maps HEAD and OPTIONS to their own tokens', () => {
+        expect(color('HEAD')).toBe('var(--method-head-color)');
+        expect(color('OPTIONS')).toBe('var(--method-options-color)');
+    });
+
+    it('falls back to the dim colour for unknown methods', () => {
+        expect(color('PROPFIND')).toBe('var(--dim-fg-color)');
+    });
+});
+
 describe('HistoryService redaction constants', () => {
     it('freezes the sensitive-name lists', () => {
         expect(Object.isFrozen(SENSITIVE_REQUEST_HEADERS)).toBe(true);

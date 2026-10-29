@@ -175,7 +175,7 @@ export class CurlImportDialog extends BaseModal {
 
             if (previewMethod) {
                 previewMethod.textContent = this.parsedRequest.method;
-                previewMethod.dataset.method = this.parsedRequest.method.toLowerCase();
+                previewMethod.dataset.method = this.parsedRequest.method;
             }
 
             if (previewUrl) {

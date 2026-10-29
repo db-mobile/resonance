@@ -196,6 +196,7 @@ fn read_request_file(path: &Path) -> Result<Option<RequestDoc>, String> {
                 && doc.body.is_none()
                 && doc.grpc.is_none()
                 && doc.mqtt.is_none()
+                && doc.websocket.is_none()
                 && ["color", "variables", "requests", "options"]
                     .iter()
                     .any(|key| doc.extra.contains_key(*key)) =>

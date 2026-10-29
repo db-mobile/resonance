@@ -266,7 +266,8 @@
     "response_body": "Body",
     "response_headers": "Headers",
     "schema": "Schema",
-    "mqtt": "MQTT"
+    "mqtt": "MQTT",
+    "websocket": "WebSocket"
   },
   "schema": {
     "title": "Response Schema",
@@ -686,6 +687,25 @@
     "will_qos": "Will QoS",
     "will_retain": "Retain will",
     "clean_session_needs_client_id": "A persistent session (clean session off) needs a fixed Client ID"
+  },
+  "websocket": {
+    "title": "WebSocket",
+    "section_connection": "Connection",
+    "protocols_label": "Sub-protocols",
+    "protocols_placeholder": "graphql-transport-ws, chat",
+    "protocols_aria": "WebSocket sub-protocols",
+    "protocols_hint": "Comma-separated, in order of preference. Sent as Sec-WebSocket-Protocol; the server's choice is shown in the transcript.",
+    "section_messages": "Saved messages",
+    "save_current": "Save current message",
+    "save_message_title": "Save message",
+    "save_message_label": "Name:",
+    "save_message_confirm": "Save",
+    "default_message_name": "Message {{n}}",
+    "nothing_to_save": "Type a message in the Body tab first",
+    "no_messages": "No saved messages yet. Compose one in the Body tab and save it here.",
+    "load": "Load",
+    "send": "Send",
+    "delete": "Delete"
   },
   "folder": {
     "new_title": "New Folder",

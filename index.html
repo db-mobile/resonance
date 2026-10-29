@@ -161,6 +161,8 @@
                             <option value="PUT">PUT</option>
                             <option value="DELETE">DELETE</option>
                             <option value="PATCH">PATCH</option>
+                            <option value="HEAD">HEAD</option>
+                            <option value="OPTIONS">OPTIONS</option>
                         </select>
                         <span class="select-arrow icon icon-12 icon-chevron-down"></span>
                     </div>
@@ -219,6 +221,10 @@
                     <button class="tab-button view-switcher-btn active" data-tab="path-params" role="tab"
                             aria-selected="true" aria-controls="path-params" data-i18n="tabs.path_params">
                         Path Params
+                    </button>
+                    <button class="tab-button view-switcher-btn" data-tab="websocket" role="tab"
+                            aria-selected="false" aria-controls="websocket" data-i18n="tabs.websocket">
+                        WebSocket
                     </button>
                     <button class="tab-button view-switcher-btn" data-tab="query-params" role="tab"
                             aria-selected="false" aria-controls="query-params" data-i18n="tabs.query_params">
@@ -477,6 +483,46 @@
                     <button type="button" id="grpc-add-metadata-btn" class="button flat small add-row-btn">
                         <span class="icon icon-12 icon-plus"></span> Add Metadata
                     </button>
+                </div>
+
+                <div class="tab-content" id="websocket" role="tabpanel">
+                    <div class="websocket-cards u-flex">
+                        <article class="grpc-source-card websocket-card boxed-list">
+                            <header class="grpc-source-card-header">
+                                <h4 class="grpc-source-card-title heading" data-i18n="websocket.section_connection">Connection</h4>
+                            </header>
+                            <div class="grpc-source-card-body u-flex u-flex-col u-gap-3">
+                                <label class="form-group">
+                                    <span class="grpc-field-label caption dim-label" data-i18n="websocket.protocols_label">Sub-protocols</span>
+                                    <input type="text" id="websocket-protocols-input" class="entry grpc-field-input monospace"
+                                           placeholder="graphql-transport-ws, chat" autocomplete="off" spellcheck="false"
+                                           aria-label="WebSocket sub-protocols"
+                                           data-i18n-placeholder="websocket.protocols_placeholder"
+                                           data-i18n-aria="websocket.protocols_aria">
+                                </label>
+                                <p class="caption dim-label websocket-field-hint" data-i18n="websocket.protocols_hint">
+                                    Comma-separated, in order of preference. Sent as Sec-WebSocket-Protocol; the server's choice is shown in the transcript.
+                                </p>
+                            </div>
+                        </article>
+
+                        <article class="grpc-source-card websocket-card boxed-list">
+                            <header class="grpc-source-card-header">
+                                <h4 class="grpc-source-card-title heading" data-i18n="websocket.section_messages">Saved messages</h4>
+                                <div class="grpc-source-card-actions">
+                                    <button type="button" id="websocket-save-message-btn" class="button flat small"
+                                            data-i18n="websocket.save_current">Save current message</button>
+                                </div>
+                            </header>
+                            <div class="grpc-source-card-body u-flex u-flex-col u-gap-3">
+                                <div id="websocket-messages-list" class="boxed-list websocket-messages-list" role="list"
+                                     aria-label="Saved WebSocket messages" hidden></div>
+                                <p id="websocket-messages-empty" class="caption dim-label" data-i18n="websocket.no_messages">
+                                    No saved messages yet. Compose one in the Body tab and save it here.
+                                </p>
+                            </div>
+                        </article>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="mqtt" role="tabpanel">

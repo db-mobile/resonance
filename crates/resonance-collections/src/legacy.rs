@@ -327,6 +327,7 @@ pub fn endpoint_to_request(endpoint: &Value, data: Option<&EndpointData>, seq: i
         doc.body = body_from_v1(data);
         doc.grpc = data.grpc_data.clone().filter(|v| !v.is_null());
         doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
+        doc.websocket = data.websocket_data.clone().filter(|v| !v.is_null());
         doc.scripts = scripts_from_v1(data.scripts.as_ref());
         doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
     }
@@ -907,6 +908,7 @@ mod tests {
                     "serverStreaming": true
                 })),
                 mqtt_data: Some(json!({"clientId": "c", "qos": 2})),
+                websocket_data: Some(json!({"protocols": ["chat"], "messages": []})),
                 ..Default::default()
             },
         );
@@ -917,6 +919,7 @@ mod tests {
         assert_eq!(doc.grpc.as_ref().unwrap()["serverStreaming"], true);
         assert_eq!(doc.grpc.as_ref().unwrap()["metadata"]["x-key"], "v");
         assert_eq!(doc.mqtt.as_ref().unwrap()["qos"], 2);
+        assert_eq!(doc.websocket.as_ref().unwrap()["protocols"][0], "chat");
     }
 
     /// The four-key gRPC writer produced a subset of the nine-key one.

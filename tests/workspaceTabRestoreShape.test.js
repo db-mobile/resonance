@@ -6,6 +6,7 @@ import { requestBarMarkup, requestFormMarkup } from './helpers/requestBarMarkup.
 const MIRROR_INPUTS = `
     <input id="sse-url-input">
     <input id="websocket-url-input">
+    <input id="websocket-protocols-input">
     <input id="graphql-url-input">
     <input id="mqtt-broker-input">
 `;
@@ -119,6 +120,14 @@ describe('restoreTabState applies the mode for every protocol', () => {
         expect(modeCalls.map(c => c.mode)).toEqual([protocol]);
     });
 
+    test.each(['HEAD', 'OPTIONS'])('%s restores into the method select', async (method) => {
+        const { manager } = await loadHarness();
+
+        await manager.restoreTabState(tabFor('http', { method }));
+
+        expect(document.getElementById('method-select').value).toBe(method);
+    });
+
     test('GraphQL writes the URL before applying the mode', async () => {
         const { manager } = await loadHarness();
 
@@ -227,6 +236,28 @@ describe('WebSocket body restoration', () => {
         await manager.restoreTabState(tabFor('websocket', { body: { mode: 'text', content: '  text message\n' } }));
         expect(graphqlBodyManager.switchMode).toHaveBeenCalledWith('text');
         expect(app.requestBodyTextEditor.setContent).toHaveBeenCalledWith('  text message\n');
+    });
+
+    test('sub-protocols and saved messages fan out to the WebSocket tab', async () => {
+        const { manager, app } = await loadHarness();
+        app.websocketPresets = { setMessages: jest.fn() };
+        const messages = [{ id: 'm1', name: 'Ping', mode: 'text', content: 'ping' }];
+        try {
+            await manager.restoreTabState(tabFor('websocket', { protocols: ['chat', 'superchat'], messages }));
+            expect(document.getElementById('websocket-protocols-input').value).toBe('chat, superchat');
+            expect(app.websocketPresets.setMessages).toHaveBeenCalledWith(messages);
+        } finally { delete app.websocketPresets; }
+    });
+
+    test('a tab saved before sub-protocols existed restores an empty field and list', async () => {
+        const { manager, app } = await loadHarness();
+        app.websocketPresets = { setMessages: jest.fn() };
+        document.getElementById('websocket-protocols-input').value = 'stale';
+        try {
+            await manager.restoreTabState(tabFor('websocket', {}));
+            expect(document.getElementById('websocket-protocols-input').value).toBe('');
+            expect(app.websocketPresets.setMessages).toHaveBeenCalledWith([]);
+        } finally { delete app.websocketPresets; }
     });
 
     test('legacy JSON messages retain JSON mode and exact content', async () => {

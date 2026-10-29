@@ -79,8 +79,10 @@ const lockedControls = new Map();
 function lockHandshake(locked) {
     for (const [control, disabled] of lockedControls) { control.disabled = disabled; }
     lockedControls.clear();
-    const input = document.getElementById('websocket-url-input');
-    if (input) { input.readOnly = locked; }
+    for (const id of ['websocket-url-input', 'websocket-protocols-input']) {
+        const input = document.getElementById(id);
+        if (input) { input.readOnly = locked; }
+    }
     for (const id of ['headers-list', 'query-params-list', 'add-header-btn', 'add-query-param-btn']) {
         const element = document.getElementById(id);
         if (!element) { continue; }

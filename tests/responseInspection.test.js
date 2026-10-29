@@ -35,6 +35,8 @@ describe('complete inspection snapshots', () => {
             expect(responseInspectionSource(response).format).toBeUndefined();
         }
         expect(responseInspectionSource({ data: { id: 1 } }).format).toBe('json');
+        expect(responseInspectionSource({ data: '', isJson: false, headers: { 'content-type': 'application/json' } }))
+            .toEqual({ unavailable: 'unavailable' });
         expect(responseInspectionSource({ data: '<r/>', isJson: false, headers: { 'content-type': 'application/xml' } }).format).toBe('xml');
     });
 });

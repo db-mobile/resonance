@@ -63,6 +63,16 @@ VALUE_OPTIONS['--output'] = VALUE_OPTIONS['-o'];
 
 const IGNORED_FLAGS = new Set(['curl', '-L', '--location', '-k', '--insecure', '-s', '--silent', '-v', '--verbose']);
 
+/** @type {Object<string, (request: Object) => void>} */
+const FLAG_OPTIONS = {
+    '-I': (request) => {
+        if (request.method === 'GET') {
+            request.method = 'HEAD';
+        }
+    }
+};
+FLAG_OPTIONS['--head'] = FLAG_OPTIONS['-I'];
+
 export class CurlParser {
     /**
      * @param {string} curlCommand
@@ -91,6 +101,13 @@ export class CurlParser {
             const token = tokens[i];
 
             if (IGNORED_FLAGS.has(token)) {
+                i++;
+                continue;
+            }
+
+            const applyFlag = FLAG_OPTIONS[token];
+            if (applyFlag) {
+                applyFlag(request);
                 i++;
                 continue;
             }

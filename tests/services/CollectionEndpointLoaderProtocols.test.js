@@ -17,6 +17,7 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
         formBodyData: { mode: 'formdata', fields: {} },
         grpcData: { target: 'localhost:50051' },
         mqttData: { clientId: 'resonance-1', qos: 1 },
+        websocketData: { protocols: ['chat'], messages: [] },
         responseSchema: null
     };
 
@@ -107,6 +108,7 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
 
         expect(data.protocol).toBe('mqtt');
         expect(data.persistedMqttData).toEqual({ clientId: 'resonance-1', qos: 1 });
+        expect(data.persistedWebSocketData).toBeNull();
     });
 
     test('a grpc endpoint still sees only its own data', async () => {
@@ -156,6 +158,8 @@ describe('CollectionEndpointLoaderService protocol handling', () => {
         expect(data.protocol).toBe('websocket');
         expect(data.persistedAuthConfig).toBeNull();
         expect(data.persistedQueryParams).toEqual([{ key: 'model', value: 'sonnet' }]);
+        expect(data.persistedWebSocketData).toEqual({ protocols: ['chat'], messages: [] });
+        expect(data.persistedMqttData).toBeNull();
     });
 });
 

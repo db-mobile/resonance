@@ -96,6 +96,7 @@ fn request(url: &str, id: &str, timeout_ms: Option<u64>) -> WsConnectRequest {
             tab_id: "tab-1".into(),
             url: url.into(),
             headers: None,
+            protocols: None,
             message: None,
             verify_ssl: None,
             client_cert: None,
@@ -128,6 +129,115 @@ async fn echo(socket: TcpStream, received: mpsc::UnboundedSender<String>) {
             _ => {}
         }
     }
+}
+
+/// Accepts one socket, records the offered `Sec-WebSocket-Protocol` header and
+/// answers with `chosen` when it is `Some`.
+async fn negotiating_echo(
+    socket: TcpStream,
+    chosen: Option<&'static str>,
+    offered: mpsc::UnboundedSender<Option<String>>,
+) {
+    use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+    #[allow(clippy::result_large_err)]
+    let callback = move |request: &Request, mut response: Response| {
+        let _ = offered.send(
+            request
+                .headers()
+                .get("Sec-WebSocket-Protocol")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string),
+        );
+        if let Some(chosen) = chosen {
+            response
+                .headers_mut()
+                .insert("Sec-WebSocket-Protocol", chosen.parse().unwrap());
+        }
+        Ok(response)
+    };
+    let Ok(mut socket) = tokio_tungstenite::accept_hdr_async(socket, callback).await else {
+        return;
+    };
+    while let Some(Ok(message)) = socket.next().await {
+        if message.is_close() {
+            let _ = socket.flush().await;
+            break;
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_requested_subprotocol_is_offered_in_order_and_the_servers_choice_is_reported() {
+    let (listener, url) = listener().await;
+    let (tx, mut offered) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        negotiating_echo(listener.accept().await.unwrap().0, Some("superchat"), tx).await;
+    });
+    let mut client = Client::new();
+    let mut options = request(&url, "one", Some(2000));
+    options.options.protocols = Some(vec!["chat".into(), "superchat".into()]);
+    client.connect(options).await;
+    let event = client.expect_event("open", "one").await;
+    assert_eq!(event["protocol"], "superchat");
+    assert_eq!(
+        offered.recv().await.unwrap().as_deref(),
+        Some("chat, superchat")
+    );
+    client.close("one").await;
+    client.expect_event("close", "one").await;
+}
+
+#[tokio::test]
+async fn a_server_that_ignores_the_offered_subprotocols_fails_the_handshake() {
+    let (listener, url) = listener().await;
+    let (tx, _offered) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        negotiating_echo(listener.accept().await.unwrap().0, None, tx).await;
+    });
+    let mut client = Client::new();
+    let mut options = request(&url, "one", Some(2000));
+    options.options.protocols = Some(vec!["chat".into()]);
+    client.connect(options).await;
+    let event = client.expect_event("error", "one").await;
+    let message = event["message"].as_str().unwrap();
+    assert!(
+        message.to_lowercase().contains("protocol"),
+        "unexpected error: {message}"
+    );
+    client.assert_removed().await;
+}
+
+#[tokio::test]
+async fn without_a_protocol_list_no_subprotocol_is_offered_and_a_header_row_still_passes_through() {
+    let (first, first_url) = listener().await;
+    let (tx, mut offered) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        negotiating_echo(first.accept().await.unwrap().0, None, tx).await;
+    });
+    let mut client = Client::new();
+    client.connect(request(&first_url, "one", Some(2000))).await;
+    let event = client.expect_event("open", "one").await;
+    assert!(event.get("protocol").is_none());
+    assert_eq!(offered.recv().await.unwrap(), None);
+    client.close("one").await;
+    client.expect_event("close", "one").await;
+
+    let (second, second_url) = listener().await;
+    let (tx, mut offered) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        negotiating_echo(second.accept().await.unwrap().0, Some("chat"), tx).await;
+    });
+    let mut options = request(&second_url, "two", Some(2000));
+    options.options.headers = Some(HashMap::from([(
+        "Sec-WebSocket-Protocol".to_string(),
+        "chat".to_string(),
+    )]));
+    client.connect(options).await;
+    let event = client.expect_event("open", "two").await;
+    assert_eq!(event["protocol"], "chat");
+    assert_eq!(offered.recv().await.unwrap().as_deref(), Some("chat"));
+    client.close("two").await;
+    client.expect_event("close", "two").await;
 }
 
 #[tokio::test]

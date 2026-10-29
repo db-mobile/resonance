@@ -85,6 +85,21 @@ describe('WorkspaceTabEndpointLoaderService protocol dispatch', () => {
     });
 
     describe('WebSocket', () => {
+        test('restores sub-protocols and saved messages flat on the tab request', () => {
+            const update = loader.createTabUpdate({
+                id: 'ws', collectionId: 'c1', protocol: 'websocket', path: 'wss://example.test',
+                persistedWebSocketData: { protocols: 'chat, superchat', messages: [{ id: 'm1', name: 'Ping', mode: 'text', content: 'ping' }] }
+            });
+            expect(update.request.protocols).toEqual(['chat', 'superchat']);
+            expect(update.request.messages).toEqual([{ id: 'm1', name: 'Ping', mode: 'text', content: 'ping' }]);
+        });
+
+        test('a request saved without WebSocket extras gets empty defaults', () => {
+            const update = loader.createTabUpdate({ id: 'ws', collectionId: 'c1', protocol: 'websocket', path: 'wss://example.test' });
+            expect(update.request.protocols).toEqual([]);
+            expect(update.request.messages).toEqual([]);
+        });
+
         test.each(['  message\n', ''])('restores the saved Text body exactly: %j', content => {
             const update = loader.createTabUpdate({
                 id: 'ws', collectionId: 'c1', protocol: 'websocket', path: 'wss://example.test',
