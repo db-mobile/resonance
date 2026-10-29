@@ -181,7 +181,7 @@
 
 .method-pill {
   flex-shrink: 0;
-  min-width: 38px;
+  min-width: 48px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -194,6 +194,8 @@
 .method-pill[data-method="PUT"] { color: var(--method-put-color); }
 .method-pill[data-method="DELETE"] { color: var(--method-delete-color); }
 .method-pill[data-method="PATCH"] { color: var(--method-patch-color); }
+.method-pill[data-method="HEAD"] { color: var(--method-head-color); }
+.method-pill[data-method="OPTIONS"] { color: var(--method-options-color); }
 
 .collections-empty {
   padding: var(--space-6) var(--space-4);

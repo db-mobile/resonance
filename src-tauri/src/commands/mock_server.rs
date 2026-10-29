@@ -422,47 +422,55 @@ async fn handle_mock_request(
         let endpoints = state.endpoints.read().unwrap();
         let settings = state.settings.read().unwrap();
 
-        endpoints
-            .iter()
-            .filter(|endpoint| endpoint.method == method.as_str().to_uppercase())
-            .find_map(|endpoint| {
-                let captures = endpoint.path_regex.captures(&path)?;
-                let params: HashMap<String, String> = endpoint
-                    .param_names
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, name)| {
-                        captures
-                            .get(index + 1)
-                            .map(|m| (name.clone(), percent_decode(m.as_str())))
+        let request_method = method.as_str().to_uppercase();
+        let find_route = |wanted: &str| {
+            endpoints
+                .iter()
+                .filter(|endpoint| endpoint.method == wanted)
+                .find_map(|endpoint| {
+                    let captures = endpoint.path_regex.captures(&path)?;
+                    let params: HashMap<String, String> = endpoint
+                        .param_names
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, name)| {
+                            captures
+                                .get(index + 1)
+                                .map(|m| (name.clone(), percent_decode(m.as_str())))
+                        })
+                        .collect();
+                    let endpoint_id = endpoint
+                        .endpoint
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let key = format!("{}_{}", endpoint.collection_id, endpoint_id);
+                    Some(MatchedRoute {
+                        delay: settings.endpoint_delays.get(&key).copied(),
+                        custom_response: settings.custom_responses.get(&key).cloned(),
+                        custom_status: settings.custom_status_codes.get(&key).copied(),
+                        endpoint: endpoint.endpoint.clone(),
+                        params,
+                        info: MatchedEndpointInfo {
+                            collection_id: endpoint.collection_id.clone(),
+                            collection_name: endpoint.collection_name.clone(),
+                            endpoint_name: endpoint
+                                .endpoint
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            endpoint_id,
+                        },
                     })
-                    .collect();
-                let endpoint_id = endpoint
-                    .endpoint
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let key = format!("{}_{}", endpoint.collection_id, endpoint_id);
-                Some(MatchedRoute {
-                    delay: settings.endpoint_delays.get(&key).copied(),
-                    custom_response: settings.custom_responses.get(&key).cloned(),
-                    custom_status: settings.custom_status_codes.get(&key).copied(),
-                    endpoint: endpoint.endpoint.clone(),
-                    params,
-                    info: MatchedEndpointInfo {
-                        collection_id: endpoint.collection_id.clone(),
-                        collection_name: endpoint.collection_name.clone(),
-                        endpoint_name: endpoint
-                            .endpoint
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                        endpoint_id,
-                    },
                 })
-            })
+        };
+        find_route(&request_method).or_else(|| {
+            (request_method == "HEAD")
+                .then(|| find_route("GET"))
+                .flatten()
+        })
     };
 
     let Some(route) = match_result else {
@@ -998,6 +1006,34 @@ mod tests {
         assert_eq!(matched_id(&state).as_deref(), Some("me"));
         call(&state, "GET", "/users/9").await;
         assert_eq!(matched_id(&state).as_deref(), Some("param"));
+    }
+
+    #[tokio::test]
+    async fn head_request_matches_get_route() {
+        let state = state_with(vec![endpoint("a", "GET", "/users")]);
+        let (status, body) = call(&state, "HEAD", "/users").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, Value::Null);
+        assert_eq!(matched_id(&state).as_deref(), Some("a"));
+    }
+
+    #[tokio::test]
+    async fn explicit_head_route_wins_over_get_fallback() {
+        let state = state_with(vec![
+            endpoint("get", "GET", "/users"),
+            endpoint("head", "HEAD", "/users"),
+        ]);
+        call(&state, "HEAD", "/users").await;
+        assert_eq!(matched_id(&state).as_deref(), Some("head"));
+    }
+
+    #[tokio::test]
+    async fn head_does_not_match_post_route() {
+        let state = state_with(vec![endpoint("a", "POST", "/users")]);
+        assert_eq!(
+            call(&state, "HEAD", "/users").await.0,
+            StatusCode::NOT_FOUND
+        );
     }
 
     #[tokio::test]

@@ -242,6 +242,8 @@ export class HistoryService {
             'PUT': 'var(--method-put-color)',
             'DELETE': 'var(--method-delete-color)',
             'PATCH': 'var(--method-patch-color)',
+            'HEAD': 'var(--method-head-color)',
+            'OPTIONS': 'var(--method-options-color)',
             'GRPC': 'var(--method-patch-color)'
         };
         return colors[method] || 'var(--dim-fg-color)';

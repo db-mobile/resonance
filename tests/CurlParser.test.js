@@ -1,5 +1,25 @@
 import { CurlParser } from '../src/modules/CurlParser.js';
 
+describe('CurlParser head flag', () => {
+    test('-I selects HEAD', () => {
+        expect(CurlParser.parse('curl -I https://api.test/users').method).toBe('HEAD');
+    });
+
+    test('--head selects HEAD', () => {
+        expect(CurlParser.parse('curl --head https://api.test/users').method).toBe('HEAD');
+    });
+
+    test('-I directly before the URL does not swallow it', () => {
+        const request = CurlParser.parse('curl -I https://api.test/users');
+        expect(request.url).toBe('https://api.test/users');
+    });
+
+    test('an explicit -X wins over -I in either order', () => {
+        expect(CurlParser.parse('curl -I -X OPTIONS https://api.test').method).toBe('OPTIONS');
+        expect(CurlParser.parse('curl -X OPTIONS -I https://api.test').method).toBe('OPTIONS');
+    });
+});
+
 describe('CurlParser data flags', () => {
     test('--data-urlencode keeps the name and encodes only the content', () => {
         const parsed = CurlParser.parse("curl --data-urlencode 'name=John Doe' https://x.com");

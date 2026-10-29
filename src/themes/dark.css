@@ -36,6 +36,8 @@
   --method-put-color: #ff9c5b;
   --method-delete-color: #ff888c;
   --method-patch-color: #dc8add;
+  --method-head-color: #7bdff4;
+  --method-options-color: #bbd1e5;
 
   --accent-color: #81d0ff;
   --protocol-graphql-color: #ff9bb9;

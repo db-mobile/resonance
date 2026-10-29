@@ -217,7 +217,9 @@ function generateCurl(config) {
     const methodUpper = (method || 'GET').toUpperCase();
     const curlParts = ['curl'];
 
-    if (methodUpper !== 'GET' || hasBody(config)) {
+    if (methodUpper === 'HEAD') {
+        curlParts.push('-I');
+    } else if (methodUpper !== 'GET' || hasBody(config)) {
         curlParts.push(`-X ${methodUpper}`);
     }
 

@@ -14,6 +14,7 @@ export function responseInspectionSource(response) {
         return data !== null && data !== undefined
             ? { format: 'json', body: JSON.stringify(data) } : { unavailable: 'unavailable' };
     }
+    if (data === '') { return { unavailable: 'unavailable' }; }
     const contentType = Object.entries(response.headers || {}).find(([key]) => key.toLowerCase() === 'content-type')?.[1] || '';
     if (/\b(?:application|text)\/(?:[\w.+-]*\+)?xml\b/i.test(contentType) ||
         (!/html|json/i.test(contentType) && /^\s*(?:<\?xml\b|<[A-Za-z_][\w.:-]*(?:\s|\/?>))/.test(data))) {

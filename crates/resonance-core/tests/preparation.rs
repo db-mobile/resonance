@@ -91,6 +91,28 @@ fn get_and_delete_prepare_json_and_text_bodies() {
 }
 
 #[test]
+fn options_keeps_its_json_body_unlike_head() {
+    for (method, expected) in [
+        ("OPTIONS", json!({"a":1})),
+        ("HEAD", serde_json::Value::Null),
+    ] {
+        let request = serde_json::from_value(json!({
+            "method":method,"url":"api.test","body":{"mode":"json","content":"{\"a\":1}"}
+        }))
+        .unwrap();
+        let prepared = prepare(
+            &request,
+            &ExecutionContext::default(),
+            &Variables::new(),
+            &mut VariableProcessor::default(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(prepared.request["body"], expected, "{method}");
+    }
+}
+
+#[test]
 fn get_and_delete_reject_invalid_json_but_head_still_ignores_it() {
     for method in ["GET", "get", "DELETE", "HEAD", "head"] {
         let request = serde_json::from_value(json!({

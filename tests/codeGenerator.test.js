@@ -48,6 +48,31 @@ describe('Code Generator', () => {
         });
     });
 
+    describe('HEAD and OPTIONS', () => {
+        const config = (method) => ({ method, url: 'https://api.example.com/users', headers: {}, body: null });
+
+        test('cURL uses -I for HEAD', () => {
+            const code = generateCode('curl', config('HEAD'));
+            expect(code).toMatch(/curl \\\n\s+-I \\/);
+            expect(code).not.toContain('-X HEAD');
+        });
+
+        test('cURL uses -X for OPTIONS', () => {
+            expect(generateCode('curl', config('OPTIONS'))).toContain('-X OPTIONS');
+        });
+
+        test('Python and Ruby use their method helpers', () => {
+            expect(generateCode('python', config('HEAD'))).toContain('requests.head(');
+            expect(generateCode('python', config('OPTIONS'))).toContain('requests.options(');
+            expect(generateCode('ruby', config('HEAD'))).toContain('Net::HTTP::Head');
+            expect(generateCode('ruby', config('OPTIONS'))).toContain('Net::HTTP::Options');
+        });
+
+        test('Java falls back to a generic method call for OPTIONS', () => {
+            expect(generateCode('java', config('OPTIONS'))).toContain('.method("OPTIONS"');
+        });
+    });
+
     describe('GET and DELETE bodies', () => {
         test.each(['GET', 'get', 'DELETE', 'delete'])('%s keeps JSON and text in supported snippets', (method) => {
             for (const body of [{ marker: 'payload' }, ['payload'], false, 0, 'raw payload']) {

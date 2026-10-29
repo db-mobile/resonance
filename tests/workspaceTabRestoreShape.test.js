@@ -119,6 +119,14 @@ describe('restoreTabState applies the mode for every protocol', () => {
         expect(modeCalls.map(c => c.mode)).toEqual([protocol]);
     });
 
+    test.each(['HEAD', 'OPTIONS'])('%s restores into the method select', async (method) => {
+        const { manager } = await loadHarness();
+
+        await manager.restoreTabState(tabFor('http', { method }));
+
+        expect(document.getElementById('method-select').value).toBe(method);
+    });
+
     test('GraphQL writes the URL before applying the mode', async () => {
         const { manager } = await loadHarness();
 
