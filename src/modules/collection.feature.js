@@ -107,5 +107,5 @@ export const collectionFeature = {
         return { repository, service, variableService, renderer, controller, requestPersistenceService, importExportService };
     },
     globals: { collectionController: 'controller', collectionService: 'service' },
-    provides: { collectionRepository: 'repository', collectionController: 'controller' },
+    provides: { collectionRepository: 'repository', collectionController: 'controller', collectionVariableService: 'variableService' },
 };

@@ -34,6 +34,7 @@ export class RequestPipeline {
      * @param {Object} deps.mockServerService
      * @param {{getForHost: function(string): (Object|null), getItems?: function(): Promise<*>}|null} [deps.certificates]
      * @param {{getCookieHeader: function(string): Promise<string|null>}|null} [deps.cookies]
+     * @param {function({environmentId: (string|null), collectionId: (string|null)}): void|null} [deps.onVariablesChanged]
      */
     constructor(deps = {}) {
         for (const name of REQUIRED_DEPS) {
@@ -49,6 +50,7 @@ export class RequestPipeline {
         this.mockServerService = deps.mockServerService;
         this.certificates = deps.certificates || null;
         this.cookies = deps.cookies || null;
+        this.onVariablesChanged = deps.onVariablesChanged || null;
     }
 
     /**

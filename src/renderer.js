@@ -36,6 +36,7 @@ import { environmentFeature } from './modules/environment.feature.js';
 import { scriptFeature } from './modules/script.feature.js';
 import { authFeature } from './modules/auth.feature.js';
 import { collectionFeature } from './modules/collection.feature.js';
+import { variableContextFeature } from './modules/variableContext.feature.js';
 import { mockServerFeature } from './modules/mockServer.feature.js';
 import { requestPipelineFeature } from './modules/requestPipeline.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
@@ -90,6 +91,7 @@ featureRegistry
     .register(scriptFeature)
     .register(authFeature)
     .register(collectionFeature)
+    .register(variableContextFeature)
     .register(mockServerFeature)
     .register(requestPipelineFeature)
     .register(schemaFeature)

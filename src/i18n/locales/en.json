@@ -289,7 +289,44 @@
     "save": "Save",
     "cancel": "Cancel",
     "placeholder_name": "Variable name",
-    "placeholder_value": "Variable value"
+    "placeholder_value": "Variable value",
+    "scope": {
+      "environment": "Environment",
+      "collection": "Collection",
+      "dynamic": "Dynamic",
+      "path_param": "Path parameter",
+      "undefined": "Not defined"
+    },
+    "tooltip": {
+      "missing": "Not defined in current environment or collection",
+      "loading": "Variables not loaded yet",
+      "secret": "secret",
+      "empty": "(empty)"
+    },
+    "dynamic_groups": {
+      "time": "Time & dates",
+      "number": "Numbers & IDs",
+      "sample": "Sample data"
+    },
+    "dynamic": {
+      "timestamp": "Unix timestamp, seconds",
+      "timestampMs": "Unix timestamp, milliseconds",
+      "isoTimestamp": "ISO 8601 date and time",
+      "randomDate": "Date within ±N days (default 365)",
+      "randomDatePast": "Date in the past N days",
+      "randomDateFuture": "Date in the next N days",
+      "uuid": "UUID v4",
+      "randomInt": "Integer in range (default 0–1000)",
+      "randomPrice": "Price with 2 decimals (default 1–1000)",
+      "randomBoolean": "true or false",
+      "randomString": "Alphanumeric string (default 8 chars)",
+      "randomLoremWords": "Lorem ipsum words",
+      "randomEmail": "Email address",
+      "randomName": "Full name",
+      "randomPhoneNumber": "Phone number",
+      "randomIPv4": "IPv4 address",
+      "randomUrl": "https URL"
+    }
   },
   "settings": {
     "title": "Settings",

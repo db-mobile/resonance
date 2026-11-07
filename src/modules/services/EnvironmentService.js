@@ -298,6 +298,7 @@ export class EnvironmentService {
     async setVariable(environmentId, name, value, isSecret = false) {
         return this._reporting('Error setting variable', async () => {
             await this.repository.setEnvironmentVariable(environmentId, name, value, isSecret);
+            this._notifyListeners({ type: 'environment-variables-changed', environmentId });
             return true;
         });
     }
@@ -310,6 +311,7 @@ export class EnvironmentService {
     async applyVariableChanges(environmentId, changes) {
         return this._reporting('Error setting variable', async () => {
             await this.repository.applyVariableChanges(environmentId, changes);
+            this._notifyListeners({ type: 'environment-variables-changed', environmentId });
             return true;
         });
     }
@@ -322,6 +324,7 @@ export class EnvironmentService {
     async deleteVariable(environmentId, name) {
         return this._reporting('Error deleting variable', async () => {
             await this.repository.deleteEnvironmentVariable(environmentId, name);
+            this._notifyListeners({ type: 'environment-variables-changed', environmentId });
             return true;
         });
     }

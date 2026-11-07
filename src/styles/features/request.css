@@ -83,7 +83,8 @@
   margin-left: var(--space-3);
 }
 
-.grpc-target-wrapper > input {
+.grpc-target-wrapper > input,
+.grpc-target-wrapper > .var-field > input {
   width: 100%;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;

@@ -14,6 +14,7 @@
  * @property {*} [responseContainerManager]
  * @property {*} [collectionController]
  * @property {*} [collectionService]
+ * @property {*} [variableContext]
  * @property {*} [secretStore]
  * @property {*} [graphqlBodyManager]
  * @property {*} [formBodyManager]

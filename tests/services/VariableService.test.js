@@ -165,6 +165,44 @@ describe('VariableService', () => {
         });
     });
 
+    describe('change notifications', () => {
+        let events;
+
+        beforeEach(() => {
+            events = [];
+            service.addChangeListener((event) => events.push(event));
+            mockProcessor.isValidVariableName.mockReturnValue(true);
+        });
+
+        test('each successful write emits collection-variables-changed once', async () => {
+            await service.setVariable('c1', 'a', '1');
+            await service.deleteVariable('c1', 'a');
+            await service.setMultipleVariables('c1', { a: '1' });
+            await service.cleanupCollectionVariables('c1');
+
+            expect(events).toEqual(Array(4).fill({ type: 'collection-variables-changed', collectionId: 'c1' }));
+        });
+
+        test('failed or rejected writes emit nothing', async () => {
+            mockRepository.setVariable.mockRejectedValue(new Error('boom'));
+            await expect(service.setVariable('c1', 'a', '1')).rejects.toThrow('boom');
+            mockProcessor.isValidVariableName.mockReturnValue(false);
+            await expect(service.setMultipleVariables('c1', { 'bad name': '1' })).rejects.toThrow();
+
+            expect(events).toEqual([]);
+        });
+
+        test('removeChangeListener stops delivery', async () => {
+            const listener = jest.fn();
+            service.addChangeListener(listener);
+            service.removeChangeListener(listener);
+
+            await service.setVariable('c1', 'a', '1');
+
+            expect(listener).not.toHaveBeenCalled();
+        });
+    });
+
     describe('exportVariables', () => {
         test('should export variables for collection', async () => {
             const variables = { apiKey: 'key1', baseUrl: 'url1' };

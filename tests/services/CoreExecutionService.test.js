@@ -63,6 +63,24 @@ test('registers before starting, orders deltas, and drains persistence before co
     );
 });
 
+test('script effects that changed variables call the pipeline variables hook once per effect', async () => {
+    const { service, backend, pipeline, execution, emit } = setup();
+    pipeline.onVariablesChanged = jest.fn();
+    backend.execution.request.mockImplementation(async () => {
+        emit(1, 'effect', { kind: 'script', environmentId: 'env', environment: { token: '1' } });
+        emit(2, 'effect', { kind: 'script', collectionId: 'col', collection: {} });
+        emit(3, 'effect', { kind: 'script', environmentId: 'env', environment: { a: '1' }, collectionId: 'col', collection: { b: '2' } });
+        emit(4, 'completed', { status: 'success' });
+    });
+
+    await service.execute('request', {}, execution, () => {});
+
+    expect(pipeline.onVariablesChanged.mock.calls).toEqual([
+        [{ environmentId: 'env', collectionId: null }],
+        [{ environmentId: 'env', collectionId: 'col' }]
+    ]);
+});
+
 test('persistence errors are surfaced and cancel scheduling while listeners are released', async () => {
     const { service, backend, pipeline, execution, emit, unlisten } = setup();
     pipeline.environmentRepository.applyVariableChanges.mockRejectedValue(new Error('disk full'));

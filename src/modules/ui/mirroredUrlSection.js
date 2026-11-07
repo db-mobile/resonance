@@ -1,4 +1,5 @@
 import { markTabModified } from '../state/tabModified.js';
+import { decorateInput } from './inputDecorator.js';
 
 export const URL_UPDATED_EVENT = 'url-updated';
 
@@ -79,6 +80,7 @@ export function createMirroredUrlSection({
     }
 
     targetWrapper.appendChild(mirrorInput);
+    decorateInput(mirrorInput, { url: peerId === 'url-input' });
     section.appendChild(badge);
     section.appendChild(targetWrapper);
 

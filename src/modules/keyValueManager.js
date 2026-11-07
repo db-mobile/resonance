@@ -4,6 +4,7 @@ import { pathParamsList, addPathParamBtn, headersList, addHeaderBtn, queryParams
 import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
+import { decorateInputsIn } from './ui/inputDecorator.js';
 
 const debouncedSavePathParams = debounce(autoSaver('savePathParams', pathParamsList), 500);
 const debouncedSaveQueryParams = debounce(autoSaver('saveQueryParams', queryParamsList), 500);
@@ -82,6 +83,7 @@ export function createKeyValueRow(key = '', value = '', options = {}) {
     row.appendChild(createTextInput('key-input', 'Key', key));
     row.appendChild(createTextInput('value-input', 'Value', value));
     row.appendChild(createRemoveRowButton());
+    decorateInputsIn(row);
 
     return row;
 }

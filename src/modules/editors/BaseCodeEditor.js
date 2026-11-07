@@ -3,7 +3,7 @@
  * @module editors/BaseCodeEditor
  */
 
-import { EditorView, lineNumbers, keymap } from '@codemirror/view';
+import { EditorView, lineNumbers, keymap, tooltips } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search';
@@ -49,7 +49,8 @@ export class BaseCodeEditor {
             lineNumbers(),
             history(),
             keymap.of(this.getKeymaps()),
-            EditorView.lineWrapping
+            EditorView.lineWrapping,
+            tooltips({ position: 'fixed', parent: document.body })
         ];
     }
 

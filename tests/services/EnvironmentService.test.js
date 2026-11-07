@@ -165,6 +165,25 @@ describe('EnvironmentService', () => {
             expect(repository.deleteEnvironmentVariable).toHaveBeenCalledWith('env1', 'k');
         });
 
+        test('variable edits notify listeners with the environment id', async () => {
+            await service.setVariable('env1', 'k', 'v');
+            await service.applyVariableChanges('env1', { k: null });
+            await service.deleteVariable('env1', 'k');
+
+            expect(events).toEqual([
+                { type: 'environment-variables-changed', environmentId: 'env1' },
+                { type: 'environment-variables-changed', environmentId: 'env1' },
+                { type: 'environment-variables-changed', environmentId: 'env1' }
+            ]);
+        });
+
+        test('a failed variable edit notifies nobody', async () => {
+            repository.setEnvironmentVariable.mockRejectedValue(new Error('boom'));
+
+            await expect(service.setVariable('env1', 'k', 'v')).rejects.toThrow('boom');
+            expect(events).toEqual([]);
+        });
+
         test.each([
             ['setVariable', 'setEnvironmentVariable', 'Error setting variable: boom'],
             ['applyVariableChanges', 'applyVariableChanges', 'Error setting variable: boom'],

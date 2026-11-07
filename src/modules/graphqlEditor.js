@@ -9,6 +9,8 @@ import { parse, print } from 'graphql';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { BaseCodeEditor } from './editors/BaseCodeEditor.js';
+import { variableSupport } from './editors/variableExtension.js';
+import { app } from './appContext.js';
 
 /**
  * @param {string} text
@@ -32,6 +34,7 @@ export class GraphQLEditor extends BaseCodeEditor {
         return [
             autocompletion(),
             graphql(),
+            ...variableSupport(() => app.variableContext),
             placeholder(createPlaceholderElement('query {\n  user(id: 1) {\n    name\n    email\n  }\n}'))
         ];
     }

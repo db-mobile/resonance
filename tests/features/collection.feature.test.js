@@ -53,6 +53,6 @@ describe('collection feature', () => {
 
     test('exposes the controller and service on app and the repository on the bus', () => {
         expect(collectionFeature.globals).toEqual({ collectionController: 'controller', collectionService: 'service' });
-        expect(collectionFeature.provides).toEqual({ collectionRepository: 'repository', collectionController: 'controller' });
+        expect(collectionFeature.provides).toEqual({ collectionRepository: 'repository', collectionController: 'controller', collectionVariableService: 'variableService' });
     });
 });
