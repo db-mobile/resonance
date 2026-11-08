@@ -266,6 +266,10 @@
                             aria-selected="false" aria-controls="schema" data-i18n="tabs.schema">
                         Schema
                     </button>
+                    <button class="tab-button view-switcher-btn" data-tab="examples" role="tab"
+                            aria-selected="false" aria-controls="examples" data-i18n="tabs.examples">
+                        Examples
+                    </button>
                 </nav>
 
                 <div class="tab-content active" id="path-params" role="tabpanel">
@@ -787,6 +791,17 @@
                         </div>
                         <div id="schema-editor-container" class="schema-editor-container editor-shell editor-frame u-flex u-flex-col u-flex-1"></div>
                         <div id="schema-validation-status" class="schema-validation-status"></div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="examples" role="tabpanel">
+                    <div class="examples-tab-container u-flex u-flex-col u-flex-1 u-min-h-0">
+                        <div class="examples-header panel-header u-flex u-items-center u-justify-between">
+                            <span class="heading" data-i18n="examples.title">Saved Examples</span>
+                            <span id="examples-count" class="badge is-hidden"></span>
+                        </div>
+                        <div id="examples-list" class="boxed-list examples-list" role="list" aria-label="Saved examples"></div>
+                        <p id="examples-empty" class="examples-empty is-hidden" data-i18n="examples.empty">No saved examples yet. Send the request and use the bookmark button in the response toolbar to keep a response as an example.</p>
                     </div>
                 </div>
             </section>

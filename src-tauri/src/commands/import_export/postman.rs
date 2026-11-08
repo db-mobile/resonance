@@ -1,10 +1,12 @@
 //! Postman collection parsing: converts a Postman export `Value` into a `Collection`.
 
 use super::common::{
-    CollectionBuilder, ParsedBody, derive_base_url, grouped_params, param_map_entry,
+    CollectionBuilder, ParsedBody, derive_base_url, example_header_value, example_headers,
+    grouped_params, imported_example, param_map_entry,
 };
 use super::{Collection, Endpoint, VariableEntry};
 use crate::commands::scripts::ScriptData;
+use resonance_collections::model::ExampleDoc;
 use serde_json::Value;
 use std::sync::LazyLock;
 
@@ -309,7 +311,59 @@ fn parse_postman_request(
         url: None,
         live_body: None,
         response_schema: None,
+        examples: extract_postman_examples(item.get("response")),
     })
+}
+
+/// Content type implied by a Postman `_postman_previewlanguage` hint.
+fn preview_language_content_type(language: Option<&Value>) -> Option<String> {
+    match language
+        .and_then(|l| l.as_str())?
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "json" => Some("application/json".to_string()),
+        "xml" => Some("application/xml".to_string()),
+        "html" => Some("text/html".to_string()),
+        "text" => Some("text/plain".to_string()),
+        _ => None,
+    }
+}
+
+/// Postman saved responses (`item.response[]`) become examples on the request.
+fn extract_postman_examples(responses: Option<&Value>) -> Vec<ExampleDoc> {
+    responses
+        .and_then(|r| r.as_array())
+        .map(|list| {
+            list.iter()
+                .filter_map(|response| {
+                    let headers = example_headers(
+                        response
+                            .get("header")
+                            .and_then(|h| h.as_array())
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|h| {
+                                Some((h.get("key")?.as_str()?, h.get("value")?.as_str()?))
+                            }),
+                    );
+                    let content_type =
+                        example_header_value(&headers, "content-type").or_else(|| {
+                            preview_language_content_type(response.get("_postman_previewlanguage"))
+                        });
+                    imported_example(
+                        response.get("code").and_then(|c| c.as_u64()),
+                        response.get("status").and_then(|s| s.as_str()),
+                        response.get("name").and_then(|n| n.as_str()),
+                        headers,
+                        content_type,
+                        response.get("body").and_then(|b| b.as_str()),
+                        false,
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Find the value of a `{ key, value }` entry in a Postman auth parameter array.
@@ -659,7 +713,27 @@ mod tests {
         "item": [
             {
                 "name": "Ping",
-                "request": { "method": "GET", "url": "https://api.example.com/ping" }
+                "request": { "method": "GET", "url": "https://api.example.com/ping" },
+                "response": [
+                    {
+                        "name": "Pong",
+                        "status": "OK",
+                        "code": 200,
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Set-Cookie", "value": "s=1" },
+                            { "key": "X-Trace", "value": "t1" }
+                        ],
+                        "body": "{\"pong\":true}"
+                    },
+                    {
+                        "status": "Service Unavailable",
+                        "code": 503,
+                        "_postman_previewlanguage": "text",
+                        "body": "down"
+                    },
+                    { "name": "No code", "body": "ignored" }
+                ]
             },
             {
                 "name": "Users",
@@ -750,6 +824,31 @@ mod tests {
             .iter()
             .find(|e| e.name == name)
             .unwrap_or_else(|| panic!("endpoint {} not found", name))
+    }
+
+    #[test]
+    fn saved_responses_become_examples() {
+        let collection = parse_fixture();
+        let ping = find_endpoint(&collection, "Ping");
+
+        assert_eq!(ping.examples.len(), 2);
+        let pong = &ping.examples[0];
+        assert_eq!(pong.name, "Pong");
+        assert_eq!(pong.status, 200);
+        assert_eq!(pong.status_text.as_deref(), Some("OK"));
+        assert_eq!(pong.content_type.as_deref(), Some("application/json"));
+        assert_eq!(pong.body.as_deref(), Some("{\"pong\":true}"));
+        let keys: Vec<&str> = pong
+            .headers
+            .iter()
+            .map(|h| h["key"].as_str().unwrap())
+            .collect();
+        assert_eq!(keys, vec!["content-type", "x-trace"]);
+
+        let down = &ping.examples[1];
+        assert_eq!(down.name, "503 Service Unavailable");
+        assert_eq!(down.content_type.as_deref(), Some("text/plain"));
+        assert!(find_endpoint(&collection, "List Users").examples.is_empty());
     }
 
     #[test]

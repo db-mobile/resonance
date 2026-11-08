@@ -108,6 +108,8 @@ if (isTauri) {
             gitStatus: () => invoke('collections_git_status'),
             getEndpointData: (collectionId, endpointId) => invoke('collection_get_endpoint_data', { collectionId, endpointId }),
             saveEndpointData: (collectionId, endpointId, data) => invoke('collection_save_endpoint_data', { collectionId, endpointId, data }),
+            getExamples: (collectionId, endpointId) => invoke('collection_get_examples', { collectionId, endpointId }),
+            saveExamples: (collectionId, endpointId, examples) => invoke('collection_save_examples', { collectionId, endpointId, examples }),
             deleteEndpointData: (collectionId, endpointId) => invoke('collection_delete_endpoint_data', { collectionId, endpointId }),
             deleteFolder: (collectionId, folderId) => invoke('collection_delete_folder', { collectionId, folderId }),
             getVariables: (collectionId) => invoke('collection_get_variables', { collectionId }),

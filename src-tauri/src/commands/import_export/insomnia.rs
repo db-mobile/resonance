@@ -402,6 +402,7 @@ fn convert_request(request: &Value) -> Endpoint {
         url: None,
         live_body: None,
         response_schema: None,
+        examples: Vec::new(),
     }
 }
 

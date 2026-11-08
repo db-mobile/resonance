@@ -3,6 +3,7 @@ import { createLazyEditorProxy } from './editorLoader.js';
 import { templateLoader } from './templateLoader.js';
 import { attachCopyHandler, attachHeadersCopyHandler } from './copyHandler.js';
 import { attachSaveResponseHandler } from './responseSaver.js';
+import { attachSaveExampleHandler } from './examples/exampleCapture.js';
 import { PreviewManager } from './PreviewManager.js';
 import { ResponseInspectionController } from './ResponseInspectionController.js';
 import { clearWebSocketTranscript } from './websocketHandler.js';
@@ -31,6 +32,7 @@ const TAB_SCOPED_SELECTORS = [
     '.preview-mode-btn',
     '.copy-response-btn',
     '.save-response-btn',
+    '.save-example-btn',
     '.clear-response-btn',
     '.copy-headers-btn',
     '.response-body-container',
@@ -181,6 +183,13 @@ export class ResponseContainerManager {
             attachCopyHandler(copyBtn, tabId);
         }
         attachSaveResponseHandler(wrapper.querySelector('.save-response-btn'), tabId);
+        const saveExampleBtn = wrapper.querySelector('.save-example-btn');
+        if (saveExampleBtn) {
+            const label = translate('examples.save_button_label', 'Save as example');
+            saveExampleBtn.setAttribute('aria-label', label);
+            saveExampleBtn.title = label;
+            attachSaveExampleHandler(saveExampleBtn, tabId);
+        }
         attachHeadersCopyHandler(wrapper.querySelector('.copy-headers-btn'), tabId);
 
         const clearBtn = wrapper.querySelector('.clear-response-btn');
@@ -208,6 +217,7 @@ export class ResponseContainerManager {
             languageSelector,
             copyBtn,
             clearBtn,
+            saveExampleBtn,
             editor,
             previewContainer,
             codeBtn,

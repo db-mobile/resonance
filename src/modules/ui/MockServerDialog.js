@@ -9,7 +9,7 @@ import { BaseModal } from './BaseModal.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 import { flattenRequests, endpointKey } from '../collections/collectionTree.js';
 import { el } from '../htmlUtils.js';
-import { translate } from '../utils/translate.js';
+import { translate, translateCount } from '../utils/translate.js';
 import { toast } from './Toast.js';
 import { setRoleTexts } from './roleText.js';
 import { extractResponseSchema } from '../controllers/MockServerController.js';
@@ -17,6 +17,55 @@ import { extractResponseSchema } from '../controllers/MockServerController.js';
 const LOG_STATUS_CLASSES = Object.freeze({ 200: 'is-success', 404: 'is-warning' });
 const DEFAULT_STATUS_CODES = Object.freeze({ POST: 201, DELETE: 204 });
 const TEMPLATE_PATH = './src/templates/mockServer/mockServerDialog.html';
+
+const TEMPLATING_REFERENCE = Object.freeze([
+    {
+        key: 'request', label: 'Request data', entries: [
+            { example: '{{request.params.id}}', key: 'params', description: 'A path parameter of the matched route' },
+            { example: '{{request.query.name}}', key: 'query', description: 'A query-string value' },
+            { example: '{{request.headers.name}}', key: 'headers', description: 'A request header (case-insensitive)' },
+            { example: '{{request.body.path}}', key: 'body_path', description: 'A value from the JSON request body; nested keys and array indexes use dots' },
+            { example: '{{request.body}}', key: 'body', description: 'The whole request body' },
+            { example: '{{request.method}}', key: 'method', description: 'The request method' },
+            { example: '{{request.path}}', key: 'path', description: 'The request path' }
+        ]
+    },
+    {
+        key: 'generated', label: 'Generated values', entries: [
+            { example: '{{$uuid}}', key: 'uuid', description: 'A random UUID' },
+            { example: '{{$timestamp}}', key: 'timestamp', description: 'Current Unix time in seconds' },
+            { example: '{{$isoTimestamp}}', key: 'iso_timestamp', description: 'Current time as ISO 8601' },
+            { example: '{{$randomInt}}', key: 'random_int', description: 'A random integer between 0 and 1000' }
+        ]
+    },
+    {
+        key: 'prefer', label: 'Choosing another response', entries: [
+            { example: 'Prefer: example=name', key: 'prefer_example', description: 'Serve the saved example or documented response with that name' },
+            { example: 'Prefer: code=404', key: 'prefer_code', description: 'Serve the saved example or documented response with that status code' }
+        ]
+    }
+]);
+
+/**
+ * @param {HTMLElement} grid
+ * @returns {void}
+ */
+export function renderTemplatingRows(grid) {
+    grid.replaceChildren();
+    for (const group of TEMPLATING_REFERENCE) {
+        const heading = document.createElement('span');
+        heading.className = 'var-reference-group u-flex u-flex-col u-gap-2';
+        heading.textContent = translate(`mock_server.templating_group_${group.key}`, group.label);
+        grid.appendChild(heading);
+        for (const entry of group.entries) {
+            const code = document.createElement('code');
+            code.textContent = entry.example;
+            const description = document.createElement('span');
+            description.textContent = translate(`mock_server.templating_${entry.key}`, entry.description);
+            grid.append(code, description);
+        }
+    }
+}
 
 /** @augments */
 export class MockServerDialog extends BaseModal {
@@ -486,14 +535,14 @@ export class MockServerDialog extends BaseModal {
             'delay-label': translate('mock_server.delay', 'Delay (ms)'),
             'status-code-label': translate('mock_server.status_code', 'Status Code'),
             'body-label': translate('mock_server.response_body', 'Response Body (JSON)'),
-            'template-hint': translate(
-                'mock_server.template_hint',
-                'Strings may use {{request.params.id}}, {{request.query.name}}, {{request.headers.name}}, {{request.body.path}}, {{$uuid}}, {{$timestamp}}, {{$isoTimestamp}} and {{$randomInt}}. Send "Prefer: code=404" or "Prefer: example=name" to get another documented response.'
-            ),
+            templating: translate('mock_server.templating_button', 'Templating…'),
             reset: translate('mock_server.reset_to_default', 'Reset to Default'),
             cancel: translate('common.cancel', 'Cancel'),
             save: translate('common.save', 'Save')
         });
+
+        this.renderExamplesBadge(dialog.querySelector('[data-role="examples-badge"]'), endpoint);
+        dialog.querySelector('#response-editor-templating-btn')?.addEventListener('click', () => this.showTemplatingReference());
 
         const closeBtn = dialog.querySelector('#response-editor-close');
         if (closeBtn) {
@@ -642,6 +691,46 @@ export class MockServerDialog extends BaseModal {
             try {return JSON.parse(generated);} catch {return { message: 'Success' };}
         }
         return generated ?? { message: 'Success' };
+    }
+
+    /**
+     * @param {HTMLElement|null} badge
+     * @param {Object} endpoint
+     * @returns {void}
+     */
+    renderExamplesBadge(badge, endpoint) {
+        if (!badge) {
+            return;
+        }
+        const count = Array.isArray(endpoint.examples) ? endpoint.examples.length : 0;
+        badge.textContent = translateCount('mock_server.examples_count', count, {
+            one: '{{count}} saved example', other: '{{count}} saved examples'
+        });
+        badge.title = translate(
+            'mock_server.examples_badge_title',
+            'The first successful saved example is served unless a custom response is saved here. "Prefer: example=name" picks one by name.'
+        );
+        badge.classList.toggle('is-hidden', count === 0);
+    }
+
+    /** @returns {void} */
+    showTemplatingReference() {
+        const reference = new BaseModal();
+        const dialog = reference.mount({
+            overlayClass: 'mock-server-templating-overlay',
+            dialogClass: 'modal-dialog modal-dialog--var-reference',
+            templatePath: TEMPLATE_PATH,
+            templateId: 'tpl-mock-server-templating-reference'
+        });
+        setRoleTexts(dialog, {
+            title: translate('mock_server.templating_title', 'Response templating'),
+            intro: translate(
+                'mock_server.templating_intro',
+                'Strings in the response body may contain these placeholders. A string that is exactly one placeholder keeps the value\'s JSON type; unknown placeholders are left as they are.'
+            )
+        });
+        renderTemplatingRows(dialog.querySelector('.var-reference-grid'));
+        dialog.querySelector('#mock-server-templating-close-btn')?.addEventListener('click', () => reference.destroy());
     }
 
     /**

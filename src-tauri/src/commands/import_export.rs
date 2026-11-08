@@ -109,6 +109,10 @@ pub struct Endpoint {
     /// Export-only: the response schema the user defined for validation.
     #[serde(skip)]
     pub response_schema: Option<Value>,
+    /// Saved example responses carried over from the source (Postman saved
+    /// responses, HAR entries); seeded into the request file on import.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<resonance_collections::model::ExampleDoc>,
 }
 
 /// An environment carried inside an Insomnia export or read from a Postman

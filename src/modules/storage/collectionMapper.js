@@ -26,11 +26,32 @@ function folderFromWire(folder) {
 }
 
 /**
- * @param {Object} folder
+ * @param {Object} endpoint
+ * @param {Set<string>} keepExamplesFor
  * @returns {Object}
  */
-function folderToWire(folder) {
-    return withoutTransients(folder);
+function endpointToWire(endpoint, keepExamplesFor) {
+    if (!endpoint || !('examples' in endpoint) || keepExamplesFor.has(endpoint.id)) {
+        return endpoint;
+    }
+    const { examples: _examples, ...rest } = endpoint;
+    return rest;
+}
+
+/**
+ * @param {Object} folder
+ * @param {Set<string>} keepExamplesFor
+ * @returns {Object}
+ */
+function folderToWire(folder, keepExamplesFor) {
+    const wire = withoutTransients(folder);
+    if (Array.isArray(wire.endpoints)) {
+        wire.endpoints = wire.endpoints.map((endpoint) => endpointToWire(endpoint, keepExamplesFor));
+    }
+    if (Array.isArray(wire.folders)) {
+        wire.folders = wire.folders.map((child) => folderToWire(child, keepExamplesFor));
+    }
+    return wire;
 }
 
 /**
@@ -51,16 +72,22 @@ export function fromWire(wire) {
 
 /**
  * @param {Object|null|undefined} collection
+ * @param {Object} [options]
+ * @param {string[]} [options.keepExamplesFor]
  * @returns {Object|null}
  */
-export function toWire(collection) {
+export function toWire(collection, { keepExamplesFor = [] } = {}) {
     if (!collection) {
         return null;
     }
 
+    const keep = new Set(keepExamplesFor);
     const wire = withoutTransients(collection);
+    if (Array.isArray(wire.endpoints)) {
+        wire.endpoints = wire.endpoints.map((endpoint) => endpointToWire(endpoint, keep));
+    }
     if (Array.isArray(wire.folders)) {
-        wire.folders = wire.folders.map(folderToWire);
+        wire.folders = wire.folders.map((folder) => folderToWire(folder, keep));
     }
     return wire;
 }

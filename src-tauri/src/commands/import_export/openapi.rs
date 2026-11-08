@@ -149,6 +149,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
                         url: None,
                         live_body: None,
                         response_schema: None,
+                        examples: Vec::new(),
                     };
 
                     // Extract base path (first segment) for folder grouping

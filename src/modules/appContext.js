@@ -15,6 +15,8 @@
  * @property {*} [collectionController]
  * @property {*} [collectionService]
  * @property {*} [variableContext]
+ * @property {*} [examplesService]
+ * @property {*} [examplesController]
  * @property {*} [secretStore]
  * @property {*} [graphqlBodyManager]
  * @property {*} [formBodyManager]

@@ -127,7 +127,7 @@ export const PROTOCOLS = Object.freeze({
         needsTarget: false,
         pathPlaceholder: '/api/endpoint',
         requestTabs: Object.freeze([
-            'path-params', 'query-params', 'headers', 'body', 'scripts', 'authorization', 'schema'
+            'path-params', 'query-params', 'headers', 'body', 'scripts', 'authorization', 'schema', 'examples'
         ]),
         defaultTab: 'path-params',
         bodyModes: null,
@@ -258,7 +258,7 @@ export const PROTOCOLS = Object.freeze({
         needsMethod: false,
         needsTarget: false,
         pathPlaceholder: 'https://api.example.com/graphql',
-        requestTabs: Object.freeze(['body', 'headers', 'authorization', 'scripts']),
+        requestTabs: Object.freeze(['body', 'headers', 'authorization', 'scripts', 'examples']),
         defaultTab: 'body',
         bodyModes: null,
         responseTabSet: 'http',

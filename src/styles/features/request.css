@@ -223,8 +223,33 @@
   color: var(--accent-color);
 }
 
-.schema-tab-container {
+.schema-tab-container,
+.examples-tab-container {
   gap: var(--space-3);
+}
+
+.examples-list {
+  overflow: auto;
+  flex-shrink: 1;
+}
+
+.examples-list:empty {
+  display: none;
+}
+
+.examples-empty {
+  margin: 0;
+  padding: var(--space-4) 0;
+  font-size: var(--font-size-small);
+  opacity: var(--dim-opacity);
+}
+
+.example-row .example-status {
+  flex-shrink: 0;
+}
+
+.example-row .example-actions .button {
+  padding: 0 var(--space-2);
 }
 
 .schema-validation-status {

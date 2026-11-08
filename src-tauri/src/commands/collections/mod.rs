@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 use legacy::{list_collection_endpoints, read_json_file};
 use resonance_collections::fs_secure::{restrict_dir, restrict_file};
 pub use resonance_collections::ipc::{Collection, EndpointData};
+use resonance_collections::model::ExampleDoc;
 use resonance_collections::{
     cache, git, ipc, layout, legacy, link, model, read, runners, secrets, write,
 };
@@ -302,6 +303,79 @@ fn save_endpoint_data_v2(
     let entry = find_request_entry_mut(&mut loaded.root, request_id)
         .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
     ipc::apply_endpoint_data(&mut entry.doc, data);
+    if !write::write_request_in_place(entry)? {
+        write::write_collection_dir(dir, loaded)?;
+    }
+    Ok(())
+}
+
+/// Largest example body accepted, in bytes of the stored string.
+pub(crate) const MAX_EXAMPLE_BODY_BYTES: usize = 512 * 1024;
+
+/// Checks a set of examples before it reaches a request file.
+///
+/// @param examples - What the frontend sent
+/// @returns Ok when every example is well-formed and ids are unique
+fn validate_examples(examples: &[ExampleDoc]) -> Result<(), String> {
+    let mut ids = HashSet::new();
+    for example in examples {
+        if example.id.trim().is_empty() {
+            return Err("Example id must not be empty".into());
+        }
+        if !ids.insert(example.id.as_str()) {
+            return Err(format!("Duplicate example id {}", example.id));
+        }
+        let name = example.name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(format!(
+                "Example {} needs a name of 1 to 120 characters",
+                example.id
+            ));
+        }
+        if !(100..=599).contains(&example.status) {
+            return Err(format!(
+                "Example {} has an invalid status {}",
+                example.id, example.status
+            ));
+        }
+        if let Some(encoding) = &example.body_encoding
+            && encoding != "base64"
+        {
+            return Err(format!(
+                "Example {} has an unsupported body encoding",
+                example.id
+            ));
+        }
+        if example
+            .body
+            .as_ref()
+            .is_some_and(|body| body.len() > MAX_EXAMPLE_BODY_BYTES)
+        {
+            return Err(format!(
+                "Example {} body exceeds {} bytes",
+                example.id, MAX_EXAMPLE_BODY_BYTES
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Replaces the saved examples of one request of a v2 tree and persists it.
+///
+/// @param dir - The collection directory
+/// @param loaded - The collection, as currently on disk
+/// @param request_id - Request to update
+/// @param examples - The full new list
+/// @returns Ok once the change is on disk
+fn save_examples_v2(
+    dir: &Path,
+    loaded: &mut read::LoadedCollection,
+    request_id: &str,
+    examples: Vec<ExampleDoc>,
+) -> Result<(), String> {
+    let entry = find_request_entry_mut(&mut loaded.root, request_id)
+        .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
+    entry.doc.examples = examples;
     if !write::write_request_in_place(entry)? {
         write::write_collection_dir(dir, loaded)?;
     }
@@ -1291,6 +1365,39 @@ pub async fn collection_save_endpoint_data(
 }
 
 #[tauri::command]
+pub async fn collection_get_examples(
+    app: AppHandle,
+    collection_id: String,
+    endpoint_id: String,
+) -> Result<Vec<ExampleDoc>, String> {
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    let Some(loaded) = load_existing(&paths.dir)? else {
+        return Ok(Vec::new());
+    };
+    Ok(ipc::find_request(&loaded, &endpoint_id)
+        .map(|doc| doc.examples.clone())
+        .unwrap_or_default())
+}
+
+#[tauri::command]
+pub async fn collection_save_examples(
+    app: AppHandle,
+    collection_id: String,
+    endpoint_id: String,
+    examples: Vec<ExampleDoc>,
+) -> Result<(), String> {
+    validate_examples(&examples)?;
+    let paths = CollectionPaths::resolve(&app, &collection_id)?;
+    if Layout::detect(&paths.dir) != Some(Layout::V2) {
+        return Err("Saving examples requires the current collection format".into());
+    }
+    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    save_examples_v2(&paths.dir, &mut loaded, &endpoint_id, examples)?;
+    collection_cache().refresh(&paths.dir, &loaded);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn collection_delete_endpoint_data(
     app: AppHandle,
     collection_id: String,
@@ -2027,6 +2134,137 @@ mod convert_on_save {
             fs::read_to_string(&unrelated).unwrap(),
             "an unrelated request was rewritten"
         );
+    }
+
+    fn example(id: &str, body: Option<String>) -> ExampleDoc {
+        ExampleDoc {
+            id: id.into(),
+            name: "200 OK".into(),
+            status: 200,
+            status_text: Some("OK".into()),
+            headers: vec![json!({"key": "content-type", "value": "application/json"})],
+            content_type: Some("application/json".into()),
+            body,
+            body_encoding: None,
+            saved_at: None,
+            extra: serde_json::Map::new(),
+        }
+    }
+
+    #[test]
+    fn examples_round_trip_through_the_request_file() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+
+        save_examples_v2(
+            temp.path(),
+            &mut loaded,
+            "custom_1",
+            vec![example("ex1", Some("{\"ok\":true}".into()))],
+        )
+        .unwrap();
+
+        let reread = read_collection_dir(temp.path()).unwrap();
+        let doc = ipc::find_request(&reread, "custom_1").unwrap();
+        assert_eq!(doc.examples.len(), 1);
+        assert_eq!(doc.examples[0].body.as_deref(), Some("{\"ok\":true}"));
+        let yaml = fs::read_to_string(temp.path().join("health.yaml")).unwrap();
+        assert!(yaml.contains("examples:\n- id: ex1"));
+    }
+
+    #[test]
+    fn saving_examples_rewrites_only_that_request_file() {
+        let temp = TempDir::new().unwrap();
+        v1_on_disk(temp.path());
+        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let unrelated = temp.path().join("pets/create-pet.yaml");
+        let marked = format!("{}# marker\n", fs::read_to_string(&unrelated).unwrap());
+        fs::write(&unrelated, &marked).unwrap();
+
+        save_examples_v2(
+            temp.path(),
+            &mut loaded,
+            "custom_1",
+            vec![example("ex1", None)],
+        )
+        .unwrap();
+        save_examples_v2(temp.path(), &mut loaded, "custom_1", Vec::new()).unwrap();
+
+        assert_eq!(marked, fs::read_to_string(&unrelated).unwrap());
+        assert!(
+            !fs::read_to_string(temp.path().join("health.yaml"))
+                .unwrap()
+                .contains("examples")
+        );
+        assert!(save_examples_v2(temp.path(), &mut loaded, "missing", Vec::new()).is_err());
+    }
+
+    #[test]
+    fn an_imported_collection_persists_its_examples() {
+        let temp = TempDir::new().unwrap();
+        let mut incoming = Collection {
+            id: "c9".into(),
+            name: "Imported".into(),
+            base_url: String::new(),
+            endpoints: vec![json!({
+                "id": "imp_1", "name": "Ping", "method": "GET", "path": "/ping",
+                "examples": [{ "id": "ex_a", "name": "Pong", "status": 200, "body": "{\"pong\":true}" }]
+            })],
+            folders: vec![],
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            can_close: false,
+            git_branch: None,
+        };
+        write_v2_collection(temp.path(), &incoming).unwrap();
+
+        let loaded = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(
+            ipc::find_request(&loaded, "imp_1").unwrap().examples[0].name,
+            "Pong"
+        );
+
+        incoming.endpoints[0]["name"] = json!("Renamed");
+        incoming.endpoints[0]
+            .as_object_mut()
+            .unwrap()
+            .remove("examples");
+        write_v2_collection(temp.path(), &incoming).unwrap();
+
+        let reloaded = read_collection_dir(temp.path()).unwrap();
+        let doc = ipc::find_request(&reloaded, "imp_1").unwrap();
+        assert_eq!(doc.name, "Renamed");
+        assert_eq!(doc.examples.len(), 1);
+    }
+
+    #[test]
+    fn invalid_examples_are_rejected() {
+        let mut no_status = example("a", None);
+        no_status.status = 0;
+        let mut no_name = example("b", None);
+        no_name.name = "  ".into();
+        let mut bad_encoding = example("c", Some("AAAA".into()));
+        bad_encoding.body_encoding = Some("hex".into());
+        let oversize = example("d", Some("x".repeat(MAX_EXAMPLE_BODY_BYTES + 1)));
+        let mut blank_id = example("e", None);
+        blank_id.id = String::new();
+
+        for bad in [no_status, no_name, bad_encoding, oversize, blank_id] {
+            assert!(
+                validate_examples(std::slice::from_ref(&bad)).is_err(),
+                "{:?}",
+                bad.id
+            );
+        }
+        assert!(validate_examples(&[example("dup", None), example("dup", None)]).is_err());
+        assert!(validate_examples(&[example("ok", Some("{}".into()))]).is_ok());
     }
 
     #[test]

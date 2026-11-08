@@ -2,11 +2,12 @@
 import fs from 'fs';
 import { RenameDialog } from '../../src/modules/ui/RenameDialog.js';
 import { EditTagsDialog } from '../../src/modules/ui/EditTagsDialog.js';
+import { ExampleNameDialog } from '../../src/modules/ui/ExampleNameDialog.js';
 import { templateLoader } from '../../src/modules/templateLoader.js';
 import { escapeHandlerCount } from '../../src/modules/ui/modalEscape.js';
 
 beforeAll(() => {
-    for (const name of ['renameDialog', 'editTagsDialog']) {
+    for (const name of ['renameDialog', 'editTagsDialog', 'exampleNameDialog']) {
         const path = `./src/templates/dialogs/${name}.html`;
         templateLoader.cache.set(path, new DOMParser().parseFromString(fs.readFileSync(path, 'utf8'), 'text/html'));
     }
@@ -19,7 +20,8 @@ afterEach(() => {
 
 const cases = [
     { create: () => new RenameDialog(), prefix: 'rename', value: 'Before', text: ' After ', expected: 'After' },
-    { create: () => new EditTagsDialog(), prefix: 'edit-tags', value: ['Before'], text: ' After,after , API ', expected: ['After', 'API'] }
+    { create: () => new EditTagsDialog(), prefix: 'edit-tags', value: ['Before'], text: ' After,after , API ', expected: ['After', 'API'] },
+    { create: () => new ExampleNameDialog(), prefix: 'example-name', value: '200 OK', text: ' Happy path ', expected: 'Happy path' }
 ];
 
 describe.each(cases)('$prefix dialog', ({ create, prefix, value, text, expected }) => {

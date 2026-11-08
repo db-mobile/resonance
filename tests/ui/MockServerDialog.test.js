@@ -234,6 +234,47 @@ describe('MockServerDialog', () => {
         dialog.close();
     });
 
+    test('the response editor shows a badge with the saved example count', async () => {
+        const withExamples = { ...endpoint('a', 'GET', '/a'), examples: [{ id: 'e1', name: 'ok', status: 200 }, { id: 'e2', name: 'missing', status: 404 }] };
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [withExamples] }];
+        const controller = makeController({ getCollections: jest.fn(async () => collections) });
+        const { dialog, editor } = await openEditor(controller);
+
+        const badge = editor.querySelector('[data-role="examples-badge"]');
+        expect(badge.classList.contains('is-hidden')).toBe(false);
+        expect(badge.textContent).toBe('2 saved examples');
+        expect(badge.title).toMatch(/Prefer: example=name/);
+        expect(editor.querySelector('[data-role="examples-hint"]')).toBeNull();
+        expect(editor.querySelector('[data-role="template-hint"]')).toBeNull();
+
+        dialog.close();
+    });
+
+    test('the templating button opens a reference modal and Escape closes only that modal', async () => {
+        const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'POST', '/a')] }];
+        const controller = makeController({ getCollections: jest.fn(async () => collections) });
+        const { dialog } = await openEditor(controller);
+
+        document.querySelector('#response-editor-templating-btn').click();
+        await flushMany();
+
+        const reference = document.querySelector('.mock-server-templating-overlay');
+        expect(reference.querySelector('[data-role="title"]').textContent).toBe('Response templating');
+        const codes = [...reference.querySelectorAll('.var-reference-grid code')].map((code) => code.textContent);
+        expect(codes).toEqual(expect.arrayContaining(['{{request.params.id}}', '{{$uuid}}', 'Prefer: code=404']));
+        expect(reference.querySelectorAll('.var-reference-group')).toHaveLength(3);
+        expect(escapeHandlerCount()).toBe(3);
+
+        pressEscape();
+        await flushMany();
+
+        expect(document.querySelector('.mock-server-templating-overlay')).toBeNull();
+        expect(document.querySelector('.mock-server-response-editor')).not.toBeNull();
+        expect(escapeHandlerCount()).toBe(2);
+
+        dialog.close();
+    });
+
     test('the response editor shows the defaults and saves delay, status and body', async () => {
         const collections = [{ id: 'c1', name: 'Shop', endpoints: [endpoint('a', 'POST', '/a')] }];
         const controller = makeController({ getCollections: jest.fn(async () => collections) });
@@ -250,7 +291,8 @@ describe('MockServerDialog', () => {
         expect(editor.querySelector('[data-role="delay-label"]').textContent).toBe('Delay (ms)');
         expect(editor.querySelector('[data-role="status-code-label"]').textContent).toBe('Status Code');
         expect(editor.querySelector('[data-role="body-label"]').textContent).toBe('Response Body (JSON)');
-        expect(editor.querySelector('[data-role="template-hint"]').textContent).toMatch(/^Strings may use /);
+        expect(editor.querySelector('[data-role="templating"]').textContent).toBe('Templating…');
+        expect(editor.querySelector('[data-role="examples-badge"]').classList.contains('is-hidden')).toBe(true);
         expect(editor.querySelector('[data-role="reset"]').textContent).toBe('Reset to Default');
         expect(editor.querySelector('[data-role="cancel"]').textContent).toBe('Cancel');
         expect(editor.querySelector('[data-role="save"]').textContent).toBe('Save');

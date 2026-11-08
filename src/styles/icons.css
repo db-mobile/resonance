@@ -155,6 +155,10 @@
   mask-image: url("../../assets/ui/plus.svg");
 }
 
+.icon-bookmark {
+  mask-image: url("../../assets/ui/bookmark.svg");
+}
+
 .icon-save {
   mask-image: url("../../assets/ui/save.svg");
 }

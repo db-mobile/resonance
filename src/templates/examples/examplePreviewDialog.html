@@ -1,0 +1,17 @@
+<template id="tpl-example-preview-dialog">
+    <div class="u-flex u-flex-col u-gap-4 u-flex-1 u-min-h-0">
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-role="title"></h2>
+            <button type="button" id="example-preview-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
+        <div class="dialog-body example-preview-body u-flex u-flex-col u-gap-4 u-flex-1 u-min-h-0">
+            <div class="u-flex u-items-center u-gap-2">
+                <span class="status-display example-preview-status"></span>
+                <code class="example-preview-content-type"></code>
+            </div>
+            <div class="example-preview-headers boxed-list"></div>
+            <p class="example-preview-binary is-hidden"></p>
+            <div class="example-preview-editor editor-shell editor-frame u-flex u-flex-col u-flex-1 u-min-h-0"></div>
+        </div>
+    </div>
+</template>

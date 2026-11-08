@@ -1,11 +1,12 @@
 use axum::{
     Router,
-    body::Bytes,
+    body::{Body, Bytes},
     extract::{Query, State as AxumState},
-    http::{HeaderMap, Method, StatusCode, Uri},
-    response::Json,
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
+    response::{IntoResponse, Json, Response},
     routing::any,
 };
+use base64::Engine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -414,7 +415,7 @@ async fn handle_mock_request(
     AxumState(state): AxumState<MockServerState>,
     headers: HeaderMap,
     body: Bytes,
-) -> (StatusCode, Json<Value>) {
+) -> Response {
     let start = std::time::Instant::now();
     let path = uri.path().to_string();
 
@@ -494,7 +495,8 @@ async fn handle_mock_request(
                 "path": path,
                 "method": method.to_string()
             })),
-        );
+        )
+            .into_response();
     };
 
     if let Some(delay_ms) = route.delay {
@@ -502,29 +504,17 @@ async fn handle_mock_request(
     }
 
     let prefer = parse_prefer(&headers);
-    let (status_code, template) = if prefer.code.is_some() || prefer.example.is_some() {
-        let (code, body) =
-            select_mock_response(&route.endpoint, prefer.code, prefer.example.as_deref());
-        (code.unwrap_or(200), body)
-    } else {
-        let (spec_code, spec_body) = select_mock_response(&route.endpoint, None, None);
-        (
-            route.custom_status.or(spec_code).unwrap_or(200),
-            route.custom_response.unwrap_or(spec_body),
-        )
-    };
-
     let body_text = String::from_utf8_lossy(&body).into_owned();
     let context = TemplateContext {
         method: method.to_string(),
         path: path.clone(),
-        params: route.params,
+        params: route.params.clone(),
         query: query.clone(),
         headers,
         body_json: serde_json::from_str(&body_text).ok(),
         body_text,
     };
-    let response = render_template(&template, &context);
+    let reply = choose_reply(&route, &prefer, &context);
 
     push_log(
         &state,
@@ -534,16 +524,232 @@ async fn handle_mock_request(
             method: method.to_string(),
             path,
             query,
-            response_status: status_code,
+            response_status: reply.status,
             response_time: start.elapsed().as_millis() as u64,
             matched_endpoint: Some(route.info),
         },
     );
 
-    (
-        StatusCode::from_u16(status_code).unwrap_or(StatusCode::OK),
-        Json(response),
+    reply.finish()
+}
+
+/// What the mock will send back: status, headers and raw body bytes.
+struct MockReply {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl MockReply {
+    /// A JSON reply, as the spec and custom-response paths have always produced.
+    fn json(status: u16, value: &Value) -> Self {
+        MockReply {
+            status,
+            headers: vec![("content-type".into(), "application/json".into())],
+            body: serde_json::to_vec(value).unwrap_or_default(),
+        }
+    }
+
+    /// Builds the axum response, dropping any header the HTTP layer rejects.
+    fn finish(self) -> Response {
+        let mut builder =
+            Response::builder().status(StatusCode::from_u16(self.status).unwrap_or(StatusCode::OK));
+        for (name, value) in &self.headers {
+            if let (Ok(name), Ok(value)) = (
+                HeaderName::from_bytes(name.as_bytes()),
+                HeaderValue::from_str(value),
+            ) {
+                builder = builder.header(name, value);
+            }
+        }
+        builder
+            .body(Body::from(self.body))
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+    }
+}
+
+/// Picks the reply for a matched route: an explicitly preferred saved example
+/// or documented response first, then the custom override, then the first
+/// successful saved example, then the spec, then the generic fallback.
+fn choose_reply(route: &MatchedRoute, prefer: &Prefer, context: &TemplateContext) -> MockReply {
+    let examples = saved_examples(&route.endpoint);
+
+    if let Some(example) = prefer
+        .example
+        .as_deref()
+        .and_then(|name| example_named(&examples, name))
+    {
+        return reply_from_example(example, context, prefer.code);
+    }
+    if let Some(example) = prefer
+        .code
+        .and_then(|code| example_with_status(&examples, code))
+    {
+        return reply_from_example(example, context, None);
+    }
+    if prefer.code.is_some() || prefer.example.is_some() {
+        let (code, body) =
+            select_mock_response(&route.endpoint, prefer.code, prefer.example.as_deref());
+        return MockReply::json(code.unwrap_or(200), &render_template(&body, context));
+    }
+
+    let (spec_code, spec_body) = select_mock_response(&route.endpoint, None, None);
+    let example = default_example(&examples);
+    if let Some(custom) = &route.custom_response {
+        let status = route
+            .custom_status
+            .or(example.map(example_status))
+            .or(spec_code)
+            .unwrap_or(200);
+        return MockReply::json(status, &render_template(custom, context));
+    }
+    if let Some(example) = example {
+        return reply_from_example(example, context, route.custom_status);
+    }
+    MockReply::json(
+        route.custom_status.or(spec_code).unwrap_or(200),
+        &render_template(&spec_body, context),
     )
+}
+
+/// Headers never copied from a saved example because the transport owns them.
+const EXAMPLE_SKIPPED_HEADERS: [&str; 5] = [
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "date",
+];
+
+/// The endpoint's saved examples that carry a usable status.
+fn saved_examples(endpoint: &Value) -> Vec<&Value> {
+    endpoint
+        .get("examples")
+        .and_then(|examples| examples.as_array())
+        .map(|examples| {
+            examples
+                .iter()
+                .filter(|example| example.get("status").and_then(|s| s.as_u64()).is_some())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn example_status(example: &Value) -> u16 {
+    example
+        .get("status")
+        .and_then(|s| s.as_u64())
+        .and_then(|s| u16::try_from(s).ok())
+        .unwrap_or(200)
+}
+
+fn example_named<'a>(examples: &[&'a Value], name: &str) -> Option<&'a Value> {
+    examples
+        .iter()
+        .copied()
+        .find(|example| example.get("name").and_then(|n| n.as_str()) == Some(name))
+}
+
+fn example_with_status<'a>(examples: &[&'a Value], code: u16) -> Option<&'a Value> {
+    examples
+        .iter()
+        .copied()
+        .find(|example| example_status(example) == code)
+}
+
+/// The example served without a preference: the lowest success status, else
+/// the first one saved.
+fn default_example<'a>(examples: &[&'a Value]) -> Option<&'a Value> {
+    examples
+        .iter()
+        .copied()
+        .filter(|example| (200..300).contains(&example_status(example)))
+        .min_by_key(|example| example_status(example))
+        .or_else(|| examples.first().copied())
+}
+
+fn example_content_type(example: &Value) -> Option<String> {
+    if let Some(content_type) = example.get("contentType").and_then(|c| c.as_str()) {
+        return Some(content_type.to_string());
+    }
+    example
+        .get("headers")
+        .and_then(|h| h.as_array())
+        .and_then(|rows| {
+            rows.iter().find_map(|row| {
+                let key = row.get("key").and_then(|k| k.as_str())?;
+                (key.eq_ignore_ascii_case("content-type"))
+                    .then(|| {
+                        row.get("value")
+                            .and_then(|v| v.as_str())
+                            .map(str::to_string)
+                    })
+                    .flatten()
+            })
+        })
+}
+
+/// Turns a saved example into a reply: base64 bodies are decoded, JSON bodies
+/// are templated like every other mock source, anything else is served raw.
+fn reply_from_example(
+    example: &Value,
+    context: &TemplateContext,
+    status_override: Option<u16>,
+) -> MockReply {
+    let is_base64 = example.get("bodyEncoding").and_then(|e| e.as_str()) == Some("base64");
+    let body_text = example.get("body").and_then(|b| b.as_str()).unwrap_or("");
+    let mut bytes = if is_base64 {
+        base64::engine::general_purpose::STANDARD
+            .decode(body_text)
+            .unwrap_or_default()
+    } else {
+        body_text.as_bytes().to_vec()
+    };
+    let content_type = example_content_type(example);
+    let looks_json = content_type
+        .as_deref()
+        .map(|c| c.to_ascii_lowercase().contains("json"))
+        .unwrap_or(true);
+    let mut rendered_json = false;
+    if !is_base64
+        && looks_json
+        && let Ok(value) = serde_json::from_slice::<Value>(&bytes)
+    {
+        bytes = serde_json::to_vec(&render_template(&value, context)).unwrap_or_default();
+        rendered_json = true;
+    }
+
+    let mut headers: Vec<(String, String)> = example
+        .get("headers")
+        .and_then(|h| h.as_array())
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|row| {
+                    let key = row
+                        .get("key")
+                        .and_then(|k| k.as_str())?
+                        .to_ascii_lowercase();
+                    let value = row.get("value").and_then(|v| v.as_str())?.to_string();
+                    (!EXAMPLE_SKIPPED_HEADERS.contains(&key.as_str()) && key != "content-type")
+                        .then_some((key, value))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let content_type = content_type.unwrap_or_else(|| {
+        if rendered_json {
+            "application/json".to_string()
+        } else {
+            "text/plain; charset=utf-8".to_string()
+        }
+    });
+    headers.push(("content-type".into(), content_type));
+
+    MockReply {
+        status: status_override.unwrap_or_else(|| example_status(example)),
+        headers,
+        body: bytes,
+    }
 }
 
 struct MatchedRoute {
@@ -1085,6 +1291,178 @@ mod tests {
             status,
             serde_json::from_slice(&bytes).unwrap_or(Value::Null),
         )
+    }
+
+    async fn call_raw(
+        state: &MockServerState,
+        method: &str,
+        uri: &str,
+        headers: &[(&str, &str)],
+    ) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        for (name, value) in headers {
+            builder = builder.header(*name, *value);
+        }
+        let response = build_router(state.clone())
+            .oneshot(builder.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, headers, bytes.to_vec())
+    }
+
+    fn with_examples() -> Value {
+        let mut ep = documented();
+        ep["id"] = serde_json::json!("e1");
+        ep["examples"] = serde_json::json!([
+            { "id": "x404", "name": "missing", "status": 404, "contentType": "application/json",
+              "body": "{\"error\": \"saved {{request.params.id}}\"}" },
+            { "id": "x201", "name": "created", "status": 201, "contentType": "application/json",
+              "body": "{\"saved\": true}" },
+            { "id": "x200", "name": "ok", "status": 200, "statusText": "OK",
+              "headers": [ { "key": "X-Example", "value": "yes" }, { "key": "content-length", "value": "99" } ],
+              "contentType": "application/json; charset=utf-8", "body": "{\"saved\": \"first\"}" },
+            { "id": "xtxt", "name": "plain", "status": 200, "contentType": "text/plain",
+              "body": "hello {{request.params.id}}" },
+            { "id": "xbin", "name": "binary", "status": 200, "contentType": "application/octet-stream",
+              "body": "AQID", "bodyEncoding": "base64" }
+        ]);
+        ep
+    }
+
+    #[tokio::test]
+    async fn the_lowest_success_example_is_served_by_default_with_its_headers() {
+        let state = state_with(vec![with_examples()]);
+
+        let (status, headers, body) = call_raw(&state, "GET", "/users/1", &[]).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            serde_json::json!({ "saved": "first" })
+        );
+        assert_eq!(headers["content-type"], "application/json; charset=utf-8");
+        assert_eq!(headers["x-example"], "yes");
+        assert_ne!(headers["content-length"], "99");
+    }
+
+    #[tokio::test]
+    async fn prefer_example_matches_a_saved_example_before_the_spec_and_templates_it() {
+        let state = state_with(vec![with_examples()]);
+
+        let (status, body) = call_with(
+            &state,
+            "GET",
+            "/users/9",
+            &[("prefer", "example=missing")],
+            "",
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "saved 9");
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/9", &[("prefer", "example=gone")], "").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "deleted");
+
+        let (status, body) = call_with(
+            &state,
+            "GET",
+            "/users/9",
+            &[("prefer", "code=418, example=created")],
+            "",
+        )
+        .await;
+        assert_eq!(status, StatusCode::IM_A_TEAPOT);
+        assert_eq!(body, serde_json::json!({ "saved": true }));
+    }
+
+    #[tokio::test]
+    async fn prefer_code_picks_the_saved_example_with_that_status_or_falls_back_to_the_spec() {
+        let state = state_with(vec![with_examples()]);
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/1", &[("prefer", "code=201")], "").await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(body, serde_json::json!({ "saved": true }));
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/7", &[("prefer", "code=404")], "").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "saved 7");
+
+        let (status, body) =
+            call_with(&state, "GET", "/users/1", &[("prefer", "code=418")], "").await;
+        assert_eq!(status, StatusCode::IM_A_TEAPOT);
+        assert_eq!(body["message"], "No documented body for status 418");
+    }
+
+    #[tokio::test]
+    async fn a_custom_response_still_wins_over_saved_examples() {
+        let state = state_with_custom(vec![with_examples()], serde_json::json!({ "custom": true }));
+
+        let (status, body) = call_with(&state, "GET", "/users/1", &[], "").await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, serde_json::json!({ "custom": true }));
+    }
+
+    #[tokio::test]
+    async fn a_custom_status_applies_to_the_served_example() {
+        let state = state_with(vec![with_examples()]);
+        state
+            .settings
+            .write()
+            .unwrap()
+            .custom_status_codes
+            .insert("c1_e1".to_string(), 202);
+
+        let (status, body) = call_with(&state, "GET", "/users/1", &[], "").await;
+
+        assert_eq!(status, StatusCode::ACCEPTED);
+        assert_eq!(body, serde_json::json!({ "saved": "first" }));
+    }
+
+    #[tokio::test]
+    async fn non_json_examples_keep_their_content_type_and_raw_body() {
+        let state = state_with(vec![with_examples()]);
+
+        let (status, headers, body) =
+            call_raw(&state, "GET", "/users/3", &[("prefer", "example=plain")]).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "text/plain");
+        assert_eq!(body, b"hello {{request.params.id}}");
+    }
+
+    #[tokio::test]
+    async fn base64_examples_are_decoded() {
+        let state = state_with(vec![with_examples()]);
+
+        let (_, headers, body) =
+            call_raw(&state, "GET", "/users/3", &[("prefer", "example=binary")]).await;
+
+        assert_eq!(headers["content-type"], "application/octet-stream");
+        assert_eq!(body, vec![1u8, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn an_endpoint_without_examples_behaves_as_before() {
+        let state = state_with(vec![endpoint("e1", "GET", "/items")]);
+
+        let (status, headers, body) = call_raw(&state, "GET", "/items", &[]).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "application/json");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap()["message"],
+            "Mock response"
+        );
     }
 
     fn state_with_custom(endpoints: Vec<Value>, custom: Value) -> MockServerState {

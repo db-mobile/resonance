@@ -25,7 +25,7 @@ const MODES = [
 
 const EXPECTED = {
     [RequestMode.HTTP]: {
-        tabs: ['path-params', 'query-params', 'headers', 'body', 'scripts', 'authorization', 'schema'],
+        tabs: ['path-params', 'query-params', 'headers', 'body', 'scripts', 'authorization', 'schema', 'examples'],
         defaultTab: 'path-params',
         methodSelect: true,
         sharedUrlBar: true,
@@ -70,7 +70,7 @@ const EXPECTED = {
         selectorVisible: false
     },
     [RequestMode.GRAPHQL]: {
-        tabs: ['body', 'headers', 'authorization', 'scripts'],
+        tabs: ['body', 'headers', 'authorization', 'scripts', 'examples'],
         defaultTab: 'body',
         methodSelect: false,
         sharedUrlBar: false,

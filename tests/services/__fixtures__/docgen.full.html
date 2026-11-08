@@ -57,6 +57,27 @@
   }
 }</code></pre>
 </details>
+<div class="examples-section">
+<h4>Example Responses</h4>
+<div class="example-response">
+<h5>Two users &lt;ok&gt; <span class="status">200 OK</span></h5>
+<p><strong>Content-Type:</strong> <code>application/json; charset=utf-8</code></p>
+<pre><code class="language-json">[
+  { &quot;id&quot;: 1 },
+  { &quot;id&quot;: 2 }
+]</code></pre>
+</div>
+<div class="example-response">
+<h5>Rate limited <span class="status">429</span></h5>
+<p><strong>Content-Type:</strong> <code>text/plain</code></p>
+<pre><code class="language-text">slow down</code></pre>
+</div>
+<div class="example-response">
+<h5>Export <span class="status">200</span></h5>
+<p><strong>Content-Type:</strong> <code>application/octet-stream</code></p>
+<p class="example-binary">Binary body (3 bytes, base64) omitted.</p>
+</div>
+</div>
 <div class="code-samples">
 <h4>Code Samples</h4>
 <div class="code-tabs">

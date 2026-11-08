@@ -173,7 +173,7 @@ describe('tab shortcuts follow the visible tabs', () => {
         setRequestMode(RequestMode.HTTP);
         registerTabShortcuts(keyboardShortcuts);
         keyboardShortcuts.showHelp();
-        expect(helpRows('Request Tabs').keys).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7']);
+        expect(helpRows('Request Tabs').keys).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8']);
         document.getElementById('close-shortcuts-btn').click();
     });
 });

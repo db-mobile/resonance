@@ -1013,6 +1013,7 @@ mod tests {
             url: None,
             live_body: None,
             response_schema: None,
+            examples: Vec::new(),
         }
     }
 

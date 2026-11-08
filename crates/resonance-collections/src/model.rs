@@ -195,6 +195,32 @@ pub enum BodyKind {
     },
 }
 
+/// One captured or imported response, kept with the request it answers so
+/// docs and the mock server can show a real body instead of a generated one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExampleDoc {
+    pub id: String,
+    pub name: String,
+    pub status: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_text: Option<String>,
+    /// `{key, value}` rows in response order, names as the transport delivered them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headers: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    /// Only `base64`, for bodies that are not text; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_encoding: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_at: Option<String>,
+    #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
+    pub extra: Map<String, Value>,
+}
+
 /// One request, as one file. Fields run identity, then addressing, then the
 /// state the user edits, then reference material.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +266,10 @@ pub struct RequestDoc {
     pub scripts: Scripts,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response_schema: Option<Value>,
+    /// Saved example responses, before the spec so a hand edit never has to
+    /// scroll past the OpenAPI material to reach them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<ExampleDoc>,
     #[serde(default, skip_serializing_if = "Spec::is_empty")]
     pub spec: Spec,
     #[serde(flatten, default, skip_serializing_if = "Map::is_empty")]
@@ -272,6 +302,7 @@ impl RequestDoc {
             websocket: None,
             scripts: Scripts::default(),
             response_schema: None,
+            examples: Vec::new(),
             spec: Spec::default(),
             extra: Map::new(),
         }
@@ -442,8 +473,82 @@ mod tests {
         doc.grpc = Some(json!({"target": "localhost:50051"}));
         doc.scripts.test = Some("expect(response.status).toBe(201);\n".into());
         doc.response_schema = Some(json!({"type": "object"}));
+        doc.examples = vec![example_doc()];
         doc.spec.responses = Some(json!({"200": {"description": "ok"}}));
         doc
+    }
+
+    fn example_doc() -> ExampleDoc {
+        ExampleDoc {
+            id: "ex_1730000000_a1b2c3d".into(),
+            name: "200 OK".into(),
+            status: 200,
+            status_text: Some("OK".into()),
+            headers: vec![
+                json!({"key": "content-type", "value": "application/json; charset=utf-8"}),
+                json!({"key": "cache-control", "value": "no-store"}),
+            ],
+            content_type: Some("application/json; charset=utf-8".into()),
+            body: Some("{\n  \"id\": 42,\n  \"name\": \"Ada\"\n}\n".into()),
+            body_encoding: None,
+            saved_at: Some("2026-11-08T10:15:00.000Z".into()),
+            extra: Map::new(),
+        }
+    }
+
+    #[test]
+    fn a_request_with_examples_matches_the_documented_layout() {
+        let mut doc = RequestDoc::new("req_1".into(), "Get user".into());
+        doc.seq = 10;
+        doc.protocol = Some("http".into());
+        doc.method = Some("GET".into());
+        doc.path = Some("/users/{id}".into());
+        doc.examples = vec![example_doc()];
+        doc.spec.responses = Some(json!({"200": {"description": "OK"}}));
+
+        let expected = r#"resonanceFormat: 2
+id: req_1
+name: Get user
+seq: 10
+protocol: http
+method: GET
+path: /users/{id}
+examples:
+- id: ex_1730000000_a1b2c3d
+  name: 200 OK
+  status: 200
+  statusText: OK
+  headers:
+  - key: content-type
+    value: application/json; charset=utf-8
+  - key: cache-control
+    value: no-store
+  contentType: application/json; charset=utf-8
+  body: |
+    {
+      "id": 42,
+      "name": "Ada"
+    }
+  savedAt: 2026-11-08T10:15:00.000Z
+spec:
+  responses:
+    '200':
+      description: OK
+"#;
+
+        assert_eq!(to_yaml(&doc), expected);
+        let parsed: RequestDoc = serde_yaml_ng::from_str(expected).unwrap();
+        assert_eq!(parsed.examples, vec![example_doc()]);
+    }
+
+    #[test]
+    fn an_unknown_example_field_survives_a_round_trip() {
+        let yaml = "resonanceFormat: 2\nid: r\nname: R\nexamples:\n- id: e\n  name: E\n  status: 204\n  note: keep me\n";
+
+        let parsed: RequestDoc = serde_yaml_ng::from_str(yaml).unwrap();
+
+        assert_eq!(parsed.examples[0].extra["note"], json!("keep me"));
+        assert!(to_yaml(&parsed).contains("note: keep me"));
     }
 
     #[test]

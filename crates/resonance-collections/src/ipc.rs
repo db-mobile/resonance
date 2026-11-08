@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
-use super::model::{Body, BodyKind, FORMAT_VERSION, FolderDoc, RequestDoc};
+use super::model::{Body, BodyKind, ExampleDoc, FORMAT_VERSION, FolderDoc, RequestDoc};
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
 /// Collection metadata stored in collection.json
@@ -144,6 +144,40 @@ pub fn request_to_endpoint(
     Value::Object(endpoint)
 }
 
+/// The tree projection of a request: everything `request_to_endpoint` carries
+/// plus the saved examples, which only the tree consumers (sidebar, docs, mock
+/// server, duplicate) need and runner captures must not pay for.
+///
+/// @param doc - The request document
+/// @param folder_id - Owning folder id, absent for a root-level request
+/// @param folder_path - Full folder path
+/// @returns The endpoint with its `examples`
+pub fn endpoint_for_tree(
+    doc: &RequestDoc,
+    folder_id: Option<&str>,
+    folder_path: &[String],
+) -> Value {
+    let mut endpoint = request_to_endpoint(doc, folder_id, folder_path);
+    if !doc.examples.is_empty()
+        && let Value::Object(map) = &mut endpoint
+    {
+        map.insert("examples".into(), json!(doc.examples));
+    }
+    endpoint
+}
+
+/// Reads the saved examples an IPC endpoint carries, if any parse.
+///
+/// @param endpoint - The endpoint as the frontend sent it
+/// @returns The examples, empty when absent or malformed
+pub fn examples_from_ipc(endpoint: &Value) -> Vec<ExampleDoc> {
+    endpoint
+        .get("examples")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default()
+}
+
 /// Projects a request's live state back into the v1 endpoint data shape.
 ///
 /// The three v1 body fields are mutually exclusive, so exactly one is set from
@@ -226,7 +260,7 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 
     let mut endpoints = Vec::new();
     for entry in &node.requests {
-        let endpoint = request_to_endpoint(&entry.doc, Some(&id), path);
+        let endpoint = endpoint_for_tree(&entry.doc, Some(&id), path);
         flat.push(endpoint.clone());
         endpoints.push(endpoint);
     }
@@ -284,7 +318,7 @@ pub fn to_ipc_collection(
     let mut folders = Vec::new();
 
     for entry in &loaded.root.requests {
-        endpoints.push(request_to_endpoint(&entry.doc, None, &[]));
+        endpoints.push(endpoint_for_tree(&entry.doc, None, &[]));
     }
 
     for folder in &loaded.root.folders {
@@ -410,10 +444,12 @@ fn entry_for(
     }
 
     let mut entry = existing.get(&id).cloned().unwrap_or_else(|| {
-        RequestEntry::new(RequestDoc::new(
+        let mut doc = RequestDoc::new(
             id.clone(),
             ipc_string(endpoint, "name").unwrap_or_else(|| id.clone()),
-        ))
+        );
+        doc.examples = examples_from_ipc(endpoint);
+        RequestEntry::new(doc)
     });
 
     overlay_metadata(&mut entry.doc, endpoint);
@@ -1150,6 +1186,64 @@ mod save_path {
             root.requests[0].source.as_ref().unwrap(),
             &std::path::PathBuf::from("/c/create-pet.yaml")
         );
+    }
+
+    fn example_value() -> Value {
+        json!({"id": "ex1", "name": "200 OK", "status": 200, "body": "{\"ok\":true}", "contentType": "application/json"})
+    }
+
+    #[test]
+    fn a_new_request_is_seeded_with_examples_from_ipc() {
+        let incoming = ipc_collection(
+            vec![
+                json!({"id": "new1", "name": "Fresh", "method": "GET", "path": "/x", "examples": [example_value()]}),
+            ],
+            vec![],
+        );
+
+        let root = tree_from_ipc(&incoming, None);
+
+        assert_eq!(root.requests[0].doc.examples.len(), 1);
+        assert_eq!(root.requests[0].doc.examples[0].name, "200 OK");
+    }
+
+    #[test]
+    fn examples_on_an_existing_request_survive_a_structural_save() {
+        let mut existing = existing_with_state();
+        existing.root.requests[0].doc.examples =
+            vec![serde_json::from_value(example_value()).unwrap()];
+        let stale = ipc_collection(
+            vec![json!({"id": "r1", "name": "Renamed", "method": "POST", "path": "/pets"})],
+            vec![],
+        );
+        let different = ipc_collection(
+            vec![
+                json!({"id": "r1", "name": "Renamed", "method": "POST", "path": "/pets",
+                "examples": [{"id": "other", "name": "Other", "status": 500}]}),
+            ],
+            vec![],
+        );
+
+        let from_stale = tree_from_ipc(&stale, Some(&existing));
+        let from_different = tree_from_ipc(&different, Some(&existing));
+
+        assert_eq!(from_stale.requests[0].doc.examples[0].id, "ex1");
+        assert_eq!(from_different.requests[0].doc.examples[0].id, "ex1");
+        assert_eq!(from_different.requests[0].doc.name, "Renamed");
+    }
+
+    #[test]
+    fn the_tree_carries_examples_but_captures_do_not() {
+        let mut existing = existing_with_state();
+        existing.root.requests[0].doc.examples =
+            vec![serde_json::from_value(example_value()).unwrap()];
+
+        let tree = to_ipc_collection(&existing, "/c", false);
+        let capture = request_to_endpoint(&existing.root.requests[0].doc, None, &[]);
+
+        assert_eq!(tree.endpoints[0]["examples"][0]["id"], json!("ex1"));
+        assert!(capture.get("examples").is_none());
+        assert!(examples_from_ipc(&json!({"examples": "nonsense"})).is_empty());
     }
 
     #[test]

@@ -40,6 +40,7 @@ import { variableContextFeature } from './modules/variableContext.feature.js';
 import { mockServerFeature } from './modules/mockServer.feature.js';
 import { requestPipelineFeature } from './modules/requestPipeline.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
+import { examplesFeature } from './modules/examples.feature.js';
 import { historyFeature } from './modules/history.feature.js';
 import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { runnerFeature } from './modules/runner.feature.js';
@@ -95,6 +96,7 @@ featureRegistry
     .register(mockServerFeature)
     .register(requestPipelineFeature)
     .register(schemaFeature)
+    .register(examplesFeature)
     .register(historyFeature)
     .register(workspaceTabFeature)
     .register(runnerFeature)
