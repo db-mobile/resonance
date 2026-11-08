@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
-use super::model::{Body, BodyKind, ExampleDoc, FORMAT_VERSION, FolderDoc, RequestDoc};
+use super::model::{Body, BodyKind, ExampleDoc, FORMAT_VERSION, FolderDoc, RequestDoc, Scripts};
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
 /// Collection metadata stored in collection.json
@@ -248,6 +248,134 @@ pub fn request_to_endpoint_data(doc: &RequestDoc) -> EndpointData {
     }
 
     data
+}
+
+/// Chooses the one body the endpoint data actually carries.
+///
+/// The IPC shape spreads the body across three fields and wrote exactly one of them per
+/// save, so precedence follows what the frontend could have produced:
+/// `formBodyData` carries its own mode and wins, then `graphqlData`, then a
+/// plain `modifiedBody` which was always JSON mode.
+///
+/// @param data - The endpoint data the frontend sent or a v1 data file held
+/// @returns The v2 body, or None when the request had none
+pub fn body_from_endpoint_data(data: &EndpointData) -> Option<Body> {
+    if let Some(form) = &data.form_body_data {
+        let mode = form.get("mode").and_then(|m| m.as_str()).unwrap_or("");
+        match mode {
+            "formdata" => {
+                return Some(Body::Known(BodyKind::FormData {
+                    fields: normalize_form_rows(form.get("fields")),
+                }));
+            }
+            "urlencoded" => {
+                return Some(Body::Known(BodyKind::UrlEncoded {
+                    fields: normalize_form_rows(form.get("fields")),
+                }));
+            }
+            "binary" => {
+                return Some(Body::Known(BodyKind::Binary {
+                    file_path: string_field(form, "filePath").unwrap_or_default(),
+                    content_type: string_field(form, "contentType").unwrap_or_default(),
+                }));
+            }
+            "text" => {
+                return Some(Body::Known(BodyKind::Text {
+                    content: form
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                }));
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(graphql) = &data.graphql_data {
+        let query = graphql
+            .get("query")
+            .and_then(|q| q.as_str())
+            .unwrap_or("")
+            .to_string();
+        let variables = graphql
+            .get("variables")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if !query.is_empty() || !variables.is_empty() {
+            return Some(Body::Known(BodyKind::Graphql {
+                query,
+                variables,
+                operation_name: string_field(graphql, "operationName"),
+            }));
+        }
+    }
+
+    if let Some(body) = &data.modified_body
+        && !body.is_empty()
+    {
+        return Some(Body::Known(BodyKind::Json {
+            content: body.clone(),
+        }));
+    }
+
+    None
+}
+
+/// Converts the scripts object, which uses the longer frontend field names.
+pub fn scripts_from_endpoint_data(value: Option<&Value>) -> Scripts {
+    let scripts = match value {
+        Some(scripts) => scripts,
+        None => return Scripts::default(),
+    };
+
+    Scripts {
+        pre_request: string_field(scripts, "preRequestScript"),
+        test: string_field(scripts, "testScript"),
+    }
+}
+
+/// Reads a string field off an endpoint data object, treating blank as absent.
+pub(crate) fn string_field(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// Normalizes form rows into the canonical array shape.
+///
+/// Mirrors `normalizeFormRows` in `src/modules/utils/formDataRows.js`: older
+/// data stored a flat `{key: value}` object where the current shape is an
+/// ordered array of rows, and both must keep loading.
+///
+/// @param fields - The persisted `fields` value, in either shape
+/// @returns Rows as an array, empty when there is nothing to convert
+fn normalize_form_rows(fields: Option<&Value>) -> Vec<Value> {
+    match fields {
+        Some(Value::Array(rows)) => rows.clone(),
+        Some(Value::Object(map)) => map
+            .iter()
+            .map(|(key, value)| {
+                let text = match value {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                let mut row = Map::new();
+                row.insert("key".into(), Value::String(key.clone()));
+                row.insert("value".into(), Value::String(text));
+                row.insert("type".into(), Value::String("text".into()));
+                row.insert("filePath".into(), Value::String(String::new()));
+                row.insert("contentType".into(), Value::String(String::new()));
+                row.insert("enabled".into(), Value::Bool(true));
+                Value::Object(row)
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// Builds one folder entry, recursing into its subfolders.
@@ -656,8 +784,8 @@ pub fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
     doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
     doc.websocket = data.websocket_data.clone().filter(|v| !v.is_null());
     doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
-    doc.scripts = super::legacy::scripts_from_v1(data.scripts.as_ref());
-    doc.body = super::legacy::body_from_v1(data);
+    doc.scripts = scripts_from_endpoint_data(data.scripts.as_ref());
+    doc.body = body_from_endpoint_data(data);
 }
 
 /// Finds one request in a loaded collection.
