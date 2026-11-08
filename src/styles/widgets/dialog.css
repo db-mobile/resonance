@@ -110,6 +110,27 @@
   width: 640px;
 }
 
+.modal-dialog--example-preview {
+  width: 760px;
+  height: min(640px, 100%);
+}
+
+.example-preview-headers {
+  max-height: 160px;
+  overflow: auto;
+  flex-shrink: 0;
+}
+
+.example-preview-headers.is-hidden,
+.example-preview-editor.is-hidden {
+  display: none;
+}
+
+.example-preview-binary {
+  margin: 0;
+  opacity: var(--dim-opacity);
+}
+
 .modal-dialog--shortcuts {
   width: 640px;
   height: min(640px, 100%);

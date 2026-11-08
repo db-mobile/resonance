@@ -1,0 +1,251 @@
+/**
+ * Variable pills inside request inputs: the mirror overlay for plain inputs,
+ * the token classes shared with the CodeMirror editors, tooltip and autocomplete.
+ */
+
+.var-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.var-field > input,
+.var-field > .var-field-mirror {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.var-field > input {
+  width: 100%;
+  color: transparent;
+  caret-color: var(--view-fg-color);
+}
+
+.var-field > input::placeholder {
+  color: var(--view-fg-color);
+  opacity: var(--dim-opacity);
+}
+
+.var-field > input:disabled {
+  color: transparent;
+}
+
+.var-field-mirror {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  border-style: solid;
+  border-color: transparent;
+  background: transparent;
+  color: var(--view-fg-color);
+  direction: ltr;
+  box-sizing: border-box;
+}
+
+.var-field-mirror-text {
+  white-space: pre;
+  flex: 0 0 auto;
+}
+
+.var-field:has(> [hidden]) {
+  display: none;
+}
+
+.var-field:has(> :disabled) > .var-field-mirror,
+.key-value-row.row-disabled .var-field-mirror {
+  opacity: 0.5;
+}
+
+.key-value-row > .var-field {
+  flex: 1;
+}
+
+.key-value-row > .var-field--key-input {
+  flex: 0 0 32%;
+}
+
+.form-body-row .file-cell > .var-field {
+  flex: 1;
+}
+
+.form-body-row .file-cell > .var-field--part-content-type-input {
+  flex: 0 0 28%;
+}
+
+.request-url-section > .var-field,
+.url-autocomplete-wrapper > .var-field {
+  flex: 1 1 180px;
+}
+
+.grpc-target-wrapper > .var-field {
+  flex: 1;
+}
+
+.var-token {
+  border-radius: var(--radius-small);
+  font-weight: inherit;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.var-token.resolved,
+.var-token.path-param {
+  background-color: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+}
+
+.var-token.dynamic {
+  background-color: color-mix(in srgb, var(--warning-color) 12%, transparent);
+  color: var(--warning-color);
+}
+
+.var-token.unresolved {
+  background-color: color-mix(in srgb, var(--error-color) 12%, transparent);
+  color: var(--error-color);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.var-token > span {
+  color: inherit;
+}
+
+.var-token.unknown {
+  background-color: var(--shade-color);
+  box-shadow: none;
+}
+
+.variable-autocomplete {
+  position: fixed;
+  z-index: var(--z-popover);
+  max-height: 320px;
+  overflow-y: auto;
+  display: none;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-popover), 0 0 0 1px var(--popover-shade-color);
+}
+
+.variable-autocomplete.visible {
+  display: block;
+}
+
+.variable-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.variable-autocomplete-item:hover,
+.variable-autocomplete-item.active {
+  background-color: var(--shade-color);
+}
+
+.variable-autocomplete-name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.variable-autocomplete-scope {
+  flex-shrink: 0;
+}
+
+.badge.neutral {
+  background-color: var(--shade-color);
+  color: inherit;
+}
+
+.variable-autocomplete-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  opacity: var(--dim-opacity);
+}
+
+.var-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 440px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-small);
+}
+
+.var-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.var-tooltip-name {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.var-tooltip-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.var-tooltip-value,
+.var-tooltip-example {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.var-tooltip-value.is-empty,
+.var-tooltip-description {
+  opacity: var(--dim-opacity);
+}
+
+.var-tooltip-missing {
+  color: var(--error-color);
+}
+
+.var-tooltip--unknown .var-tooltip-missing {
+  color: inherit;
+  opacity: var(--dim-opacity);
+}
+
+
+.var-tooltip-floating {
+  position: fixed;
+  z-index: var(--z-popover);
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-popover), 0 0 0 1px var(--popover-shade-color);
+  pointer-events: none;
+}
+
+.var-tooltip-floating[hidden] {
+  display: none;
+}
+
+.var-reference-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
+  align-items: baseline;
+}
+
+.var-reference-grid .var-reference-group {
+  grid-column: 1 / -1;
+}

@@ -67,7 +67,7 @@ src-tauri/
         ├── graphql_subscription.rs  # GraphQL subscriptions (graphql-transport-ws)
         ├── mock_server.rs        # Mock server with Axum
         ├── scripts.rs            # Desktop script storage (execution lives in resonance-core)
-        ├── import_export/        # OpenAPI/Postman import and export
+        ├── import_export/        # OpenAPI/Postman/Insomnia/HAR import, OpenAPI export
         ├── collections/          # Git-friendly collection file storage
         ├── store.rs              # Settings/data persistence
         ├── secrets.rs            # OS keychain secret storage

@@ -517,8 +517,8 @@ export class CollectionDialogs {
             let selectedStoragePath = defaultStoragePath;
 
             const t = (key, fallback) => (app.i18n && app.i18n.t) ? app.i18n.t(key) : fallback;
-            titleElement.textContent = t('import_dialog.title_collection', 'Import Collection');
-            subtitleElement.textContent = t('import_dialog.subtitle_collection', 'Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.');
+            titleElement.textContent = t('import_dialog.title_collection', 'Import File');
+            subtitleElement.textContent = t('import_dialog.subtitle_collection', 'Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file, or a Postman or Insomnia environment export — the format is detected automatically.');
 
             const setError = (message = '') => {
                 if (!message) {

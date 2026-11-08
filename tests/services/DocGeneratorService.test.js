@@ -406,6 +406,62 @@ describe('DocGeneratorService', () => {
         });
     });
 
+    describe('example responses', () => {
+        const withExamples = (examples) => ({
+            ...mockCollection,
+            endpoints: [{ id: 'ep-x', method: 'GET', name: 'X', path: '/x', examples }]
+        });
+
+        test('_exampleLang maps content types to fence languages', () => {
+            expect(service._exampleLang('application/json; charset=utf-8')).toBe('json');
+            expect(service._exampleLang('application/problem+json')).toBe('json');
+            expect(service._exampleLang('text/xml')).toBe('xml');
+            expect(service._exampleLang('text/html')).toBe('html');
+            expect(service._exampleLang('text/plain')).toBe('text');
+            expect(service._exampleLang(undefined)).toBe('text');
+        });
+
+        test('renders each example with status, content type and a fenced body in markdown', async () => {
+            const markdown = await service.generateMarkdown(withExamples([
+                { id: 'a', name: 'Happy', status: 200, statusText: 'OK', contentType: 'application/json', body: '{"a":1}' },
+                { id: 'b', name: 'Nope', status: 404, body: 'gone' }
+            ]));
+
+            expect(markdown).toContain('#### Example Responses');
+            expect(markdown).toContain('**Happy** — 200 OK');
+            expect(markdown).toContain('**Content-Type:** `application/json`');
+            expect(markdown).toContain('```json\n{"a":1}\n```');
+            expect(markdown).toContain('**Nope** — 404');
+            expect(markdown).toContain('```text\ngone\n```');
+        });
+
+        test('binary examples get a placeholder and malformed ones are skipped', async () => {
+            const markdown = await service.generateMarkdown(withExamples([
+                { id: 'a', name: 'Bin', status: 200, contentType: 'image/png', body: 'AQID', bodyEncoding: 'base64' },
+                { id: 'b', name: 'Broken', body: 'x' }
+            ]));
+
+            expect(markdown).toContain('_Binary body (3 bytes, base64) omitted._');
+            expect(markdown).not.toContain('Broken');
+        });
+
+        test('omits the section without examples', async () => {
+            const markdown = await service.generateMarkdown(withExamples([]));
+            expect(markdown).not.toContain('Example Responses');
+        });
+
+        test('html escapes names and bodies and keeps the language class', async () => {
+            global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('{{CONTENT}}') });
+            const html = await service.generateHtml(withExamples([
+                { id: 'a', name: 'A <b>', status: 500, statusText: 'Boom', contentType: 'text/html', body: '<p>x</p>' }
+            ]));
+
+            expect(html).toContain('<div class="examples-section">');
+            expect(html).toContain('<h5>A &lt;b&gt; <span class="status">500 Boom</span></h5>');
+            expect(html).toContain('<pre><code class="language-html">&lt;p&gt;x&lt;/p&gt;</code></pre>');
+        });
+    });
+
     describe('persisted data handling', () => {
         test('reads each endpoint\'s persisted data once per document', async () => {
             mockCollectionRepository.getAllPersistedEndpointData.mockResolvedValue({

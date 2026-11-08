@@ -14,8 +14,7 @@ use super::super::store_files::MAIN_STORE as STORE_FILE;
 const LAST_IMPORT_DIR_KEY: &str = "lastImportDirectory";
 
 /// Postman OAuth2 parameter names paired with the app's config keys, as
-/// `(postman_key, app_key)`. Import reads it left to right and export right to
-/// left; one table keeps the two directions from drifting apart.
+/// `(postman_key, app_key)`, read by the importer.
 pub(crate) const OAUTH2_KEY_MAP: [(&str, &str); 12] = [
     ("accessTokenUrl", "tokenUrl"),
     ("authUrl", "authorizationUrl"),
@@ -136,12 +135,9 @@ pub(crate) async fn pick_import_file_with_kind(
     match import_kind {
         "collection" => {
             dialog = dialog.add_filter(
-                "Collection Files (OpenAPI, Postman, Insomnia, HAR)",
+                "Collection and Environment Files (OpenAPI, Postman, Insomnia, HAR)",
                 &["json", "yaml", "yml", "har"],
             );
-        }
-        "postman_environment" => {
-            dialog = dialog.add_filter("Postman Environment", &["json"]);
         }
         "cookie_jar" => {
             dialog = dialog.add_filter("Cookie Export", &["json"]);

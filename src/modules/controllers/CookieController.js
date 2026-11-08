@@ -3,8 +3,6 @@
  * @module controllers/CookieController
  */
 
-import { app } from '../appContext.js';
-
 export class CookieController {
     constructor(cookieJarService, cookieManagerDialog) {
         this.service = cookieJarService;
@@ -16,21 +14,6 @@ export class CookieController {
     setActiveEnvironment(environmentId, environmentName) {
         this._activeEnvironmentId = environmentId || 'default';
         this._activeEnvironmentName = environmentName || null;
-    }
-
-    /** @returns {Promise<boolean>} */
-    async _isJarEnabled() {
-        const settings = app.getApiHandlerSettingsCache?.() ?? await window.backendAPI?.settings?.get();
-        return settings?.cookieJarEnabled !== false;
-    }
-
-    async getCookieHeader(requestUrl) {
-        try {
-            if (!(await this._isJarEnabled())) { return null; }
-            return await this.service.getCookieHeaderForRequest(requestUrl, this._activeEnvironmentId);
-        } catch (_e) {
-            return null;
-        }
     }
 
     /**

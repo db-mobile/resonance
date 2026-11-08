@@ -1,6 +1,6 @@
 name: db-mobile-resonance
 base: core22
-version: '3.5.8'
+version: '3.6.0'
 title: Resonance
 summary: Test and explore web services
 description: |
@@ -12,7 +12,7 @@ description: |
   - GraphQL with query and variables editors, schema introspection, an interactive query explorer and subscriptions over WebSocket
   - gRPC with server reflection, local .proto files, all four RPC kinds and TLS/mTLS
   - WebSocket, Server-Sent Events and MQTT connections with live status
-  - Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI and Postman
+  - Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI
   - Code generation in 9 languages and Markdown/HTML documentation generation
   - Built-in mock server with response templating, custom bodies, status codes and delays
   - Pre-request and test scripts in sandboxed JavaScript with a Postman-compatible pm API

@@ -161,7 +161,7 @@ jobs:
 
   build-mac:
     needs: [test, lint, rust-test]
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
     - name: Checkout code
@@ -291,7 +291,7 @@ jobs:
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-musl
             toolchain-targets: aarch64-unknown-linux-musl
-          - os: macos-14
+          - os: macos-15
             target: universal-apple-darwin
             toolchain-targets: aarch64-apple-darwin,x86_64-apple-darwin
           - os: windows-latest
@@ -310,7 +310,7 @@ jobs:
         targets: ${{ matrix.toolchain-targets }}
 
     - name: Ensure dtolnay cargo wins over preinstalled rustup shim (macOS)
-      if: matrix.os == 'macos-14'
+      if: runner.os == 'macOS'
       run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
     - name: Rust cache

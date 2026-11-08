@@ -6,7 +6,8 @@
 import { BaseModal } from './BaseModal.js';
 import { translate } from '../utils/translate.js';
 
-const LAST_CONVERTING_RELEASE = '3.3.0';
+const LAST_RELEASE_CONVERTING_OLD_DATA_VERSIONS = '3.5.8';
+const LAST_RELEASE_CONVERTING_GLOBAL_STORE_COLLECTIONS = '3.3.0';
 
 /**
  * @param {{kind: string, step?: string, message?: string, found?: number, min?: number, data?: string}} issue
@@ -24,13 +25,13 @@ export function describeMigrationIssue(issue) {
             return translate(
                 'data_migration.too_old',
                 'Your data was saved by a Resonance release this version can no longer convert, so it was left unchanged. Install Resonance {{release}}, start it once, then update again.',
-                { release: LAST_CONVERTING_RELEASE }
+                { release: LAST_RELEASE_CONVERTING_OLD_DATA_VERSIONS }
             );
         case 'unsupported':
             return translate(
                 'data_migration.global_store_collections',
                 'Collections saved by a Resonance release from before March 2026 are still in your settings. This version can no longer convert them, so they were left unchanged. Install Resonance {{release}}, start it once, then update again.',
-                { release: LAST_CONVERTING_RELEASE }
+                { release: LAST_RELEASE_CONVERTING_GLOBAL_STORE_COLLECTIONS }
             );
         default:
             return translate('data_migration.unknown', 'Your data could not be fully converted to the current format.');

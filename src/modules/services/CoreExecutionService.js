@@ -326,11 +326,19 @@ export class CoreExecutionService {
     async applyEffect(effect) {
         const { collectionRepository, environmentRepository, variableRepository } = this.pipeline;
         if (effect.kind === 'script') {
-            if (effect.environmentId && Object.keys(effect.environment || {}).length) {
+            const environmentChanged = Boolean(effect.environmentId && Object.keys(effect.environment || {}).length);
+            const collectionChanged = Boolean(effect.collectionId && Object.keys(effect.collection || {}).length);
+            if (environmentChanged) {
                 await environmentRepository.applyVariableChanges(effect.environmentId, effect.environment);
             }
-            if (effect.collectionId && Object.keys(effect.collection || {}).length) {
+            if (collectionChanged) {
                 await variableRepository.applyVariableChanges(effect.collectionId, effect.collection);
+            }
+            if (environmentChanged || collectionChanged) {
+                this.pipeline.onVariablesChanged?.({
+                    environmentId: environmentChanged ? effect.environmentId : null,
+                    collectionId: collectionChanged ? effect.collectionId : null
+                });
             }
         }
         if (effect.kind === 'auth') {

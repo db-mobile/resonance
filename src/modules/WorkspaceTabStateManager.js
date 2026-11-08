@@ -1,4 +1,5 @@
 import { getCurrentEndpoint, setCurrentEndpoint } from './state/currentEndpoint.js';
+import { FORM_RESTORED_EVENT } from './ui/inputDecorator.js';
 import { app } from './appContext.js';
 import { responseInspectionSource } from './responseInspectionSource.js';
 import { setResponseMeta } from './responseSaver.js';
@@ -271,6 +272,7 @@ export class WorkspaceTabStateManager {
         }
 
         await this[RESTORE_BY_PROTOCOL[resolveProtocolId(tab.request.protocol)]](tab);
+        document.dispatchEvent(new CustomEvent(FORM_RESTORED_EVENT, { detail: { tabId: tab.id ?? null } }));
     }
 
     /**
@@ -679,9 +681,7 @@ export class WorkspaceTabStateManager {
         renderCookies(containerElements?.cookiesDisplay, response.cookies);
 
         if (containerElements?.performanceDisplay) {
-            if (response.performanceHTML) {
-                containerElements.performanceDisplay.innerHTML = response.performanceHTML;
-            } else if (response.timings) {
+            if (response.timings) {
                 displayPerformanceMetrics(containerElements.performanceDisplay, response.timings, response.size);
             } else {
                 clearPerformanceMetrics(containerElements.performanceDisplay);

@@ -111,14 +111,6 @@ export class CollectionRepository {
         return this.backendAPI.collections.exportOpenApi(collectionId, format);
     }
 
-    /**
-     * @param {string} collectionId
-     * @returns {Promise<Object>}
-     */
-    exportPostman(collectionId) {
-        return this.backendAPI.collections.exportPostman(collectionId);
-    }
-
     /** @returns {void} */
     invalidateCache() {
         this._byIdCache.clear();
@@ -132,7 +124,7 @@ export class CollectionRepository {
      */
     async saveOne(collection, { newRequestIds } = {}) {
         try {
-            const wire = toWire(collection);
+            const wire = toWire(collection, { keepExamplesFor: newRequestIds ?? [] });
             const skipped = newRequestIds
                 ? await this.backendAPI.collections.save(wire, newRequestIds)
                 : await this.backendAPI.collections.save(wire);
@@ -434,6 +426,40 @@ export class CollectionRepository {
      */
     async _writeSidecar(collectionId, endpointId, field, value, label) {
         return this._writeFields(collectionId, endpointId, { [field]: value }, label);
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @returns {Promise<Array<Object>>}
+     */
+    async getExamples(collectionId, endpointId) {
+        try {
+            const examples = await this.backendAPI.collections.getExamples(collectionId, endpointId);
+            return Array.isArray(examples) ? examples : [];
+        } catch (error) {
+            throw wrapFailure('load examples', error);
+        }
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} endpointId
+     * @param {function(Array<Object>): Array<Object>} mutate
+     * @returns {Promise<Array<Object>>}
+     */
+    async updateExamples(collectionId, endpointId, mutate) {
+        return this._withEndpointWrite(collectionId, endpointId, async () => {
+            const current = await this.getExamples(collectionId, endpointId);
+            const next = mutate(current.map((example) => ({ ...example })));
+            try {
+                await this.backendAPI.collections.saveExamples(collectionId, endpointId, next);
+            } catch (error) {
+                throw wrapFailure('save examples', error);
+            }
+            this.invalidateCache();
+            return next;
+        });
     }
 
     async updateEndpointFields(collectionId, endpointId, updates) {

@@ -49,16 +49,6 @@ export class SettingsModal extends BaseModal {
             throw error;
         }
 
-        const appVersionDisplay = modal.querySelector('#settings-app-version');
-        if (appVersionDisplay) {
-            try {
-                const version = await window.backendAPI?.app?.getVersion?.();
-                if (version) {
-                    appVersionDisplay.textContent = `v${version}`;
-                }
-            } catch {}
-        }
-
         const tabButton = tab ? modal.querySelector(`.settings-tab[data-tab="${tab}"]`) : null;
         if (tabButton) {
             tabButton.click();

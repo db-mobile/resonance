@@ -77,16 +77,12 @@ describe('CertificateService', () => {
     });
 
     describe('saveItems', () => {
-        test('persists and notifies listeners', async () => {
-            const listener = jest.fn();
-            service.addChangeListener(listener);
-
+        test('persists and caches the saved items', async () => {
             const items = [{ host: 'h', certPath: '/c.crt', keyPath: '/c.key', caPath: '', enabled: true }];
             const saved = await service.saveItems(items);
 
             expect(mockRepository.saveCertificates).toHaveBeenCalledWith({ items });
             expect(saved).toEqual(items);
-            expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: 'certificates-updated' }));
             expect(service.getForHost('h')).toEqual({ certPath: '/c.crt', keyPath: '/c.key', caPath: '' });
         });
     });

@@ -25,7 +25,8 @@ export const ALL_REQUEST_TABS = [
     'mqtt',
     'scripts',
     'authorization',
-    'schema'
+    'schema',
+    'examples'
 ];
 
 const RESPONSE_TABS = [

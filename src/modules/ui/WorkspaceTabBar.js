@@ -78,7 +78,7 @@ export class WorkspaceTabBar {
     }
 
     _createTabElement(tab, isActive) {
-        const tabEl = el('div', `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}${tab.isModified ? ' modified' : ''}`);
+        const tabEl = el('div', `workspace-tab u-flex u-items-center${isActive ? ' active' : ''}`);
         tabEl.dataset.tabId = tab.id;
 
         const nameEl = el('span', 'workspace-tab-name u-truncate', tab.name);
@@ -196,7 +196,7 @@ export class WorkspaceTabBar {
     _setDragPreview(event, tab) {
         this._removeDragPreview();
 
-        const preview = el('div', `workspace-tab-drag-preview${tab.isModified ? ' modified' : ''}`);
+        const preview = el('div', 'workspace-tab-drag-preview');
 
         if (tab.isModified) {
             const indicator = el('span', 'workspace-tab-modified-indicator');
@@ -567,14 +567,12 @@ export class WorkspaceTabBar {
 
         if (updates.isModified !== undefined) {
             if (updates.isModified) {
-                tabEl.classList.add('modified');
                 if (!tabEl.querySelector('.workspace-tab-modified-indicator')) {
                     const indicator = el('span', 'workspace-tab-modified-indicator');
                     indicator.setAttribute('aria-label', 'Modified');
                     tabEl.insertBefore(indicator, tabEl.firstChild);
                 }
             } else {
-                tabEl.classList.remove('modified');
                 const indicator = tabEl.querySelector('.workspace-tab-modified-indicator');
                 if (indicator) {
                     indicator.remove();

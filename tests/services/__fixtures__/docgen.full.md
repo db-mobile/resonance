@@ -107,6 +107,33 @@ Paged list
 }
 ```
 
+#### Example Responses
+
+**Two users <ok>** — 200 OK
+
+**Content-Type:** `application/json; charset=utf-8`
+
+```json
+[
+  { "id": 1 },
+  { "id": 2 }
+]
+```
+
+**Rate limited** — 429
+
+**Content-Type:** `text/plain`
+
+```text
+slow down
+```
+
+**Export** — 200
+
+**Content-Type:** `application/octet-stream`
+
+_Binary body (3 bytes, base64) omitted._
+
 #### Code Samples
 
 **cURL (Command line)**

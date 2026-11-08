@@ -6,7 +6,8 @@
 use serde_json::{Map, Value};
 use std::path::Path;
 
-use super::legacy::{load_v1_dir, scripts_from_v1};
+use super::ipc::scripts_from_endpoint_data;
+use super::legacy::load_v1_dir;
 use super::read::{FolderNode, Layout, read_collection_dir};
 use super::write::write_collection_dir;
 
@@ -56,7 +57,7 @@ pub fn absorb_store_scripts(dir: &Path, scripts: &mut Map<String, Value>) -> Res
         };
         let stored = scripts.remove(key);
         if doc.scripts.is_empty() {
-            doc.scripts = scripts_from_v1(stored.as_ref());
+            doc.scripts = scripts_from_endpoint_data(stored.as_ref());
             if !doc.scripts.is_empty() {
                 absorbed += 1;
             }

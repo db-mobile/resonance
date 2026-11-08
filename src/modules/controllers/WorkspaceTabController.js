@@ -708,30 +708,20 @@ export class WorkspaceTabController {
      * @param {Object} [endpoint.persistedHeaders]
      * @param {string} [endpoint.persistedBody]
      * @param {Object} [endpoint.persistedAuthConfig]
-     * @param {boolean} [inNewTab=false]
      * @returns {Promise<void>}
      */
-    async loadEndpoint(endpoint, inNewTab = false) {
-        return this._withTabLock(() => this._doLoadEndpoint(endpoint, inNewTab));
+    async loadEndpoint(endpoint) {
+        return this._withTabLock(() => this._doLoadEndpoint(endpoint));
     }
 
     /**
      * @param {Object} endpoint
-     * @param {boolean} [inNewTab=false]
      * @returns {Promise<void>}
      */
-    async _doLoadEndpoint(endpoint, inNewTab = false) {
+    async _doLoadEndpoint(endpoint) {
         try {
-            let targetTabId;
-
-            if (inNewTab) {
-                const newTab = await this._doCreateNewTab({ protocol: endpoint.protocol });
-                targetTabId = newTab.id;
-            } else {
-                await this._saveCurrentTabState();
-                targetTabId = await this.service.getActiveTabId();
-            }
-
+            await this._saveCurrentTabState();
+            const targetTabId = await this.service.getActiveTabId();
             await this.endpointLoader.loadEndpoint(endpoint, targetTabId);
         } catch {}
     }
@@ -876,7 +866,7 @@ export class WorkspaceTabController {
     async closeTabsForCollection(collectionId) {
         try {
             const tabs = await this.service.getAllTabs();
-            await this.closeTabs(tabs.filter(tab => tab.collectionId === collectionId).map(tab => tab.id));
+            await this.closeTabs(tabs.filter(tab => tab.endpoint?.collectionId === collectionId).map(tab => tab.id));
         } catch {}
     }
 

@@ -14,7 +14,6 @@ import { registerTabShortcuts } from './modules/tabShortcuts.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, handleWebSocketConnectionAction } from './modules/apiHandler.js';
-import { getSettingsCache } from './modules/state/settingsCache.js';
 import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
@@ -36,9 +35,11 @@ import { environmentFeature } from './modules/environment.feature.js';
 import { scriptFeature } from './modules/script.feature.js';
 import { authFeature } from './modules/auth.feature.js';
 import { collectionFeature } from './modules/collection.feature.js';
+import { variableContextFeature } from './modules/variableContext.feature.js';
 import { mockServerFeature } from './modules/mockServer.feature.js';
 import { requestPipelineFeature } from './modules/requestPipeline.feature.js';
 import { schemaFeature } from './modules/schema.feature.js';
+import { examplesFeature } from './modules/examples.feature.js';
 import { historyFeature } from './modules/history.feature.js';
 import { workspaceTabFeature } from './modules/workspaceTab.feature.js';
 import { runnerFeature } from './modules/runner.feature.js';
@@ -52,8 +53,6 @@ import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
-
-app.getApiHandlerSettingsCache = getSettingsCache;
 
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
@@ -90,9 +89,11 @@ featureRegistry
     .register(scriptFeature)
     .register(authFeature)
     .register(collectionFeature)
+    .register(variableContextFeature)
     .register(mockServerFeature)
     .register(requestPipelineFeature)
     .register(schemaFeature)
+    .register(examplesFeature)
     .register(historyFeature)
     .register(workspaceTabFeature)
     .register(runnerFeature)
@@ -325,14 +326,12 @@ function applyShortcutHints() {
 function createLazyEditor(container, options, changeCallback) {
     let instance = null;
     let loadStarted = false;
-    let destroyed = false;
     let pendingContent = null;
 
     function ensure() {
-        if (instance || destroyed || !container || loadStarted) { return; }
+        if (instance || !container || loadStarted) { return; }
         loadStarted = true;
         loadEditor('requestBody').then((RequestBodyEditor) => {
-            if (destroyed) { return; }
             instance = new RequestBodyEditor(container, options);
             if (pendingContent !== null) {
                 instance.setContent(pendingContent);
@@ -350,21 +349,8 @@ function createLazyEditor(container, options, changeCallback) {
             else { pendingContent = content; ensure(); }
         },
         getContent() { return instance ? instance.getContent() : (pendingContent ?? ''); },
-        clear() {
-            if (instance) { instance.clear(); }
-            else { pendingContent = ''; }
-        },
-        onChange(cb) {
-            changeCallback = cb;
-            if (instance) { instance.onChange(cb); }
-        },
         formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
-        focus() {
-            if (instance) { instance.focus(); }
-            else { ensure(); }
-        },
-        ensure() { ensure(); },
-        destroy() { instance?.destroy(); instance = null; destroyed = true; pendingContent = null; }
+        ensure() { ensure(); }
     };
 }
 
@@ -417,16 +403,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         event.preventDefault();
         importMenu.show(event, [
             {
-                label: 'Collection File',
+                label: 'Collection or Environment File',
                 translationKey: 'import.collection',
                 icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 3v6h6"></path>',
                 onClick: () => collectionController.importCollectionFile()
-            },
-            {
-                label: 'Postman Environment',
-                translationKey: 'import.postman_environment',
-                icon: '<path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>',
-                onClick: () => collectionController.importPostmanEnvironment()
             },
             {
                 label: 'cURL Command',

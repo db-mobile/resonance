@@ -648,11 +648,7 @@ export class CollectionRenderer {
      * @returns {void}
      */
     attachCollectionEventListeners(collectionDiv, headerDiv, collection, eventHandlers) {
-        headerDiv.addEventListener('click', async (e) => {
-            if (e.target.closest('.context-menu')) {
-                return;
-            }
-
+        headerDiv.addEventListener('click', async () => {
             collectionDiv.classList.toggle('expanded');
             
             await this.saveExpansionState();

@@ -184,17 +184,6 @@ export class CollectionService {
     }
 
     /**
-     * @param {string} collectionId
-     * @returns {Promise<Object>}
-     */
-    async exportCollectionAsPostman(collectionId) {
-        return this._runExport(
-            'Collection exported successfully to Postman',
-            () => this.repository.exportPostman(collectionId)
-        );
-    }
-
-    /**
      * @param {string|{name: string, storageParentPath?: string}} nameOrOptions
      * @returns {Promise<Object>}
      */

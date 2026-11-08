@@ -5,8 +5,12 @@
 //! calls survive, obvious assets don't), dedupes exact repeats, and reports
 //! both counts so nothing disappears silently.
 
-use super::common::{grouped_params, param_map_entry, unique_folder_id};
+use super::common::{
+    example_header_value, example_headers, grouped_params, imported_example, param_map_entry,
+    unique_folder_id,
+};
 use super::{Collection, Endpoint, Folder};
+use resonance_collections::model::ExampleDoc;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
@@ -97,7 +101,14 @@ pub(crate) fn parse_har(har: Value, source_name: &str) -> Result<HarImport, Stri
             continue;
         }
 
-        let endpoint = build_endpoint(request, &method, raw_url, &parsed_url, &mut name_counts);
+        let endpoint = build_endpoint(
+            request,
+            entry.get("response"),
+            &method,
+            raw_url,
+            &parsed_url,
+            &mut name_counts,
+        );
         endpoint_hosts.push(parsed_url.host_str().unwrap_or("").to_string());
         endpoints.push(endpoint);
     }
@@ -164,6 +175,7 @@ fn is_asset_entry(entry: &Value) -> bool {
 
 fn build_endpoint(
     request: &Value,
+    response: Option<&Value>,
     method: &str,
     raw_url: &str,
     parsed_url: &url::Url,
@@ -198,7 +210,44 @@ fn build_endpoint(
         url: None,
         live_body: None,
         response_schema: None,
+        examples: extract_har_example(response),
     }
+}
+
+/// A HAR entry's recorded response becomes one example on the request.
+fn extract_har_example(response: Option<&Value>) -> Vec<ExampleDoc> {
+    let Some(response) = response else {
+        return Vec::new();
+    };
+    let headers = example_headers(
+        response
+            .get("headers")
+            .and_then(|h| h.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|h| Some((h.get("name")?.as_str()?, h.get("value")?.as_str()?))),
+    );
+    let content = response.get("content");
+    let content_type = content
+        .and_then(|c| c.get("mimeType"))
+        .and_then(|m| m.as_str())
+        .filter(|m| !m.is_empty())
+        .map(str::to_string)
+        .or_else(|| example_header_value(&headers, "content-type"));
+    imported_example(
+        response.get("status").and_then(|s| s.as_u64()),
+        response.get("statusText").and_then(|s| s.as_str()),
+        None,
+        headers,
+        content_type,
+        content.and_then(|c| c.get("text")).and_then(|t| t.as_str()),
+        content
+            .and_then(|c| c.get("encoding"))
+            .and_then(|e| e.as_str())
+            == Some("base64"),
+    )
+    .into_iter()
+    .collect()
 }
 
 fn extract_parameters(request: &Value) -> Option<Value> {
@@ -361,7 +410,16 @@ mod tests {
                                 "text": "{\"name\":\"rex\"}"
                             }
                         },
-                        "response": { "content": { "mimeType": "application/json" } }
+                        "response": {
+                            "status": 201,
+                            "statusText": "Created",
+                            "headers": [
+                                { "name": "Content-Type", "value": "application/json; charset=utf-8" },
+                                { "name": "Set-Cookie", "value": "s=1" },
+                                { "name": "Content-Length", "value": "12" }
+                            ],
+                            "content": { "mimeType": "application/json", "text": "{\"id\":7}" }
+                        }
                     },
                     {
                         "request": {
@@ -419,7 +477,11 @@ mod tests {
                                 ]
                             }
                         },
-                        "response": { "content": { "mimeType": "application/json" } }
+                        "response": {
+                            "status": 200,
+                            "statusText": "OK",
+                            "content": { "mimeType": "application/octet-stream", "text": "AQID", "encoding": "base64" }
+                        }
                     }
                 ]
             }
@@ -465,6 +527,46 @@ mod tests {
             post.request_body.as_ref().unwrap()["example"],
             "{\"name\":\"rex\"}"
         );
+    }
+
+    #[test]
+    fn responses_become_examples() {
+        let result = import();
+        let post = result
+            .collection
+            .endpoints
+            .iter()
+            .find(|e| e.method == "POST" && e.path.contains("/v1/users"))
+            .unwrap();
+        assert_eq!(post.examples.len(), 1);
+        let created = &post.examples[0];
+        assert_eq!(created.name, "201 Created");
+        assert_eq!(created.status, 201);
+        assert_eq!(created.content_type.as_deref(), Some("application/json"));
+        assert_eq!(created.body.as_deref(), Some("{\"id\":7}"));
+        let keys: Vec<&str> = created
+            .headers
+            .iter()
+            .map(|h| h["key"].as_str().unwrap())
+            .collect();
+        assert_eq!(keys, vec!["content-type"]);
+
+        let token = result
+            .collection
+            .endpoints
+            .iter()
+            .find(|e| e.path.contains("/token"))
+            .unwrap();
+        assert_eq!(token.examples[0].body_encoding.as_deref(), Some("base64"));
+        assert_eq!(token.examples[0].body.as_deref(), Some("AQID"));
+
+        let get = result
+            .collection
+            .endpoints
+            .iter()
+            .find(|e| e.method == "GET")
+            .unwrap();
+        assert!(get.examples.is_empty());
     }
 
     #[test]

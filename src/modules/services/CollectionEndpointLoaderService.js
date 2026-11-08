@@ -82,6 +82,6 @@ export class CollectionEndpointLoaderService {
             grpcData: allowed.grpcData
         };
 
-        await app.workspaceTabController.loadEndpoint(endpointData, false);
+        await app.workspaceTabController.loadEndpoint(endpointData);
     }
 }

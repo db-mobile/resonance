@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { DocGeneratorService } from '../../src/modules/services/DocGeneratorService.js';
 
@@ -10,6 +10,18 @@ const FIXTURES = join(process.cwd(), 'tests', 'services', '__fixtures__');
  */
 function fixture(name) {
     return readFileSync(join(FIXTURES, name), 'utf8');
+}
+
+/**
+ * @param {string} name
+ * @param {string} actual
+ * @returns {string}
+ */
+function golden(name, actual) {
+    if (process.env.UPDATE_GOLDEN) {
+        writeFileSync(join(FIXTURES, name), actual);
+    }
+    return fixture(name);
 }
 
 /**
@@ -52,6 +64,16 @@ const collection = {
                     name: 'List users',
                     path: '/users',
                     description: 'Paged list',
+                    examples: [
+                        {
+                            id: 'ex-ok', name: 'Two users <ok>', status: 200, statusText: 'OK',
+                            contentType: 'application/json; charset=utf-8',
+                            body: '[\n  { "id": 1 },\n  { "id": 2 }\n]'
+                        },
+                        { id: 'ex-empty', name: 'Rate limited', status: 429, contentType: 'text/plain', body: 'slow down' },
+                        { id: 'ex-bin', name: 'Export', status: 200, contentType: 'application/octet-stream', body: 'AQID', bodyEncoding: 'base64' },
+                        { id: 'ex-bad', name: 'Malformed', body: 'no status' }
+                    ],
                     parameters: {
                         query: {
                             page: { type: 'integer', required: true, description: 'Page number', example: 1 },
@@ -144,7 +166,7 @@ describe('DocGeneratorService golden output', () => {
     test('markdown without persisted data or code samples', async () => {
         const markdown = await service.generateMarkdown(collection);
 
-        expect(withoutDate(markdown)).toBe(fixture('docgen.plain.md'));
+        expect(withoutDate(markdown)).toBe(golden('docgen.plain.md', withoutDate(markdown)));
     });
 
     test('markdown with persisted data and code samples', async () => {
@@ -153,7 +175,7 @@ describe('DocGeneratorService golden output', () => {
             languages: ['curl', 'python', 'javascript-fetch', 'not-a-language']
         });
 
-        expect(withoutDate(markdown)).toBe(fixture('docgen.full.md'));
+        expect(withoutDate(markdown)).toBe(golden('docgen.full.md', withoutDate(markdown)));
     });
 
     test('html with persisted data and code samples', async () => {
@@ -162,6 +184,6 @@ describe('DocGeneratorService golden output', () => {
             languages: ['curl', 'javascript-fetch', 'not-a-language']
         });
 
-        expect(withoutDate(html)).toBe(fixture('docgen.full.html'));
+        expect(withoutDate(html)).toBe(golden('docgen.full.html', withoutDate(html)));
     });
 });

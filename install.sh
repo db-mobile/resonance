@@ -69,8 +69,8 @@ while [ $# -gt 0 ]; do
 done
 
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fsSL "$1" -o "$2"; }
-  resolve_latest() { curl -fsSLI -o /dev/null -w '%{url_effective}' "$LATEST_URL"; }
+  fetch() { curl -fsSL --retry 3 "$1" -o "$2"; }
+  resolve_latest() { curl -fsSLI --retry 3 -o /dev/null -w '%{url_effective}' "$LATEST_URL"; }
 elif command -v wget >/dev/null 2>&1; then
   fetch() { wget -q "$1" -O "$2"; }
   resolve_latest() {

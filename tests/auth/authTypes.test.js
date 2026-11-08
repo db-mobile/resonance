@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { AUTH_TYPES, getAuthType, getAuthTypeLabel, getSecretAuthFields } from '../../src/modules/auth/authTypes.js';
-import { SECRET_AUTH_FIELDS } from '../../src/modules/auth/authSecrets.js';
+import { AUTH_TYPES, getAuthType, getAuthTypeLabel } from '../../src/modules/auth/authTypes.js';
 
 const TEMPLATE_HTML = fs.readFileSync(path.join(process.cwd(), 'src/templates/auth/authFields.html'), 'utf8');
 
@@ -37,21 +36,6 @@ describe('AUTH_TYPES registry', () => {
                 expect(TEMPLATE_HTML).toContain(`id="${field.id}"`);
             }
         }
-    });
-
-    test('secret fields match the redaction table', () => {
-        expect(SECRET_AUTH_FIELDS).toEqual({
-            bearer: ['token'],
-            basic: ['password'],
-            'api-key': ['keyValue'],
-            oauth2: ['clientSecret', 'password', 'token', 'refreshToken'],
-            digest: ['password'],
-            ntlm: ['password'],
-            'aws-v4': ['secretAccessKey', 'sessionToken']
-        });
-        expect(getSecretAuthFields('oauth2')).toEqual(['clientSecret', 'password', 'token', 'refreshToken']);
-        expect(getSecretAuthFields('none')).toEqual([]);
-        expect(getSecretAuthFields('nope')).toEqual([]);
     });
 
     test('lookups fall back safely and the entries are frozen', () => {

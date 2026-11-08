@@ -15,7 +15,6 @@ function makePipeline(overrides = {}) {
         requestBuilder: new RequestBuilderService(null, null),
         mockServerService: { shouldUseMockServer: jest.fn(async () => ({ shouldUseMock: false, mockBaseUrl: null })) },
         certificates: { getForHost: jest.fn((host) => (host === 'api.test' ? { certPath: '/c.pem' } : null)) },
-        cookies: { getCookieHeader: jest.fn(async () => 'sid=1') },
         ...overrides
     };
     return { pipeline: new RequestPipeline(deps), deps };
@@ -29,10 +28,9 @@ describe('RequestPipeline construction', () => {
         expect(() => new RequestPipeline({ backendAPI: {} })).toThrow('missing dependency "collectionRepository"');
     });
 
-    test('treats certificates and cookies as optional', () => {
-        const { pipeline } = makePipeline({ certificates: undefined, cookies: undefined });
+    test('treats certificates as optional', () => {
+        const { pipeline } = makePipeline({ certificates: undefined });
         expect(pipeline.certificates).toBeNull();
-        expect(pipeline.cookies).toBeNull();
     });
 });
 
@@ -67,18 +65,6 @@ describe('RequestPipeline.resolveAuth', () => {
         expect(deps.collectionRepository.getInheritedAuth).toHaveBeenCalledWith('c1', 'e1');
         expect(authData.headers).toEqual({ Authorization: 'Bearer inherited' });
         expect(source).toEqual({ kind: 'collection' });
-    });
-
-    test('applies the bearer fallback only when asked', async () => {
-        const { pipeline } = makePipeline();
-        const authConfig = { type: 'bearer', config: { token: '' } };
-        const variables = { bearerToken: 'fallback' };
-
-        const plain = await pipeline.resolveAuth({ authConfig, endpoint: ENDPOINT, variables, processor });
-        const withFallback = await pipeline.resolveAuth({ authConfig, endpoint: ENDPOINT, variables, processor, bearerFallback: true });
-
-        expect(plain.authData.headers).toEqual({});
-        expect(withFallback.authData.headers).toEqual({ Authorization: 'Bearer fallback' });
     });
 
     test('refreshes an expired OAuth token and persists request-level auth through the callback', async () => {

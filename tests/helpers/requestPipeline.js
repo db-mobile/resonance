@@ -21,9 +21,6 @@ export async function installTestRequestPipeline(app, backendAPI) {
         certificates: {
             getForHost: (host) => app.certificateController?.getForHost(host) ?? null,
             getItems: () => app.certificateController?.getItems?.()
-        },
-        cookies: {
-            getCookieHeader: (url) => (app.cookieController ? app.cookieController.getCookieHeader(url) : Promise.resolve(null))
         }
     });
     setRequestPipeline(pipeline);

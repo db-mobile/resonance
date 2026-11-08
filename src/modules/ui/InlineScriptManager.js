@@ -96,10 +96,6 @@ export class InlineScriptManager {
         await this._inFlightSave;
     }
 
-    async saveScripts() {
-        await this._saveScriptsFor(this.currentCollectionId, this.currentEndpointId);
-    }
-
     /**
      * @param {string} collectionId
      * @param {string} endpointId

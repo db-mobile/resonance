@@ -276,11 +276,3 @@ export function getAuthType(id) {
 export function getAuthTypeLabel(id) {
     return getAuthType(id)?.label || id;
 }
-
-/**
- * @param {string} id
- * @returns {string[]}
- */
-export function getSecretAuthFields(id) {
-    return [...(getAuthType(id)?.secretFields ?? [])];
-}

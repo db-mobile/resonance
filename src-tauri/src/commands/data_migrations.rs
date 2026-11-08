@@ -14,18 +14,23 @@
 
 use serde::Serialize;
 use serde_json::{Map, Value};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
 use super::collections::{COLLECTIONS_DIR, absorb_store_scripts, convert_v1_dir};
-use super::store_files::{MAIN_STORE, migrate_store_split, read_store, write_store};
+use super::store_files::{
+    MAIN_STORE, migrate_store_split, read_store, store_file_for, write_store,
+};
 
 pub const MIN_SUPPORTED_DATA_VERSION: u32 = 0;
 
 const DATA_VERSION_KEY: &str = "dataVersion";
 const STORE_SCRIPTS_KEY: &str = "persistedScripts";
 const GLOBAL_STORE_COLLECTIONS_KEY: &str = "collections";
+const COOKIE_JAR_KEY: &str = "cookieJar";
+const DEFAULT_COOKIE_ENVIRONMENT: &str = "default";
 
 struct Step {
     to: u32,
@@ -48,6 +53,11 @@ const STEPS: &[Step] = &[
         to: 3,
         name: "scripts from the store into request files",
         run: move_store_scripts,
+    },
+    Step {
+        to: 4,
+        name: "cookie jar ids",
+        run: rekey_cookies,
     },
 ];
 
@@ -204,6 +214,90 @@ fn move_store_scripts(dir: &Path) -> Result<(), String> {
     } else {
         Err(failures.join("; "))
     }
+}
+
+/// Rekeys every cookie jar entry to `{environment}|{domain}|{path}|{name}`,
+/// the id cookies have carried since 2.12.6, and keeps only the newest entry
+/// per id. Mirrors `CookieRepository._migrateLegacyIds`, which the webview
+/// still runs lazily until this step retires it.
+fn rekey_cookies(dir: &Path) -> Result<(), String> {
+    let path = dir.join(store_file_for(COOKIE_JAR_KEY));
+    let mut store = read_store(&path);
+    let Some(Value::Array(cookies)) = store.get(COOKIE_JAR_KEY) else {
+        return Ok(());
+    };
+    let Some(rekeyed) = rekeyed_cookies(cookies) else {
+        return Ok(());
+    };
+    store.insert(COOKIE_JAR_KEY.to_string(), Value::Array(rekeyed));
+    write_store(&path, &store)
+}
+
+/// @returns The jar with current ids, or None when it already had them
+fn rekeyed_cookies(cookies: &[Value]) -> Option<Vec<Value>> {
+    let mut changed = false;
+    let mut order = Vec::new();
+    let mut by_id: HashMap<String, Value> = HashMap::new();
+
+    for (index, cookie) in cookies.iter().enumerate() {
+        let Value::Object(fields) = cookie else {
+            order.push(format!("\0{index}"));
+            by_id.insert(format!("\0{index}"), cookie.clone());
+            continue;
+        };
+        let environment = string_or_empty(fields, "environmentId");
+        let environment = if environment.is_empty() {
+            DEFAULT_COOKIE_ENVIRONMENT
+        } else {
+            environment
+        };
+        let id = format!(
+            "{}|{}|{}|{}",
+            environment,
+            string_or_empty(fields, "domain"),
+            string_or_empty(fields, "path"),
+            string_or_empty(fields, "name")
+        );
+        let mut entry = fields.clone();
+        if fields.get("id").and_then(Value::as_str) != Some(&id) {
+            changed = true;
+            entry.insert("id".to_string(), Value::String(id.clone()));
+            entry.insert(
+                "environmentId".to_string(),
+                Value::String(environment.to_string()),
+            );
+        }
+        match by_id.get(&id) {
+            None => {
+                order.push(id.clone());
+                by_id.insert(id, Value::Object(entry));
+            }
+            Some(existing) => {
+                changed = true;
+                if updated_at(&entry) > existing.as_object().map_or(0.0, updated_at) {
+                    by_id.insert(id, Value::Object(entry));
+                }
+            }
+        }
+    }
+
+    changed.then(|| {
+        order
+            .into_iter()
+            .filter_map(|id| by_id.remove(&id))
+            .collect()
+    })
+}
+
+fn string_or_empty<'a>(fields: &'a Map<String, Value>, key: &str) -> &'a str {
+    fields.get(key).and_then(Value::as_str).unwrap_or("")
+}
+
+fn updated_at(cookie: &Map<String, Value>) -> f64 {
+    cookie
+        .get("updatedAt")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
 }
 
 #[cfg(test)]
@@ -384,6 +478,70 @@ mod tests {
             "store split did not run"
         );
         assert!(temp.path().join("resonance-history.json").exists());
+    }
+
+    #[test]
+    fn the_chain_rekeys_cookies_after_the_store_split_moved_them() {
+        let temp = TempDir::new().unwrap();
+        write_main(
+            temp.path(),
+            json!({
+                "cookieJar": [
+                    {"id": "old-1", "domain": "a.test", "path": "/", "name": "s", "value": "stale", "updatedAt": 1},
+                    {"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s", "value": "fresh", "updatedAt": 2},
+                    {"id": "env1|b.test|/|t", "environmentId": "env1", "domain": "b.test", "path": "/", "name": "t", "value": "kept"}
+                ]
+            }),
+        );
+
+        assert!(run(temp.path()).is_empty());
+
+        assert!(read_main(temp.path()).get("cookieJar").is_none());
+        let cookies = read_store(&temp.path().join(store_file_for("cookieJar")));
+        assert_eq!(
+            cookies["cookieJar"],
+            json!([
+                {"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s", "value": "fresh", "updatedAt": 2},
+                {"id": "env1|b.test|/|t", "environmentId": "env1", "domain": "b.test", "path": "/", "name": "t", "value": "kept"}
+            ])
+        );
+        assert_eq!(stored_version(temp.path()), 4);
+    }
+
+    #[test]
+    fn a_jar_with_current_ids_is_not_rewritten() {
+        let cookies = vec![
+            json!({"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s"}),
+            json!({"id": "env1|b.test|/|t", "environmentId": "env1", "domain": "b.test", "path": "/", "name": "t"}),
+        ];
+
+        assert_eq!(rekeyed_cookies(&cookies), None);
+    }
+
+    #[test]
+    fn a_rekeyed_entry_keeps_its_position_and_the_older_duplicate_loses() {
+        let cookies = vec![
+            json!({"id": "x", "environmentId": null, "domain": "a.test", "path": "/", "name": "s", "value": "newer", "updatedAt": 5}),
+            json!({"id": "y", "domain": "c.test", "path": "/", "name": "u"}),
+            json!({"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s", "value": "older", "updatedAt": 3}),
+        ];
+
+        let rekeyed = rekeyed_cookies(&cookies).unwrap();
+
+        assert_eq!(rekeyed.len(), 2);
+        assert_eq!(rekeyed[0]["id"], "default|a.test|/|s");
+        assert_eq!(rekeyed[0]["value"], "newer");
+        assert_eq!(rekeyed[1]["id"], "default|c.test|/|u");
+        assert_eq!(rekeyed[1]["environmentId"], "default");
+    }
+
+    #[test]
+    fn a_missing_jar_is_a_no_op() {
+        let temp = TempDir::new().unwrap();
+
+        assert_eq!(rekey_cookies(temp.path()), Ok(()));
+
+        assert!(!temp.path().join(store_file_for("cookieJar")).exists());
     }
 
     #[test]

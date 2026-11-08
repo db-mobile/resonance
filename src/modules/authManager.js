@@ -416,7 +416,6 @@ export class AuthManager {
         const authUrl = await api.oauth2.buildAuthorizationUrl(authUrlParams);
 
         this.currentAuthConfig.config._pendingState = state;
-        this.currentAuthConfig.config._pendingPkce = pkceParams;
 
         window.open(authUrl, '_blank', 'width=600,height=700');
 
@@ -471,7 +470,6 @@ export class AuthManager {
             this._handleTokenResponse(result, errorGroup, errorMessage);
 
             delete raw._pendingState;
-            delete raw._pendingPkce;
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to exchange code');
         }

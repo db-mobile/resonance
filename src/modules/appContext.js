@@ -14,6 +14,9 @@
  * @property {*} [responseContainerManager]
  * @property {*} [collectionController]
  * @property {*} [collectionService]
+ * @property {*} [variableContext]
+ * @property {*} [examplesService]
+ * @property {*} [examplesController]
  * @property {*} [secretStore]
  * @property {*} [graphqlBodyManager]
  * @property {*} [formBodyManager]
@@ -25,7 +28,6 @@
  * @property {*} [i18n]
  * @property {Function} [captureGrpcState]
  * @property {Function} [applyGrpcState]
- * @property {Function} [getApiHandlerSettingsCache]
  */
 
 /** @type {AppContext} */

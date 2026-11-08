@@ -87,10 +87,6 @@ export class CollectionImportExportService {
         await this._exportQuietly(() => this.collectionService.exportCollectionAsOpenApi(collection.id, 'yaml'));
     }
 
-    async handleExportPostman(collection) {
-        await this._exportQuietly(() => this.collectionService.exportCollectionAsPostman(collection.id));
-    }
-
     async handleGenerateDocumentation(collection) {
         try {
             if (!this.docGeneratorService.hasHttpEndpoints(collection)) {
@@ -155,6 +151,17 @@ export class CollectionImportExportService {
                 skippedAssets = 0,
                 deduped = 0
             } = result;
+            if (!collection) {
+                const names = [];
+                for (const environment of environments) {
+                    const created = await app.environmentController?.handleImportEnvironment(environment);
+                    names.push(created?.name ?? environment.name);
+                }
+                toast.success(names.length === 1
+                    ? `Imported environment "${names[0]}"`
+                    : `Imported ${names.length} environments`);
+                return null;
+            }
             await this.refreshCollections(false);
             await this.saveResponseSchemasFromImport(collection);
             await this.storeImportedCollectionAuth(collection);
@@ -200,26 +207,6 @@ export class CollectionImportExportService {
                 }
             }
         } catch {
-        }
-    }
-
-    async importPostmanEnvironment() {
-        try {
-            const environment = await this.backendAPI.collections.importPostmanEnvironment();
-
-            if (!environment) {
-                this.statusDisplay.update('Import cancelled', null);
-                return null;
-            }
-
-            if (app.environmentController) {
-                const created = await app.environmentController.handleImportEnvironment(environment);
-                this.statusDisplay.update(`Imported environment "${created.name}"`, null);
-            }
-            return environment;
-        } catch (error) {
-            this.statusDisplay.update(`Import error: ${error.message}`, null);
-            throw error;
         }
     }
 

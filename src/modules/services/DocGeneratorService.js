@@ -239,6 +239,52 @@ export class DocGeneratorService {
     }
 
     /**
+     * @param {Object} endpoint
+     * @returns {Array<Object>}
+     */
+    _exampleResponses(endpoint) {
+        return Array.isArray(endpoint.examples)
+            ? endpoint.examples.filter(example => example && Number.isInteger(example.status))
+            : [];
+    }
+
+    /**
+     * @param {string|undefined} contentType
+     * @returns {string}
+     */
+    _exampleLang(contentType) {
+        const type = (contentType || '').split(';')[0].trim().toLowerCase();
+        if (type.includes('json')) {
+            return 'json';
+        }
+        if (type.includes('xml')) {
+            return 'xml';
+        }
+        if (type.includes('html')) {
+            return 'html';
+        }
+        return 'text';
+    }
+
+    /**
+     * @param {Object} example
+     * @returns {number}
+     */
+    _exampleBinaryBytes(example) {
+        const body = example.body || '';
+        const padding = body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0;
+        return Math.max(0, Math.floor((body.length * 3) / 4) - padding);
+    }
+
+    /**
+     * @param {Object} example
+     * @returns {string}
+     */
+    _exampleStatusLine(example) {
+        return `${example.status} ${example.statusText || ''}`.trim();
+    }
+
+    /**
      * @param {Array<string>} languages
      * @returns {Array<{langId: string, lang: Object}>}
      */
@@ -345,6 +391,28 @@ export class DocGeneratorService {
             lines.push(JSON.stringify(responseSchema, null, 2));
             lines.push('```');
             lines.push('');
+        }
+
+        const examples = this._exampleResponses(endpoint);
+        if (examples.length > 0) {
+            lines.push('#### Example Responses');
+            lines.push('');
+            for (const example of examples) {
+                lines.push(`**${example.name}** — ${this._exampleStatusLine(example)}`);
+                lines.push('');
+                if (example.contentType) {
+                    lines.push(`**Content-Type:** \`${example.contentType}\``);
+                    lines.push('');
+                }
+                if (example.bodyEncoding === 'base64') {
+                    lines.push(`_Binary body (${this._exampleBinaryBytes(example)} bytes, base64) omitted._`);
+                } else if (example.body) {
+                    lines.push(`\`\`\`${this._exampleLang(example.contentType)}`);
+                    lines.push(example.body);
+                    lines.push('```');
+                }
+                lines.push('');
+            }
         }
 
         if (languages.length > 0) {
@@ -490,6 +558,26 @@ export class DocGeneratorService {
             html.push('<summary><h4>Response Schema</h4></summary>');
             html.push(`<pre><code class="language-json">${escapeHtml(JSON.stringify(responseSchema, null, 2))}</code></pre>`);
             html.push('</details>');
+        }
+
+        const examples = this._exampleResponses(endpoint);
+        if (examples.length > 0) {
+            html.push('<div class="examples-section">');
+            html.push('<h4>Example Responses</h4>');
+            for (const example of examples) {
+                html.push('<div class="example-response">');
+                html.push(`<h5>${escapeHtml(example.name)} <span class="status">${escapeHtml(this._exampleStatusLine(example))}</span></h5>`);
+                if (example.contentType) {
+                    html.push(`<p><strong>Content-Type:</strong> <code>${escapeHtml(example.contentType)}</code></p>`);
+                }
+                if (example.bodyEncoding === 'base64') {
+                    html.push(`<p class="example-binary">Binary body (${this._exampleBinaryBytes(example)} bytes, base64) omitted.</p>`);
+                } else if (example.body) {
+                    html.push(`<pre><code class="language-${this._exampleLang(example.contentType)}">${escapeHtml(example.body)}</code></pre>`);
+                }
+                html.push('</div>');
+            }
+            html.push('</div>');
         }
 
         if (languages.length > 0) {

@@ -30,6 +30,25 @@ export const baseEditorTheme = EditorView.theme({
     '.cm-placeholder': {
         color: 'var(--dim-fg-color)',
         fontStyle: 'italic'
+    },
+    '.cm-tooltip': {
+        backgroundColor: 'var(--popover-bg-color)',
+        color: 'var(--popover-fg-color)',
+        border: 'none',
+        borderRadius: 'var(--radius-small)',
+        boxShadow: 'var(--shadow-popover)'
+    },
+    '.cm-tooltip:has(> .var-tooltip)': {
+        padding: '0'
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+        backgroundColor: 'var(--accent-bg-color)',
+        color: 'var(--accent-fg-color)'
+    },
+    '.cm-tooltip-autocomplete .cm-completionDetail': {
+        marginLeft: 'var(--space-3)',
+        fontStyle: 'normal',
+        opacity: 'var(--dim-opacity)'
     }
 });
 

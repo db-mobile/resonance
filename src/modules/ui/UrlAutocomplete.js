@@ -21,12 +21,13 @@ export class UrlAutocomplete {
     _createDOM() {
         const wrapper = document.createElement('div');
         wrapper.className = 'url-autocomplete-wrapper';
-        this.urlInput.parentNode.insertBefore(wrapper, this.urlInput);
-        wrapper.appendChild(this.urlInput);
+        const anchor = this.urlInput.closest('.var-field') ?? this.urlInput;
+        anchor.parentNode.insertBefore(wrapper, anchor);
+        wrapper.appendChild(anchor);
 
-        if (this.urlInput.style.display === 'none') {
+        if (anchor.style.display === 'none') {
             wrapper.style.display = 'none';
-            this.urlInput.style.display = '';
+            anchor.style.display = '';
         }
 
         this.dropdown = document.createElement('ul');
@@ -65,9 +66,18 @@ export class UrlAutocomplete {
         this.urlInput.addEventListener('blur', () => {
             setTimeout(() => this._hide(), 150);
         });
+
+        this.urlInput.addEventListener('variable-autocomplete:open', () => {
+            this._debouncedShow.cancel();
+            this._hide();
+        });
     }
 
     async _showSuggestions(query) {
+        if (this.urlInput.dataset.varCompleting === 'true') {
+            this._hide();
+            return;
+        }
         const seq = ++this._searchSeq;
         const entries = await this.historyController.service.searchHistory(query);
         if (seq !== this._searchSeq) {

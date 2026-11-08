@@ -35,7 +35,6 @@ describe('CollectionImportExportService', () => {
             },
             collectionService: {
                 exportCollectionAsOpenApi: jest.fn().mockResolvedValue({}),
-                exportCollectionAsPostman: jest.fn().mockResolvedValue({}),
                 loadCollections: jest.fn().mockResolvedValue([{ id: 'c1', name: 'Existing' }]),
                 createCollection: jest.fn().mockResolvedValue({ id: 'c2', name: 'Fresh' }),
                 addRequestToCollection: jest.fn().mockResolvedValue({ id: 'e1' })
@@ -52,6 +51,80 @@ describe('CollectionImportExportService', () => {
         };
         service = new CollectionImportExportService(deps);
         delete app.collectionController;
+        delete app.environmentController;
+    });
+
+    describe('importCollectionFile', () => {
+        beforeEach(() => {
+            deps.collectionDialogs.showCollectionImportDialog = jest.fn().mockResolvedValue({
+                filePath: '/tmp/import.json',
+                storageParentPath: '/store'
+            });
+            deps.backendAPI.collections.importCollectionFile = jest.fn();
+            app.environmentController = {
+                handleImportEnvironment: jest.fn(async (env) => ({ id: 'env1', name: `${env.name} 1` }))
+            };
+        });
+
+        test('a collection result refreshes the sidebar, imports bundled environments and toasts', async () => {
+            const collection = { id: 'c1', name: 'Pets', endpoints: [] };
+            deps.backendAPI.collections.importCollectionFile.mockResolvedValue({
+                format: 'insomnia',
+                collection,
+                environments: [{ name: 'Staging', variables: { host: 'x' } }],
+                skippedRequests: 2
+            });
+
+            await expect(service.importCollectionFile()).resolves.toBe(collection);
+
+            expect(deps.backendAPI.collections.importCollectionFile).toHaveBeenCalledWith('/tmp/import.json', '/store');
+            expect(deps.refreshCollections).toHaveBeenCalledWith(false);
+            expect(app.environmentController.handleImportEnvironment).toHaveBeenCalledWith({ name: 'Staging', variables: { host: 'x' } });
+            expect(toast.success).toHaveBeenCalledWith('Imported "Pets" (+1 environment(s), 2 non-HTTP request(s) skipped)');
+        });
+
+        test('an environment-only result creates the environments without touching collections', async () => {
+            deps.backendAPI.collections.importCollectionFile.mockResolvedValue({
+                format: 'postman_environment',
+                environments: [{ name: 'Dev', variables: { host: 'x' }, secretKeys: ['token'] }]
+            });
+
+            await expect(service.importCollectionFile()).resolves.toBeNull();
+
+            expect(deps.refreshCollections).not.toHaveBeenCalled();
+            expect(app.environmentController.handleImportEnvironment).toHaveBeenCalledWith({ name: 'Dev', variables: { host: 'x' }, secretKeys: ['token'] });
+            expect(toast.success).toHaveBeenCalledWith('Imported environment "Dev 1"');
+        });
+
+        test('several imported environments are counted in the toast', async () => {
+            deps.backendAPI.collections.importCollectionFile.mockResolvedValue({
+                format: 'insomnia_environment',
+                environments: [{ name: 'Staging', variables: {} }, { name: 'Prod', variables: {} }]
+            });
+
+            await service.importCollectionFile();
+
+            expect(app.environmentController.handleImportEnvironment).toHaveBeenCalledTimes(2);
+            expect(toast.success).toHaveBeenCalledWith('Imported 2 environments');
+        });
+
+        test('a cancelled dialog or picker reports the cancellation', async () => {
+            deps.collectionDialogs.showCollectionImportDialog.mockResolvedValueOnce(null);
+            await expect(service.importCollectionFile()).resolves.toBeNull();
+            expect(deps.backendAPI.collections.importCollectionFile).not.toHaveBeenCalled();
+
+            deps.backendAPI.collections.importCollectionFile.mockResolvedValue(null);
+            await expect(service.importCollectionFile()).resolves.toBeNull();
+            expect(deps.statusDisplay.update).toHaveBeenCalledWith('Import cancelled', null);
+            expect(toast.success).not.toHaveBeenCalled();
+        });
+
+        test('a failed import toasts the error and rethrows', async () => {
+            deps.backendAPI.collections.importCollectionFile.mockRejectedValue('Not a Postman environment file');
+
+            await expect(service.importCollectionFile()).rejects.toBe('Not a Postman environment file');
+            expect(toast.error).toHaveBeenCalledWith('Import failed: Not a Postman environment file');
+        });
     });
 
     test.each([
@@ -69,20 +142,16 @@ describe('CollectionImportExportService', () => {
         test('delegates to the collection service', async () => {
             await service.handleExportOpenApiJson({ id: 'c1' });
             await service.handleExportOpenApiYaml({ id: 'c1' });
-            await service.handleExportPostman({ id: 'c1' });
 
             expect(deps.collectionService.exportCollectionAsOpenApi).toHaveBeenNthCalledWith(1, 'c1', 'json');
             expect(deps.collectionService.exportCollectionAsOpenApi).toHaveBeenNthCalledWith(2, 'c1', 'yaml');
-            expect(deps.collectionService.exportCollectionAsPostman).toHaveBeenCalledWith('c1');
         });
 
         test('swallows export failures', async () => {
             deps.collectionService.exportCollectionAsOpenApi.mockRejectedValue(new Error('x'));
-            deps.collectionService.exportCollectionAsPostman.mockRejectedValue(new Error('x'));
 
             await expect(service.handleExportOpenApiJson({ id: 'c1' })).resolves.toBeUndefined();
             await expect(service.handleExportOpenApiYaml({ id: 'c1' })).resolves.toBeUndefined();
-            await expect(service.handleExportPostman({ id: 'c1' })).resolves.toBeUndefined();
         });
     });
 

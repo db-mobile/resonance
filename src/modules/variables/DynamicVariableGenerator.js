@@ -64,7 +64,7 @@ export class DynamicVariableGenerator {
             return this.requestCache.get(cacheKey);
         }
 
-        const generator = this.generators[name];
+        const generator = Object.hasOwn(this.generators, name) ? this.generators[name] : null;
         if (!generator) {
             return null;
         }
@@ -85,19 +85,7 @@ export class DynamicVariableGenerator {
      * @returns {boolean}
      */
     isDynamicVariable(name) {
-        return name in this.generators;
-    }
-
-    /**
-     * @param {string} name
-     * @param {string} params
-     * @returns {string}
-     */
-    getPlaceholder(name, params = null) {
-        if (params) {
-            return `[${name}:${params}]`;
-        }
-        return `[${name}]`;
+        return Object.hasOwn(this.generators, name);
     }
 
     /** @returns {string} */

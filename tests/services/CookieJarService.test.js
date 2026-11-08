@@ -1,84 +1,6 @@
 import { CookieJarService } from '../../src/modules/services/CookieJarService.js';
 import { CookieRepository } from '../../src/modules/storage/CookieRepository.js';
 
-describe('CookieJarService environment isolation', () => {
-    let service;
-    let repository;
-    let storeData;
-
-    beforeEach(() => {
-        storeData = {};
-        const mockBackendAPI = {
-            store: {
-                get: jest.fn(async (key) => storeData[key]),
-                set: jest.fn(async (key, value) => {
-                    storeData[key] = value;
-                })
-            }
-        };
-        repository = new CookieRepository(mockBackendAPI);
-        service = new CookieJarService(repository);
-    });
-
-    test('same cookie in two environments is stored separately', async () => {
-        await service.processCookiesFromResponse(
-            ['session=devToken; Path=/'],
-            'https://api.example.com/login',
-            'env-dev'
-        );
-        await service.processCookiesFromResponse(
-            ['session=prodToken; Path=/'],
-            'https://api.example.com/login',
-            'env-prod'
-        );
-
-        const devHeader = await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev');
-        const prodHeader = await service.getCookieHeaderForRequest('https://api.example.com/', 'env-prod');
-
-        expect(devHeader).toBe('session=devToken');
-        expect(prodHeader).toBe('session=prodToken');
-    });
-
-    test('updating a cookie only affects its own environment', async () => {
-        await service.processCookiesFromResponse(
-            ['session=devToken; Path=/'],
-            'https://api.example.com/login',
-            'env-dev'
-        );
-        await service.processCookiesFromResponse(
-            ['session=rotatedDevToken; Path=/'],
-            'https://api.example.com/login',
-            'env-dev'
-        );
-
-        const devCookies = await service.getAll('env-dev');
-
-        expect(devCookies).toHaveLength(1);
-        expect(devCookies[0].value).toBe('rotatedDevToken');
-    });
-
-    test('expiring a cookie in one environment keeps the sibling environment cookie', async () => {
-        await service.processCookiesFromResponse(
-            ['session=devToken; Path=/'],
-            'https://api.example.com/login',
-            'env-dev'
-        );
-        await service.processCookiesFromResponse(
-            ['session=prodToken; Path=/'],
-            'https://api.example.com/login',
-            'env-prod'
-        );
-        await service.processCookiesFromResponse(
-            ['session=gone; Path=/; Max-Age=0'],
-            'https://api.example.com/logout',
-            'env-dev'
-        );
-
-        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev')).toBeNull();
-        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-prod')).toBe('session=prodToken');
-    });
-});
-
 describe('CookieJarService manual editing', () => {
     let service;
     let storeData;
@@ -148,10 +70,10 @@ describe('CookieJarService manual editing', () => {
         );
 
         expect(await service.getAll('env-prod')).toHaveLength(0);
-        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev')).toBe('session=dev');
+        expect(await service.getAll('env-dev')).toHaveLength(1);
     });
 
-    test('string expires values are parsed and land in the Cookie header until then', async () => {
+    test('string expires values are parsed to a timestamp', async () => {
         const future = new Date(Date.now() + 3600_000).toISOString();
         const stored = await service.putCookie(
             { name: 'session', value: 'abc', domain: 'api.example.com', expires: future },
@@ -159,7 +81,7 @@ describe('CookieJarService manual editing', () => {
         );
 
         expect(typeof stored.expires).toBe('number');
-        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev')).toBe('session=abc');
+        expect(stored.expires).toBe(Date.parse(future));
     });
 
     test.each([
@@ -173,163 +95,6 @@ describe('CookieJarService manual editing', () => {
     ])('putCookie rejects invalid input %#', async (cookie, errorCode) => {
         expect(service.validateCookie(cookie)).toBe(errorCode);
         await expect(service.putCookie(cookie, 'env-dev')).rejects.toThrow(errorCode);
-        expect(await service.getAll('env-dev')).toHaveLength(0);
-    });
-});
-
-describe('CookieRepository legacy id migration', () => {
-    let repository;
-    let storeData;
-    let mockBackendAPI;
-
-    const legacyCookie = {
-        id: 'api.example.com|/|session',
-        environmentId: 'env-dev',
-        name: 'session',
-        value: 'legacyToken',
-        domain: 'api.example.com',
-        path: '/',
-        expires: null,
-        httpOnly: false,
-        secure: false,
-        sameSite: null,
-        hostOnly: true,
-        createdAt: 1000,
-        updatedAt: 1000
-    };
-
-    beforeEach(() => {
-        storeData = {};
-        mockBackendAPI = {
-            store: {
-                get: jest.fn(async (key) => storeData[key]),
-                set: jest.fn(async (key, value) => {
-                    storeData[key] = value;
-                })
-            }
-        };
-        repository = new CookieRepository(mockBackendAPI);
-    });
-
-    test('rewrites legacy ids to the environment-scoped format and persists', async () => {
-        storeData.cookieJar = [legacyCookie];
-
-        const cookies = await repository.getAll('env-dev');
-
-        expect(cookies).toHaveLength(1);
-        expect(cookies[0].id).toBe('env-dev|api.example.com|/|session');
-        expect(storeData.cookieJar[0].id).toBe('env-dev|api.example.com|/|session');
-    });
-
-    test('assigns default environment to cookies without one', async () => {
-        storeData.cookieJar = [{ ...legacyCookie, environmentId: undefined }];
-
-        const cookies = await repository.getAll('default');
-
-        expect(cookies).toHaveLength(1);
-        expect(cookies[0].id).toBe('default|api.example.com|/|session');
-        expect(cookies[0].environmentId).toBe('default');
-    });
-
-    test('deduplicates colliding entries keeping the most recently updated', async () => {
-        storeData.cookieJar = [
-            { ...legacyCookie, value: 'older', updatedAt: 1000 },
-            { ...legacyCookie, value: 'newer', updatedAt: 2000 }
-        ];
-
-        const cookies = await repository.getAll('env-dev');
-
-        expect(cookies).toHaveLength(1);
-        expect(cookies[0].value).toBe('newer');
-    });
-
-    test('leaves already-migrated data untouched without rewriting the store', async () => {
-        storeData.cookieJar = [
-            { ...legacyCookie, id: 'env-dev|api.example.com|/|session' }
-        ];
-
-        await repository.getAll('env-dev');
-
-        expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
-    });
-});
-
-describe('CookieJarService store traffic', () => {
-    let service;
-    let mockBackendAPI;
-
-    beforeEach(() => {
-        const storeData = { cookieJar: [] };
-        mockBackendAPI = {
-            store: {
-                get: jest.fn(async (key) => storeData[key]),
-                set: jest.fn(async (key, value) => { storeData[key] = value; })
-            }
-        };
-        service = new CookieJarService(new CookieRepository(mockBackendAPI));
-    });
-
-    test('a response with several cookies is saved in one write', async () => {
-        await service.processCookiesFromResponse(
-            ['a=1; Path=/', 'b=2; Path=/', 'gone=x; Path=/; Max-Age=0'],
-            'https://api.example.com/login',
-            'env-dev'
-        );
-
-        expect(mockBackendAPI.store.set).toHaveBeenCalledTimes(1);
-        expect(await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev')).toBe('a=1; b=2');
-    });
-
-    test('building request cookies neither rewrites the jar nor rereads it', async () => {
-        await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev');
-        await service.getCookieHeaderForRequest('https://api.example.com/', 'env-dev');
-
-        expect(mockBackendAPI.store.set).not.toHaveBeenCalled();
-        expect(mockBackendAPI.store.get).toHaveBeenCalledTimes(1);
-    });
-});
-
-describe('CookieJarService Domain attribute', () => {
-    let service;
-
-    beforeEach(() => {
-        const storeData = { cookieJar: [] };
-        const mockBackendAPI = {
-            store: {
-                get: jest.fn(async (key) => storeData[key]),
-                set: jest.fn(async (key, value) => { storeData[key] = value; })
-            }
-        };
-        service = new CookieJarService(new CookieRepository(mockBackendAPI));
-    });
-
-    test('a cookie for an unrelated domain is rejected', async () => {
-        await service.processCookiesFromResponse(
-            ['stolen=1; Domain=victim.com; Path=/'],
-            'https://attacker.com/',
-            'env-dev'
-        );
-
-        expect(await service.getAll('env-dev')).toHaveLength(0);
-    });
-
-    test('a cookie for a parent domain of the request host is accepted', async () => {
-        await service.processCookiesFromResponse(
-            ['shared=1; Domain=.example.com; Path=/'],
-            'https://api.example.com/',
-            'env-dev'
-        );
-
-        expect(await service.getCookieHeaderForRequest('https://www.example.com/', 'env-dev')).toBe('shared=1');
-    });
-
-    test('a cookie for a subdomain of the request host is rejected', async () => {
-        await service.processCookiesFromResponse(
-            ['child=1; Domain=api.example.com; Path=/'],
-            'https://example.com/',
-            'env-dev'
-        );
-
         expect(await service.getAll('env-dev')).toHaveLength(0);
     });
 });

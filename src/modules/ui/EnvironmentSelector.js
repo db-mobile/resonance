@@ -11,7 +11,6 @@ export class EnvironmentSelector {
         this.dropdown = null;
         this.isOpen = false;
         this.releaseEscape = null;
-        this.activeEnvironment = null;
     }
 
     initialize(containerId) {
@@ -144,7 +143,6 @@ export class EnvironmentSelector {
     }
 
     setActiveEnvironment(environment) {
-        this.activeEnvironment = environment;
         const nameSpan = document.getElementById('env-selector-name');
         if (nameSpan && environment) {
             nameSpan.textContent = environment.name;

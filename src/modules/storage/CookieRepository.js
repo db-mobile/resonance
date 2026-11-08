@@ -3,8 +3,6 @@
  * @module storage/CookieRepository
  */
 
-import { cookieEnvironmentId, cookieId } from '../utils/cookieId.js';
-
 export class CookieRepository {
     constructor(backendAPI) {
         this.backendAPI = backendAPI;
@@ -22,37 +20,11 @@ export class CookieRepository {
                 data = [];
                 await this.backendAPI.store.set(this.COOKIE_JAR_KEY, data);
             }
-            this._cookies = await this._migrateLegacyIds(data);
+            this._cookies = data;
             return this._cookies;
         } catch (_e) {
             return [];
         }
-    }
-
-    async _migrateLegacyIds(cookies) {
-        let changed = false;
-        const byId = new Map();
-        for (const cookie of cookies) {
-            const envId = cookieEnvironmentId(cookie.environmentId);
-            const id = cookieId(envId, cookie.domain, cookie.path, cookie.name);
-            const migrated = id === cookie.id ? cookie : { ...cookie, id, environmentId: envId };
-            if (migrated !== cookie) {
-                changed = true;
-            }
-            const existing = byId.get(id);
-            if (!existing || (migrated.updatedAt || 0) > (existing.updatedAt || 0)) {
-                byId.set(id, migrated);
-            }
-        }
-        if (byId.size !== cookies.length) {
-            changed = true;
-        }
-        if (!changed) {
-            return cookies;
-        }
-        const result = [...byId.values()];
-        await this._save(result);
-        return result;
     }
 
     async _save(cookies) {
@@ -80,26 +52,6 @@ export class CookieRepository {
         await this._save(next);
     }
 
-    /**
-     * @param {Object[]} cookies
-     * @returns {Promise<void>}
-     */
-    async applyResponseCookies(cookies) {
-        const now = Date.now();
-        const byId = new Map((await this._getArrayFromStore()).map(c => [c.id, c]));
-        for (const cookie of cookies) {
-            if (cookie.expires !== null && cookie.expires <= now) {
-                byId.delete(cookie.id);
-                continue;
-            }
-            const existing = byId.get(cookie.id);
-            byId.set(cookie.id, existing
-                ? { ...existing, ...cookie, updatedAt: now }
-                : { ...cookie, createdAt: now, updatedAt: now });
-        }
-        await this._save([...byId.values()].filter(c => c.expires === null || c.expires > now));
-    }
-
     async delete(id) {
         const cookies = await this._getArrayFromStore();
         await this._save(cookies.filter(c => c.id !== id));
@@ -108,14 +60,5 @@ export class CookieRepository {
     async deleteAll(environmentId) {
         const cookies = await this._getArrayFromStore();
         await this._save(cookies.filter(c => c.environmentId !== environmentId));
-    }
-
-    async deleteExpired() {
-        const now = Date.now();
-        const cookies = await this._getArrayFromStore();
-        const live = cookies.filter(c => c.expires === null || c.expires > now);
-        if (live.length !== cookies.length) {
-            await this._save(live);
-        }
     }
 }

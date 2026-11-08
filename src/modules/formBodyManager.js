@@ -6,6 +6,7 @@
 import { normalizeFormRows, isMeaningfulRow } from './utils/formDataRows.js';
 import { markTabModified } from './state/tabModified.js';
 import { createEnabledCheckbox, createRemoveRowButton, createTextInput } from './keyValueManager.js';
+import { decorateInputsIn } from './ui/inputDecorator.js';
 
 export class FormBodyManager {
     constructor() {
@@ -159,6 +160,7 @@ export class FormBodyManager {
         }
 
         rowEl.appendChild(createRemoveRowButton());
+        decorateInputsIn(rowEl);
 
         return rowEl;
     }

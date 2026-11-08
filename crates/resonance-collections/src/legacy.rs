@@ -16,11 +16,11 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use super::model::{
-    Body, BodyKind, CollectionDoc, FORMAT_VERSION, FolderDoc, Params, RequestDoc, Scripts, Spec,
-};
+use super::model::{CollectionDoc, FORMAT_VERSION, FolderDoc, Params, RequestDoc, Spec};
 use super::read::{FolderNode, LoadedCollection, RequestEntry};
-use crate::ipc::{Collection, EndpointData};
+use crate::ipc::{
+    Collection, EndpointData, body_from_endpoint_data, scripts_from_endpoint_data, string_field,
+};
 use crate::layout::{COLLECTION_JSON, find_endpoint_data_file};
 
 /// Reads and parses one JSON file.
@@ -106,15 +106,6 @@ pub fn load_v1_dir(dir: &Path) -> Result<LoadedCollection, String> {
 /// Gap between generated `seq` values, matching the writer's step.
 const SEQ_STEP: i64 = 10;
 
-/// Reads a string field off a v1 JSON object, treating blank as absent.
-fn string_field(value: &Value, key: &str) -> Option<String> {
-    value
-        .get(key)
-        .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-}
-
 /// Reads a nested object field, treating an empty object as absent.
 fn object_field(value: &Value, key: &str) -> Option<Value> {
     value
@@ -131,38 +122,6 @@ fn non_empty_object(value: &Value) -> Option<Value> {
         Value::Null => None,
         Value::Object(map) if map.is_empty() => None,
         other => Some(other.clone()),
-    }
-}
-
-/// Normalizes v1 form rows into the canonical array shape.
-///
-/// Mirrors `normalizeFormRows` in `src/modules/utils/formDataRows.js`: older
-/// data stored a flat `{key: value}` object where the current shape is an
-/// ordered array of rows, and both must keep loading.
-///
-/// @param fields - The persisted `fields` value, in either shape
-/// @returns Rows as an array, empty when there is nothing to convert
-fn normalize_form_rows(fields: Option<&Value>) -> Vec<Value> {
-    match fields {
-        Some(Value::Array(rows)) => rows.clone(),
-        Some(Value::Object(map)) => map
-            .iter()
-            .map(|(key, value)| {
-                let text = match value {
-                    Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                };
-                let mut row = Map::new();
-                row.insert("key".into(), Value::String(key.clone()));
-                row.insert("value".into(), Value::String(text));
-                row.insert("type".into(), Value::String("text".into()));
-                row.insert("filePath".into(), Value::String(String::new()));
-                row.insert("contentType".into(), Value::String(String::new()));
-                row.insert("enabled".into(), Value::Bool(true));
-                Value::Object(row)
-            })
-            .collect(),
-        _ => Vec::new(),
     }
 }
 
@@ -188,93 +147,6 @@ fn prune_parameter_buckets(parameters: Option<Value>) -> Option<Value> {
         None
     } else {
         Some(Value::Object(pruned))
-    }
-}
-
-/// Chooses the one body a v1 endpoint actually had.
-///
-/// v1 spread the body across three fields and wrote exactly one of them per
-/// save, so precedence follows what the frontend could have produced:
-/// `formBodyData` carries its own mode and wins, then `graphqlData`, then a
-/// plain `modifiedBody` which was always JSON mode.
-///
-/// @param data - The endpoint's v1 data file
-/// @returns The v2 body, or None when the request had none
-pub fn body_from_v1(data: &EndpointData) -> Option<Body> {
-    if let Some(form) = &data.form_body_data {
-        let mode = form.get("mode").and_then(|m| m.as_str()).unwrap_or("");
-        match mode {
-            "formdata" => {
-                return Some(Body::Known(BodyKind::FormData {
-                    fields: normalize_form_rows(form.get("fields")),
-                }));
-            }
-            "urlencoded" => {
-                return Some(Body::Known(BodyKind::UrlEncoded {
-                    fields: normalize_form_rows(form.get("fields")),
-                }));
-            }
-            "binary" => {
-                return Some(Body::Known(BodyKind::Binary {
-                    file_path: string_field(form, "filePath").unwrap_or_default(),
-                    content_type: string_field(form, "contentType").unwrap_or_default(),
-                }));
-            }
-            "text" => {
-                return Some(Body::Known(BodyKind::Text {
-                    content: form
-                        .get("content")
-                        .and_then(|c| c.as_str())
-                        .unwrap_or("")
-                        .to_string(),
-                }));
-            }
-            _ => {}
-        }
-    }
-
-    if let Some(graphql) = &data.graphql_data {
-        let query = graphql
-            .get("query")
-            .and_then(|q| q.as_str())
-            .unwrap_or("")
-            .to_string();
-        let variables = graphql
-            .get("variables")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-
-        if !query.is_empty() || !variables.is_empty() {
-            return Some(Body::Known(BodyKind::Graphql {
-                query,
-                variables,
-                operation_name: string_field(graphql, "operationName"),
-            }));
-        }
-    }
-
-    if let Some(body) = &data.modified_body
-        && !body.is_empty()
-    {
-        return Some(Body::Known(BodyKind::Json {
-            content: body.clone(),
-        }));
-    }
-
-    None
-}
-
-/// Converts v1 scripts, which used longer field names.
-pub fn scripts_from_v1(value: Option<&Value>) -> Scripts {
-    let scripts = match value {
-        Some(scripts) => scripts,
-        None => return Scripts::default(),
-    };
-
-    Scripts {
-        pre_request: string_field(scripts, "preRequestScript"),
-        test: string_field(scripts, "testScript"),
     }
 }
 
@@ -324,11 +196,11 @@ pub fn endpoint_to_request(endpoint: &Value, data: Option<&EndpointData>, seq: i
             query: data.query_params.clone(),
             headers: data.headers.clone(),
         };
-        doc.body = body_from_v1(data);
+        doc.body = body_from_endpoint_data(data);
         doc.grpc = data.grpc_data.clone().filter(|v| !v.is_null());
         doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
         doc.websocket = data.websocket_data.clone().filter(|v| !v.is_null());
-        doc.scripts = scripts_from_v1(data.scripts.as_ref());
+        doc.scripts = scripts_from_endpoint_data(data.scripts.as_ref());
         doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
     }
 
@@ -452,6 +324,7 @@ pub fn v1_to_v2(collection: &Collection, data: &HashMap<String, EndpointData>) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{Body, BodyKind};
     use serde_json::json;
 
     fn v1_collection(endpoints: Vec<Value>, folders: Vec<Value>) -> Collection {

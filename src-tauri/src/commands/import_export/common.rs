@@ -1,8 +1,95 @@
 //! Helpers shared by the collection importers (Postman, Insomnia, HAR).
 
 use super::{Endpoint, Folder};
-use serde_json::Value;
+use resonance_collections::model::ExampleDoc;
+use serde_json::{Map, Value};
 use std::collections::HashSet;
+
+/// Response headers never kept on an imported example: transport details and
+/// session cookies.
+pub(crate) const EXAMPLE_SKIPPED_HEADERS: [&str; 6] = [
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "date",
+    "set-cookie",
+];
+
+/// Builds the `{key, value}` header rows of an example, lowercased and
+/// without the transport headers.
+pub(crate) fn example_headers<'a>(pairs: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<Value> {
+    pairs
+        .map(|(key, value)| (key.trim().to_ascii_lowercase(), value))
+        .filter(|(key, _)| !key.is_empty() && !EXAMPLE_SKIPPED_HEADERS.contains(&key.as_str()))
+        .map(|(key, value)| serde_json::json!({ "key": key, "value": value }))
+        .collect()
+}
+
+/// The value of one header row, by case-insensitive name.
+pub(crate) fn example_header_value(headers: &[Value], name: &str) -> Option<String> {
+    headers.iter().find_map(|row| {
+        let key = row.get("key")?.as_str()?;
+        key.eq_ignore_ascii_case(name)
+            .then(|| {
+                row.get("value")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .flatten()
+    })
+}
+
+/// True when the example body fits the size the request file accepts.
+pub(crate) fn example_within_limit(example: &ExampleDoc) -> bool {
+    example
+        .body
+        .as_ref()
+        .is_none_or(|body| body.len() <= crate::commands::collections::MAX_EXAMPLE_BODY_BYTES)
+}
+
+/// Assembles an imported example; `None` when the status is not an HTTP one.
+pub(crate) fn imported_example(
+    status: Option<u64>,
+    status_text: Option<&str>,
+    name: Option<&str>,
+    headers: Vec<Value>,
+    content_type: Option<String>,
+    body: Option<&str>,
+    base64: bool,
+) -> Option<ExampleDoc> {
+    let status = status.and_then(|code| u16::try_from(code).ok())?;
+    if !(100..=599).contains(&status) {
+        return None;
+    }
+    let status_text = status_text
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string);
+    let name = name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            format!("{} {}", status, status_text.as_deref().unwrap_or(""))
+                .trim()
+                .to_string()
+        });
+    let body = body.filter(|body| !body.is_empty()).map(str::to_string);
+    let example = ExampleDoc {
+        id: uuid::Uuid::new_v4().to_string(),
+        name,
+        status,
+        status_text,
+        headers,
+        content_type,
+        body_encoding: (base64 && body.is_some()).then(|| "base64".to_string()),
+        body,
+        saved_at: None,
+        extra: Map::new(),
+    };
+    example_within_limit(&example).then_some(example)
+}
 
 /// Accumulates imported endpoints. Each one goes into the flat list and, when
 /// it sits under a folder chain, into that chain's composite-named folder

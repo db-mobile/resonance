@@ -1,6 +1,9 @@
 import { EditorView } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
 import { BaseCodeEditor } from './editors/BaseCodeEditor.js';
+import { variableSupport } from './editors/variableExtension.js';
+import { app } from './appContext.js';
 import { formatJsonBody } from './utils/formatJson.js';
 import { toast } from './ui/Toast.js';
 
@@ -13,7 +16,12 @@ export class RequestBodyEditor extends BaseCodeEditor {
             extensions.push(json());
         }
 
-        return [...extensions, ...this.getSearchExtensions()];
+        return [
+            ...extensions,
+            autocompletion(),
+            ...variableSupport(() => app.variableContext),
+            ...this.getSearchExtensions()
+        ];
     }
 
     /** @returns {string} */
@@ -25,6 +33,7 @@ export class RequestBodyEditor extends BaseCodeEditor {
     getKeymaps() {
         return [
             { key: 'Shift-Alt-f', run: () => { this.formatJSONWithFeedback(); return true; } },
+            ...completionKeymap,
             ...super.getKeymaps()
         ];
     }

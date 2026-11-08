@@ -89,12 +89,4 @@ describe('CookieController.applyScriptCookieChanges', () => {
         expect(await service.getAll('original')).toEqual([]);
         expect(await service.getAll('selected-later')).toHaveLength(1);
     });
-
-    it('script-set cookies are injected into a matching request', async () => {
-        await controller.applyScriptCookieChanges([
-            { op: 'set', cookie: { name: 'token', value: 'xyz', domain: 'api.example.com', path: '/' } }
-        ]);
-
-        expect(await controller.getCookieHeader('https://api.example.com/users')).toBe('token=xyz');
-    });
 });

@@ -24,9 +24,14 @@ describe('MigrationNoticeDialog', () => {
         expect(text).toContain('runs again the next time');
     });
 
-    test('too-old and unsupported data point at the last converting release', () => {
-        expect(describeMigrationIssue({ kind: 'tooOld', found: 0, min: 2 })).toContain('Install Resonance 3.3.0');
-        expect(describeMigrationIssue({ kind: 'unsupported', data: 'globalStoreCollections' })).toContain('before March 2026');
+    test('too-old data points at the last release that still converts every data version', () => {
+        expect(describeMigrationIssue({ kind: 'tooOld', found: 0, min: 2 })).toContain('Install Resonance 3.5.8');
+    });
+
+    test('global-store collections point at the last release that still read them', () => {
+        const text = describeMigrationIssue({ kind: 'unsupported', data: 'globalStoreCollections' });
+        expect(text).toContain('before March 2026');
+        expect(text).toContain('Install Resonance 3.3.0');
     });
 
     test('no dialog opens when the migration reported nothing', async () => {

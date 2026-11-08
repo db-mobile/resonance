@@ -3,7 +3,7 @@ import { getSettings } from './state/settingsCache.js';
 import { app } from './appContext.js';
 import { updateStatusDisplay } from './statusDisplay.js';
 import { toast } from './ui/Toast.js';
-import { i18n } from '../i18n/index.js';
+import { i18n } from '../i18n/I18nManager.js';
 import {
     StreamSession,
     createBackendEventListener,

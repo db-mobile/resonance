@@ -97,13 +97,9 @@ async function cancelHttpRequest() {
         const execution = manualExecutions.get(requestTabId);
         if (!execution) { return; }
         await execution.cancel();
-        const result = { success: true };
-
-        if (result.success) {
-            await showStatusIfActive(requestTabId, 'Request cancelled');
-            displayResponseWithLineNumbersForTab('Request was cancelled by user', null, requestTabId);
-            clearResponsePanes(requestTabId, globalResponseElements());
-        }
+        await showStatusIfActive(requestTabId, 'Request cancelled');
+        displayResponseWithLineNumbersForTab('Request was cancelled by user', null, requestTabId);
+        clearResponsePanes(requestTabId, globalResponseElements());
     } catch (error) {
         updateStatusDisplay('Error cancelling request', null);
         updateResponseTime(null);

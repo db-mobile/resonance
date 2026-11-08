@@ -55,9 +55,6 @@ async function loadApiHandler(sendResult) {
     app.workspaceTabController = {
         service: { getActiveTabId: jest.fn().mockResolvedValue('tab-1'), updateTab }
     };
-    app.cookieController = {
-        getCookieHeader: jest.fn().mockResolvedValue(null)
-    };
 
     setCurrentEndpoint(null);
     document.getElementById('url-input').value = 'https://api.example.com/items';

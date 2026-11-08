@@ -152,3 +152,29 @@ describe('listFromWire', () => {
         expect(listFromWire([{ id: 'c1' }, null])).toHaveLength(1);
     });
 });
+
+describe('toWire examples', () => {
+    test('drops examples everywhere unless the endpoint id is kept', () => {
+        const collection = {
+            id: 'c', name: 'C',
+            endpoints: [
+                { id: 'a', name: 'A', examples: [{ id: 'x', name: 'X', status: 200 }] },
+                { id: 'b', name: 'B', examples: [] }
+            ],
+            folders: [{
+                id: 'f', name: 'F',
+                endpoints: [{ id: 'a', name: 'A', examples: [{ id: 'x', name: 'X', status: 200 }] }],
+                folders: [{ id: 'g', name: 'G', endpoints: [{ id: 'b', name: 'B', examples: [] }] }]
+            }]
+        };
+
+        const wire = toWire(collection, { keepExamplesFor: ['b'] });
+
+        expect(wire.endpoints[0].examples).toBeUndefined();
+        expect(wire.endpoints[1].examples).toEqual([]);
+        expect(wire.folders[0].endpoints[0].examples).toBeUndefined();
+        expect(wire.folders[0].folders[0].endpoints[0].examples).toEqual([]);
+        expect(collection.endpoints[0].examples).toHaveLength(1);
+        expect(toWire(collection).endpoints[1].examples).toBeUndefined();
+    });
+});

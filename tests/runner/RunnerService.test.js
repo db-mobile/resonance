@@ -55,8 +55,7 @@ describe('RunnerService', () => {
             collectionRepository: new CollectionRepository(mockBackendAPI, null),
             environmentRepository: new EnvironmentRepository(mockBackendAPI, null),
             mockServerService: new MockServerService(new MockServerRepository(mockBackendAPI), null),
-            certificates: new CertificateService(new CertificateRepository(mockBackendAPI)),
-            cookies: { getCookieHeader: (url) => app.cookieController?.getCookieHeader(url) ?? null }
+            certificates: new CertificateService(new CertificateRepository(mockBackendAPI))
         });
         service = new RunnerService(mockRepository, mockBackendAPI, mockStatusDisplay, { pipeline });
 
@@ -210,12 +209,14 @@ describe('RunnerService', () => {
     });
 
     describe('stopExecution', () => {
-        test('should set shouldStop flag when running', () => {
+        test('cancels the execution and reports when running', () => {
             service.isRunning = true;
+            const cancel = jest.fn().mockResolvedValue(undefined);
+            service._execution = { cancel };
 
             service.stopExecution();
 
-            expect(service.shouldStop).toBe(true);
+            expect(cancel).toHaveBeenCalled();
             expect(mockStatusDisplay.update).toHaveBeenCalledWith('Stopping runner...', null);
         });
 
@@ -224,7 +225,6 @@ describe('RunnerService', () => {
 
             service.stopExecution();
 
-            expect(service.shouldStop).toBe(false);
             expect(mockStatusDisplay.update).not.toHaveBeenCalled();
         });
     });
@@ -234,8 +234,9 @@ describe('RunnerService', () => {
             const listener = jest.fn();
 
             service.addListener(listener);
+            service._notifyListeners('test-event', {});
 
-            expect(service.listeners).toContain(listener);
+            expect(listener).toHaveBeenCalledWith('test-event', {});
         });
 
         test('should notify all listeners', () => {

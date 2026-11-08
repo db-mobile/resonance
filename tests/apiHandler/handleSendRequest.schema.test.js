@@ -77,9 +77,6 @@ async function loadApiHandler() {
     app.workspaceTabController = {
         service: { getActiveTabId: jest.fn().mockResolvedValue('tab-1'), updateTab }
     };
-    app.cookieController = {
-        getCookieHeader: jest.fn().mockResolvedValue(null)
-    };
 
     const container = {
         tabId: 'tab-1',

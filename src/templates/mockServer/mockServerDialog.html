@@ -79,7 +79,10 @@
         <div class="dialog-header">
             <div>
                 <h2 class="dialog-title" data-role="title"></h2>
-                <p class="dialog-subtitle" data-role="subtitle"></p>
+                <div class="u-flex u-items-center u-gap-3">
+                    <p class="dialog-subtitle" data-role="subtitle"></p>
+                    <span class="badge accent is-hidden" data-role="examples-badge"></span>
+                </div>
             </div>
             <button type="button" id="response-editor-close" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
         </div>
@@ -113,14 +116,16 @@
         </div>
 
         <div class="u-flex u-flex-col u-flex-1 u-min-h-0 u-overflow-hidden">
-            <label class="form-label" data-role="body-label"></label>
+            <div class="u-flex u-items-center u-justify-between">
+                <label class="form-label" data-role="body-label"></label>
+                <button type="button" id="response-editor-templating-btn" class="btn btn-xs btn-outline" data-role="templating"></button>
+            </div>
             <textarea
                 id="response-editor-textarea"
                 class="textarea-base mock-server-response-editor-textarea"
                 spellcheck="false"
             ></textarea>
             <div id="response-editor-error" class="field-error"></div>
-            <p class="form-hint mock-server-template-hint" data-role="template-hint"></p>
         </div>
         </div>
 
@@ -131,5 +136,18 @@
                 <button id="response-editor-save" class="btn btn-primary" data-role="save"></button>
             </div>
         </div>
+    </div>
+</template>
+
+<template id="tpl-mock-server-templating-reference">
+    <div class="u-flex u-flex-col u-gap-4 u-overflow-hidden">
+        <div class="dialog-header">
+            <h2 class="dialog-title" data-role="title"></h2>
+            <button type="button" id="mock-server-templating-close-btn" class="dialog-close-btn" aria-label="Close" data-i18n-aria="common.close"><span class="icon icon-16 icon-x"></span></button>
+        </div>
+
+        <p class="var-reference-intro"></p>
+
+        <div class="var-reference-grid"></div>
     </div>
 </template>

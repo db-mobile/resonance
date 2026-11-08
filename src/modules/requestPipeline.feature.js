@@ -19,7 +19,7 @@ import { setRequestPipeline } from './requestServices.js';
  * @param {Object} deps.environmentRepository
  * @param {Object} deps.mockServerService
  * @param {Object|null} [deps.certificates]
- * @param {Object|null} [deps.cookies]
+ * @param {Function|null} [deps.onVariablesChanged]
  * @returns {RequestPipeline}
  */
 export function createRequestPipeline({
@@ -30,7 +30,7 @@ export function createRequestPipeline({
     environmentRepository,
     mockServerService,
     certificates = null,
-    cookies = null
+    onVariablesChanged = null
 }) {
     const variableRepository = new VariableRepository(backendAPI, secretStore);
     const variableService = new VariableService(variableRepository, new VariableProcessor(), statusDisplay, environmentRepository);
@@ -43,7 +43,7 @@ export function createRequestPipeline({
         requestBuilder,
         mockServerService,
         certificates,
-        cookies
+        onVariablesChanged
     });
 }
 
@@ -59,7 +59,7 @@ export const requestPipelineFeature = {
             environmentRepository: ctx.get('environmentRepository'),
             mockServerService: ctx.get('mockServerService'),
             certificates: ctx.get('certificateController') ?? null,
-            cookies: ctx.get('cookieController') ?? null
+            onVariablesChanged: () => ctx.get('variableContext')?.refresh()
         });
         return { pipeline };
     },

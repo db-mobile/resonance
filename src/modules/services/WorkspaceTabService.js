@@ -3,9 +3,7 @@
  * @module services/WorkspaceTabService
  */
 
-import logger from '../logger.js';
 
-const log = logger.scope('WorkspaceTabService');
 
 export class WorkspaceTabService {
     /**
@@ -86,7 +84,6 @@ export class WorkspaceTabService {
         return this._reporting('Error switching tab', async () => {
             const tab = await this.repository.getTabById(tabId);
             if (!tab) {
-                log.warn('Tab not found', { tabId });
                 return null;
             }
 

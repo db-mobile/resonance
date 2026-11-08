@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
-use super::model::{Body, BodyKind, FORMAT_VERSION, FolderDoc, RequestDoc};
+use super::model::{Body, BodyKind, ExampleDoc, FORMAT_VERSION, FolderDoc, RequestDoc, Scripts};
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 
 /// Collection metadata stored in collection.json
@@ -144,6 +144,40 @@ pub fn request_to_endpoint(
     Value::Object(endpoint)
 }
 
+/// The tree projection of a request: everything `request_to_endpoint` carries
+/// plus the saved examples, which only the tree consumers (sidebar, docs, mock
+/// server, duplicate) need and runner captures must not pay for.
+///
+/// @param doc - The request document
+/// @param folder_id - Owning folder id, absent for a root-level request
+/// @param folder_path - Full folder path
+/// @returns The endpoint with its `examples`
+pub fn endpoint_for_tree(
+    doc: &RequestDoc,
+    folder_id: Option<&str>,
+    folder_path: &[String],
+) -> Value {
+    let mut endpoint = request_to_endpoint(doc, folder_id, folder_path);
+    if !doc.examples.is_empty()
+        && let Value::Object(map) = &mut endpoint
+    {
+        map.insert("examples".into(), json!(doc.examples));
+    }
+    endpoint
+}
+
+/// Reads the saved examples an IPC endpoint carries, if any parse.
+///
+/// @param endpoint - The endpoint as the frontend sent it
+/// @returns The examples, empty when absent or malformed
+pub fn examples_from_ipc(endpoint: &Value) -> Vec<ExampleDoc> {
+    endpoint
+        .get("examples")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default()
+}
+
 /// Projects a request's live state back into the v1 endpoint data shape.
 ///
 /// The three v1 body fields are mutually exclusive, so exactly one is set from
@@ -216,6 +250,134 @@ pub fn request_to_endpoint_data(doc: &RequestDoc) -> EndpointData {
     data
 }
 
+/// Chooses the one body the endpoint data actually carries.
+///
+/// The IPC shape spreads the body across three fields and wrote exactly one of them per
+/// save, so precedence follows what the frontend could have produced:
+/// `formBodyData` carries its own mode and wins, then `graphqlData`, then a
+/// plain `modifiedBody` which was always JSON mode.
+///
+/// @param data - The endpoint data the frontend sent or a v1 data file held
+/// @returns The v2 body, or None when the request had none
+pub fn body_from_endpoint_data(data: &EndpointData) -> Option<Body> {
+    if let Some(form) = &data.form_body_data {
+        let mode = form.get("mode").and_then(|m| m.as_str()).unwrap_or("");
+        match mode {
+            "formdata" => {
+                return Some(Body::Known(BodyKind::FormData {
+                    fields: normalize_form_rows(form.get("fields")),
+                }));
+            }
+            "urlencoded" => {
+                return Some(Body::Known(BodyKind::UrlEncoded {
+                    fields: normalize_form_rows(form.get("fields")),
+                }));
+            }
+            "binary" => {
+                return Some(Body::Known(BodyKind::Binary {
+                    file_path: string_field(form, "filePath").unwrap_or_default(),
+                    content_type: string_field(form, "contentType").unwrap_or_default(),
+                }));
+            }
+            "text" => {
+                return Some(Body::Known(BodyKind::Text {
+                    content: form
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                }));
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(graphql) = &data.graphql_data {
+        let query = graphql
+            .get("query")
+            .and_then(|q| q.as_str())
+            .unwrap_or("")
+            .to_string();
+        let variables = graphql
+            .get("variables")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if !query.is_empty() || !variables.is_empty() {
+            return Some(Body::Known(BodyKind::Graphql {
+                query,
+                variables,
+                operation_name: string_field(graphql, "operationName"),
+            }));
+        }
+    }
+
+    if let Some(body) = &data.modified_body
+        && !body.is_empty()
+    {
+        return Some(Body::Known(BodyKind::Json {
+            content: body.clone(),
+        }));
+    }
+
+    None
+}
+
+/// Converts the scripts object, which uses the longer frontend field names.
+pub fn scripts_from_endpoint_data(value: Option<&Value>) -> Scripts {
+    let scripts = match value {
+        Some(scripts) => scripts,
+        None => return Scripts::default(),
+    };
+
+    Scripts {
+        pre_request: string_field(scripts, "preRequestScript"),
+        test: string_field(scripts, "testScript"),
+    }
+}
+
+/// Reads a string field off an endpoint data object, treating blank as absent.
+pub(crate) fn string_field(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// Normalizes form rows into the canonical array shape.
+///
+/// Mirrors `normalizeFormRows` in `src/modules/utils/formDataRows.js`: older
+/// data stored a flat `{key: value}` object where the current shape is an
+/// ordered array of rows, and both must keep loading.
+///
+/// @param fields - The persisted `fields` value, in either shape
+/// @returns Rows as an array, empty when there is nothing to convert
+fn normalize_form_rows(fields: Option<&Value>) -> Vec<Value> {
+    match fields {
+        Some(Value::Array(rows)) => rows.clone(),
+        Some(Value::Object(map)) => map
+            .iter()
+            .map(|(key, value)| {
+                let text = match value {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                let mut row = Map::new();
+                row.insert("key".into(), Value::String(key.clone()));
+                row.insert("value".into(), Value::String(text));
+                row.insert("type".into(), Value::String("text".into()));
+                row.insert("filePath".into(), Value::String(String::new()));
+                row.insert("contentType".into(), Value::String(String::new()));
+                row.insert("enabled".into(), Value::Bool(true));
+                Value::Object(row)
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Builds one folder entry, recursing into its subfolders.
 ///
 /// Each folder carries its own `endpoints` and a nested `folders`, so the
@@ -226,7 +388,7 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
 
     let mut endpoints = Vec::new();
     for entry in &node.requests {
-        let endpoint = request_to_endpoint(&entry.doc, Some(&id), path);
+        let endpoint = endpoint_for_tree(&entry.doc, Some(&id), path);
         flat.push(endpoint.clone());
         endpoints.push(endpoint);
     }
@@ -284,7 +446,7 @@ pub fn to_ipc_collection(
     let mut folders = Vec::new();
 
     for entry in &loaded.root.requests {
-        endpoints.push(request_to_endpoint(&entry.doc, None, &[]));
+        endpoints.push(endpoint_for_tree(&entry.doc, None, &[]));
     }
 
     for folder in &loaded.root.folders {
@@ -410,10 +572,12 @@ fn entry_for(
     }
 
     let mut entry = existing.get(&id).cloned().unwrap_or_else(|| {
-        RequestEntry::new(RequestDoc::new(
+        let mut doc = RequestDoc::new(
             id.clone(),
             ipc_string(endpoint, "name").unwrap_or_else(|| id.clone()),
-        ))
+        );
+        doc.examples = examples_from_ipc(endpoint);
+        RequestEntry::new(doc)
     });
 
     overlay_metadata(&mut entry.doc, endpoint);
@@ -620,8 +784,8 @@ pub fn apply_endpoint_data(doc: &mut RequestDoc, data: &EndpointData) {
     doc.mqtt = data.mqtt_data.clone().filter(|v| !v.is_null());
     doc.websocket = data.websocket_data.clone().filter(|v| !v.is_null());
     doc.response_schema = data.response_schema.clone().filter(|v| !v.is_null());
-    doc.scripts = super::legacy::scripts_from_v1(data.scripts.as_ref());
-    doc.body = super::legacy::body_from_v1(data);
+    doc.scripts = scripts_from_endpoint_data(data.scripts.as_ref());
+    doc.body = body_from_endpoint_data(data);
 }
 
 /// Finds one request in a loaded collection.
@@ -1150,6 +1314,64 @@ mod save_path {
             root.requests[0].source.as_ref().unwrap(),
             &std::path::PathBuf::from("/c/create-pet.yaml")
         );
+    }
+
+    fn example_value() -> Value {
+        json!({"id": "ex1", "name": "200 OK", "status": 200, "body": "{\"ok\":true}", "contentType": "application/json"})
+    }
+
+    #[test]
+    fn a_new_request_is_seeded_with_examples_from_ipc() {
+        let incoming = ipc_collection(
+            vec![
+                json!({"id": "new1", "name": "Fresh", "method": "GET", "path": "/x", "examples": [example_value()]}),
+            ],
+            vec![],
+        );
+
+        let root = tree_from_ipc(&incoming, None);
+
+        assert_eq!(root.requests[0].doc.examples.len(), 1);
+        assert_eq!(root.requests[0].doc.examples[0].name, "200 OK");
+    }
+
+    #[test]
+    fn examples_on_an_existing_request_survive_a_structural_save() {
+        let mut existing = existing_with_state();
+        existing.root.requests[0].doc.examples =
+            vec![serde_json::from_value(example_value()).unwrap()];
+        let stale = ipc_collection(
+            vec![json!({"id": "r1", "name": "Renamed", "method": "POST", "path": "/pets"})],
+            vec![],
+        );
+        let different = ipc_collection(
+            vec![
+                json!({"id": "r1", "name": "Renamed", "method": "POST", "path": "/pets",
+                "examples": [{"id": "other", "name": "Other", "status": 500}]}),
+            ],
+            vec![],
+        );
+
+        let from_stale = tree_from_ipc(&stale, Some(&existing));
+        let from_different = tree_from_ipc(&different, Some(&existing));
+
+        assert_eq!(from_stale.requests[0].doc.examples[0].id, "ex1");
+        assert_eq!(from_different.requests[0].doc.examples[0].id, "ex1");
+        assert_eq!(from_different.requests[0].doc.name, "Renamed");
+    }
+
+    #[test]
+    fn the_tree_carries_examples_but_captures_do_not() {
+        let mut existing = existing_with_state();
+        existing.root.requests[0].doc.examples =
+            vec![serde_json::from_value(example_value()).unwrap()];
+
+        let tree = to_ipc_collection(&existing, "/c", false);
+        let capture = request_to_endpoint(&existing.root.requests[0].doc, None, &[]);
+
+        assert_eq!(tree.endpoints[0]["examples"][0]["id"], json!("ex1"));
+        assert!(capture.get("examples").is_none());
+        assert!(examples_from_ipc(&json!({"examples": "nonsense"})).is_empty());
     }
 
     #[test]

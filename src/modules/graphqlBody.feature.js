@@ -5,18 +5,12 @@
 
 import { GraphQLBodyManager } from './graphqlBodyManager.js';
 import { setGraphQLBodyManager } from './apiHandler.js';
-import { bodyInput } from './domElements.js';
 
 /** @type {import('./registry/FeatureRegistry.js').FeatureDescriptor} */
 export const graphqlBodyFeature = {
     name: 'graphqlBody',
     create() {
-        const manager = new GraphQLBodyManager({
-            bodyInput,
-            graphqlQueryEditor: document.getElementById('graphql-query-editor'),
-            graphqlVariablesEditor: document.getElementById('graphql-variables-editor'),
-            graphqlFormatBtn: document.getElementById('graphql-format-btn')
-        });
+        const manager = new GraphQLBodyManager();
 
         manager.initialize();
         setGraphQLBodyManager(manager);

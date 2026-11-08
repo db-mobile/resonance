@@ -46,7 +46,7 @@ function updateUIForMode(mode) {
 
     const methodSelectContainer = document.querySelector('.method-select-container');
     const urlInput = document.getElementById('url-input');
-    const urlInputContainer = urlInput?.closest('.url-autocomplete-wrapper') || urlInput;
+    const urlInputContainer = urlInput?.closest('.url-autocomplete-wrapper') || urlInput?.closest('.var-field') || urlInput;
     const curlBtn = document.getElementById('curl-btn');
     const bodyModeSelect = document.getElementById('body-mode-select');
     const bodyModeContainer = bodyModeSelect?.closest('.body-mode-selector-container');

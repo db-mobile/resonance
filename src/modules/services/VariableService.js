@@ -3,6 +3,8 @@
  * @module services/VariableService
  */
 
+import { ChangeEmitter } from './ChangeEmitter.js';
+
 export class VariableService {
     /**
      * @param {VariableRepository} variableRepository
@@ -15,6 +17,22 @@ export class VariableService {
         this.processor = variableProcessor;
         this.statusDisplay = statusDisplay;
         this.environmentRepository = environmentRepository;
+        this._events = new ChangeEmitter();
+    }
+
+    /** @param {Function} callback */
+    addChangeListener(callback) {
+        this._events.add(callback);
+    }
+
+    /** @param {Function} callback */
+    removeChangeListener(callback) {
+        this._events.remove(callback);
+    }
+
+    /** @param {string} collectionId */
+    _notifyVariablesChanged(collectionId) {
+        this._events.emit({ type: 'collection-variables-changed', collectionId });
     }
 
     /**
@@ -71,6 +89,7 @@ export class VariableService {
             }
 
             await this.repository.setVariable(collectionId, name, value);
+            this._notifyVariablesChanged(collectionId);
             this.statusDisplay.update(`Variable "${name}" saved`, null);
             return true;
         });
@@ -84,6 +103,7 @@ export class VariableService {
     async deleteVariable(collectionId, name) {
         return this._reporting('Error deleting variable', async () => {
             await this.repository.deleteVariable(collectionId, name);
+            this._notifyVariablesChanged(collectionId);
             this.statusDisplay.update(`Variable "${name}" deleted`, null);
             return true;
         });
@@ -104,6 +124,7 @@ export class VariableService {
             }
 
             await this.repository.setVariablesForCollection(collectionId, variables, secretKeys);
+            this._notifyVariablesChanged(collectionId);
             this.statusDisplay.update('Variables saved successfully', null);
             return true;
         });
@@ -122,26 +143,13 @@ export class VariableService {
     }
 
     /**
-     * @param {string} template
-     * @param {string} collectionId
-     * @returns {Promise<string>}
-     */
-    async processTemplate(template, collectionId) {
-        try {
-            const variables = await this.getVariablesForCollection(collectionId);
-            return this.processor.processTemplate(template, variables);
-        } catch (error) {
-            return template;
-        }
-    }
-
-    /**
      * @param {string} collectionId
      * @returns {Promise<void>}
      */
     async cleanupCollectionVariables(collectionId) {
         try {
             await this.repository.deleteAllVariablesForCollection(collectionId);
+            this._notifyVariablesChanged(collectionId);
         } catch (error) {
             console.error('Error cleaning up collection variables:', error);
         }

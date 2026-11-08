@@ -120,31 +120,6 @@ describe('VariableService', () => {
         });
     });
 
-    describe('processTemplate', () => {
-        test('should process template with variables', async () => {
-            const template = 'Hello {{ name }}!';
-            const variables = { name: 'World' };
-            const processedTemplate = 'Hello World!';
-
-            mockRepository.getVariablesForCollection.mockResolvedValue(variables);
-            mockProcessor.processTemplate.mockReturnValue(processedTemplate);
-
-            const result = await service.processTemplate(template, 'collection-1');
-
-            expect(result).toBe(processedTemplate);
-            expect(mockProcessor.processTemplate).toHaveBeenCalledWith(template, variables);
-        });
-
-        test('should return original template if processing fails', async () => {
-            const template = 'Hello {{ name }}!';
-            mockRepository.getVariablesForCollection.mockRejectedValue(new Error('Error'));
-
-            const result = await service.processTemplate(template, 'collection-1');
-
-            expect(result).toBe(template);
-        });
-    });
-
     describe('cleanupCollectionVariables', () => {
         test('should cleanup variables for collection', async () => {
             mockRepository.deleteAllVariablesForCollection.mockResolvedValue();
@@ -162,6 +137,44 @@ describe('VariableService', () => {
 
             expect(consoleSpy).toHaveBeenCalledWith('Error cleaning up collection variables:', expect.any(Error));
             consoleSpy.mockRestore();
+        });
+    });
+
+    describe('change notifications', () => {
+        let events;
+
+        beforeEach(() => {
+            events = [];
+            service.addChangeListener((event) => events.push(event));
+            mockProcessor.isValidVariableName.mockReturnValue(true);
+        });
+
+        test('each successful write emits collection-variables-changed once', async () => {
+            await service.setVariable('c1', 'a', '1');
+            await service.deleteVariable('c1', 'a');
+            await service.setMultipleVariables('c1', { a: '1' });
+            await service.cleanupCollectionVariables('c1');
+
+            expect(events).toEqual(Array(4).fill({ type: 'collection-variables-changed', collectionId: 'c1' }));
+        });
+
+        test('failed or rejected writes emit nothing', async () => {
+            mockRepository.setVariable.mockRejectedValue(new Error('boom'));
+            await expect(service.setVariable('c1', 'a', '1')).rejects.toThrow('boom');
+            mockProcessor.isValidVariableName.mockReturnValue(false);
+            await expect(service.setMultipleVariables('c1', { 'bad name': '1' })).rejects.toThrow();
+
+            expect(events).toEqual([]);
+        });
+
+        test('removeChangeListener stops delivery', async () => {
+            const listener = jest.fn();
+            service.addChangeListener(listener);
+            service.removeChangeListener(listener);
+
+            await service.setVariable('c1', 'a', '1');
+
+            expect(listener).not.toHaveBeenCalled();
         });
     });
 

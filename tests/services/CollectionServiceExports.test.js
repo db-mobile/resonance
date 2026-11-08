@@ -15,27 +15,27 @@ describe('CollectionService exports, opening and row saves', () => {
             savePersistedPathParams: jest.fn().mockResolvedValue(undefined),
             savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
             savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
-            exportOpenApi: jest.fn().mockResolvedValue({ success: true }),
-            exportPostman: jest.fn().mockResolvedValue({ success: true, skipped: { count: 2 } })
+            exportOpenApi: jest.fn().mockResolvedValue({ success: true })
         };
         statusDisplay = { update: jest.fn() };
         service = new CollectionService(repository, {}, statusDisplay);
     });
 
-    describe('exportCollectionAsOpenApi / exportCollectionAsPostman', () => {
+    describe('exportCollectionAsOpenApi', () => {
         test('reports progress and success, including skipped items', async () => {
-            const openApi = await service.exportCollectionAsOpenApi('c1', 'yaml');
-            const postman = await service.exportCollectionAsPostman('c1');
+            const yaml = await service.exportCollectionAsOpenApi('c1', 'yaml');
+            repository.exportOpenApi.mockResolvedValue({ success: true, skipped: { count: 2 } });
+            const json = await service.exportCollectionAsOpenApi('c1', 'json');
 
-            expect(repository.exportOpenApi).toHaveBeenCalledWith('c1', 'yaml');
-            expect(repository.exportPostman).toHaveBeenCalledWith('c1');
-            expect(openApi).toEqual({ success: true });
-            expect(postman).toEqual({ success: true, skipped: { count: 2 } });
+            expect(repository.exportOpenApi).toHaveBeenNthCalledWith(1, 'c1', 'yaml');
+            expect(repository.exportOpenApi).toHaveBeenNthCalledWith(2, 'c1', 'json');
+            expect(yaml).toEqual({ success: true });
+            expect(json).toEqual({ success: true, skipped: { count: 2 } });
             expect(statusDisplay.update.mock.calls).toEqual([
                 ['Exporting collection...', null],
                 ['Collection exported successfully to YAML', null],
                 ['Exporting collection...', null],
-                ['Collection exported successfully to Postman (2 items skipped)', null]
+                ['Collection exported successfully to JSON (2 items skipped)', null]
             ]);
         });
 
@@ -51,8 +51,8 @@ describe('CollectionService exports, opening and row saves', () => {
             await expect(service.exportCollectionAsOpenApi('c1', 'json')).rejects.toThrow('Export failed');
             expect(statusDisplay.update).toHaveBeenLastCalledWith('Export error: Export failed', null);
 
-            repository.exportPostman.mockRejectedValue(new Error('disk'));
-            await expect(service.exportCollectionAsPostman('c1')).rejects.toThrow('disk');
+            repository.exportOpenApi.mockRejectedValue(new Error('disk'));
+            await expect(service.exportCollectionAsOpenApi('c1', 'json')).rejects.toThrow('disk');
             expect(statusDisplay.update).toHaveBeenLastCalledWith('Export error: disk', null);
         });
     });

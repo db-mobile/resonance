@@ -17,33 +17,6 @@ if (isTauri) {
             setWindowTheme: (theme) => invoke('app_set_window_theme', { theme }),
             migrationStatus: () => invoke('data_migration_status')
         },
-        logger: {
-            error: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            warn: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            info: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            debug: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            verbose: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            }
-        },
         execution: {
             request: (input) => invoke('execute_request', { input }),
             run: (input) => invoke('execute_run', { input }),
@@ -108,6 +81,8 @@ if (isTauri) {
             gitStatus: () => invoke('collections_git_status'),
             getEndpointData: (collectionId, endpointId) => invoke('collection_get_endpoint_data', { collectionId, endpointId }),
             saveEndpointData: (collectionId, endpointId, data) => invoke('collection_save_endpoint_data', { collectionId, endpointId, data }),
+            getExamples: (collectionId, endpointId) => invoke('collection_get_examples', { collectionId, endpointId }),
+            saveExamples: (collectionId, endpointId, examples) => invoke('collection_save_examples', { collectionId, endpointId, examples }),
             deleteEndpointData: (collectionId, endpointId) => invoke('collection_delete_endpoint_data', { collectionId, endpointId }),
             deleteFolder: (collectionId, folderId) => invoke('collection_delete_folder', { collectionId, folderId }),
             getVariables: (collectionId) => invoke('collection_get_variables', { collectionId }),
@@ -116,15 +91,13 @@ if (isTauri) {
             pickDirectory: (remember = true) => invoke('collections_pick_directory', { remember }),
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
             importCollectionFile: (filePath = null, storageParentPath = null) => invoke('import_collection_file', { filePath, storageParentPath }),
-            importPostmanEnvironment: () => invoke('import_postman_environment'),
             runners: {
                 list: (collectionId) => invoke('collection_runners_list', { collectionId }),
                 save: (collectionId, runner) => invoke('collection_runners_save', { collectionId, runner }),
                 delete: (collectionId, runnerId) => invoke('collection_runners_delete', { collectionId, runnerId }),
                 readData: (collectionId, path) => invoke('collection_runner_data_read', { collectionId, path })
             },
-            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
-            exportPostman: (collectionId) => invoke('export_postman', { collectionId })
+            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format })
         },
         environments: {
             saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })
