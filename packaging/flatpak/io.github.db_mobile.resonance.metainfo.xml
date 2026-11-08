@@ -116,6 +116,15 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.0" date="2026-11-08">
+      <description>
+        <p>New features introduced</p>
+        <ul>
+          <li>Highlight variables in request inputs with autocomplete and hover details showing the resolved value</li>
+          <li>Save example responses with requests to document APIs and serve them from the mock server</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.5.8" date="2026-10-29">
       <description>
         <p>HTTP method support and WebSocket improvements</p>
