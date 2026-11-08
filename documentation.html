@@ -92,10 +92,11 @@
         <h3>Importing Collections</h3>
         <h4>Collection file</h4>
         <ol class="doc-list">
-          <li>Open the main menu (&#9776;) at the top of the sidebar, choose <strong>Import</strong> and then <strong>Collection File</strong> — or press <code>Ctrl/Cmd+O</code></li>
-          <li>Pick an <strong>OpenAPI 3.0 / 3.1</strong> or <strong>Swagger 2.0</strong> spec (YAML or JSON), a <strong>Postman</strong> v2.0 / v2.1 collection, an <strong>Insomnia</strong> v4 (JSON) or v5 (YAML) export, or a <strong>HAR</strong> file — the format is detected automatically</li>
+          <li>Open the main menu (&#9776;) at the top of the sidebar, choose <strong>Import</strong> and then <strong>Collection or Environment File</strong> — or press <code>Ctrl/Cmd+O</code></li>
+          <li>Pick an <strong>OpenAPI 3.0 / 3.1</strong> or <strong>Swagger 2.0</strong> spec (YAML or JSON), a <strong>Postman</strong> v2.0 / v2.1 collection, an <strong>Insomnia</strong> v4 (JSON) or v5 (YAML) export, a <strong>HAR</strong> file, or a <strong>Postman</strong> or <strong>Insomnia</strong> environment export — the format is detected automatically</li>
           <li>Choose where the collection folder is created, then click <strong>Import</strong></li>
           <li>OpenAPI endpoints get example bodies and <a href="requests.html#schema-validation">response schemas</a> from the spec; Postman request examples, auth settings, and scripts are preserved; environments in an Insomnia export are imported too</li>
+          <li>An environment file creates environments instead of a collection and ignores the destination folder: <em>secret</em> (Postman) and <em>confidential</em> (Insomnia) variables go to the OS keychain, disabled Postman variables are skipped, an Insomnia sub-environment inherits its base environment, and a name that already exists gets a numeric suffix</li>
         </ol>
         <h4>cURL command</h4>
         <ol class="doc-list">
@@ -106,17 +107,11 @@
         <ol class="doc-list">
           <li>Click <strong>Import</strong> and choose <strong>Existing Folder</strong> to open a collection that already lives on disk — for example in a git checkout — in place</li>
         </ol>
-        <h4>Postman Environment</h4>
-        <ol class="doc-list">
-          <li>Click <strong>Import</strong> and choose <strong>Postman Environment</strong></li>
-          <li>Pick the exported <code>.postman_environment.json</code> file — its variables become a new Resonance environment</li>
-          <li>Variables of type <em>secret</em> are stored in the OS keychain, and disabled variables are skipped. If an environment with the same name exists, the import gets a numeric suffix</li>
-        </ol>
 
         <h3>Organising Collections</h3>
         <p>Right-click in the collections sidebar for these actions:</p>
         <ul class="doc-list">
-          <li><strong>Collection:</strong> New Request, New Folder, Run Collection, Manage Variables, Edit Auth, Export as OpenAPI (JSON or YAML), Export as Postman, Generate Documentation, Rename, Delete (or Close for a collection opened in place)</li>
+          <li><strong>Collection:</strong> New Request, New Folder, Run Collection, Manage Variables, Edit Auth, Export as OpenAPI (JSON or YAML), Generate Documentation, Rename, Delete (or Close for a collection opened in place)</li>
           <li><strong>Folder:</strong> New Request (created inside the folder), New Subfolder, Rename Folder, Run Folder, Edit Auth, Delete Folder (removes the folder and the requests in it)</li>
           <li><strong>Request:</strong> Pin, Rename, <strong>Duplicate</strong> (copies the body, headers, parameters, scripts, and stored credentials), <strong>Move to Folder…</strong> (another folder or the collection root), Delete</li>
         </ul>
@@ -130,7 +125,6 @@
         <h4>Exporting collections</h4>
         <ul class="doc-list">
           <li><strong>Export as OpenAPI</strong> writes an OpenAPI 3.0.3 spec with paths, parameters, bodies, and saved responses</li>
-          <li><strong>Export as Postman</strong> writes a Postman v2.1 collection including folders, scripts, auth, and collection variables</li>
           <li><strong>Generate Documentation</strong> produces an HTML or Markdown API reference, optionally with example data and code samples in your chosen languages</li>
           <li>Secret values are exported empty; <code>&#123;&#123;variable&#125;&#125;</code> references are kept. Only HTTP requests are exported</li>
         </ul>
