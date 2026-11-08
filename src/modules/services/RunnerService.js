@@ -22,15 +22,8 @@ export class RunnerService {
         this.collectionRepository = pipeline.collectionRepository;
 
         this.isRunning = false;
-        this.shouldStop = false;
-        this.currentRunId = null;
         this.core = new CoreExecutionService(pipeline, backendAPI);
         this._events = new ChangeEmitter();
-    }
-
-    /** @returns {Set<Function>} */
-    get listeners() {
-        return this._events.listeners;
     }
 
     /**
@@ -170,8 +163,6 @@ export class RunnerService {
         }
         this._assertIdle();
         this.isRunning = true;
-        this.shouldStop = false;
-        this.currentRunId = runnerId ?? 'temp';
         const execution = this.core.createExecution();
         this._execution = execution;
         const startTime = Date.now();
@@ -231,8 +222,6 @@ export class RunnerService {
             results.endTime ||= Date.now();
             results.totalTime = results.endTime - results.startTime;
             this.isRunning = false;
-            this.shouldStop = false;
-            this.currentRunId = null;
             this._execution = null;
             try {
                 await onFinish?.();
@@ -249,7 +238,6 @@ export class RunnerService {
         if (!this.isRunning) {
             return;
         }
-        this.shouldStop = true;
         this._execution?.cancel().catch(() => {});
         this.statusDisplay?.update(translate('runner.stopping', 'Stopping runner...'), null);
     }

@@ -3,31 +3,12 @@
  * @module services/CertificateService
  */
 
-import { ChangeEmitter } from './ChangeEmitter.js';
-
 export class CertificateService {
     /** @param {CertificateRepository} certificateRepository */
     constructor(certificateRepository) {
         this.repository = certificateRepository;
-        this._events = new ChangeEmitter();
         /** @type {Array<Object>|null} */
         this._cache = null;
-    }
-
-    /**
-     * @param {Function} callback
-     * @returns {void}
-     */
-    addChangeListener(callback) {
-        this._events.add(callback);
-    }
-
-    /**
-     * @param {Object} event
-     * @returns {void}
-     */
-    _notifyListeners(event) {
-        this._events.emit(event);
     }
 
     /** @returns {Promise<Array<Object>>} */
@@ -44,8 +25,6 @@ export class CertificateService {
     async saveItems(items) {
         const saved = await this.repository.saveCertificates({ items });
         this._cache = saved.items;
-
-        this._notifyListeners({ type: 'certificates-updated', items: saved.items });
         return saved.items;
     }
 

@@ -6,7 +6,7 @@
 /**
  * @param {Function} fn
  * @param {number} wait
- * @returns {Function & {cancel: Function, flush: Function, pending: Function}}
+ * @returns {Function & {cancel: Function, flush: Function}}
  */
 export function debounce(fn, wait) {
     let timer = null;
@@ -38,8 +38,6 @@ export function debounce(fn, wait) {
         clearTimeout(timer);
         return invoke();
     };
-
-    debounced.pending = () => timer !== null;
 
     return debounced;
 }

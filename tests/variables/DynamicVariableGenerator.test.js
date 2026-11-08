@@ -398,17 +398,11 @@ describe('DynamicVariableGenerator', () => {
             expect(generator.isDynamicVariable('custom')).toBe(false);
             expect(generator.isDynamicVariable('')).toBe(false);
         });
-    });
 
-    describe('getPlaceholder', () => {
-        test('should return placeholder without params', () => {
-            expect(generator.getPlaceholder('uuid')).toBe('[uuid]');
-            expect(generator.getPlaceholder('timestamp')).toBe('[timestamp]');
-        });
-
-        test('should return placeholder with params', () => {
-            expect(generator.getPlaceholder('randomInt', '1:100')).toBe('[randomInt:1:100]');
-            expect(generator.getPlaceholder('randomString', '16')).toBe('[randomString:16]');
+        test('ignores inherited object properties', () => {
+            expect(generator.isDynamicVariable('constructor')).toBe(false);
+            expect(generator.isDynamicVariable('toString')).toBe(false);
+            expect(generator.generate('constructor')).toBeNull();
         });
     });
 

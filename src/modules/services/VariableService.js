@@ -143,20 +143,6 @@ export class VariableService {
     }
 
     /**
-     * @param {string} template
-     * @param {string} collectionId
-     * @returns {Promise<string>}
-     */
-    async processTemplate(template, collectionId) {
-        try {
-            const variables = await this.getVariablesForCollection(collectionId);
-            return this.processor.processTemplate(template, variables);
-        } catch (error) {
-            return template;
-        }
-    }
-
-    /**
      * @param {string} collectionId
      * @returns {Promise<void>}
      */

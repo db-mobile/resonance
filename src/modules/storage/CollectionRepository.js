@@ -445,23 +445,6 @@ export class CollectionRepository {
     /**
      * @param {string} collectionId
      * @param {string} endpointId
-     * @param {Array<Object>} examples
-     * @returns {Promise<void>}
-     */
-    async saveExamples(collectionId, endpointId, examples) {
-        await this._withEndpointWrite(collectionId, endpointId, async () => {
-            try {
-                await this.backendAPI.collections.saveExamples(collectionId, endpointId, examples);
-            } catch (error) {
-                throw wrapFailure('save examples', error);
-            }
-            this.invalidateCache();
-        });
-    }
-
-    /**
-     * @param {string} collectionId
-     * @param {string} endpointId
      * @param {function(Array<Object>): Array<Object>} mutate
      * @returns {Promise<Array<Object>>}
      */

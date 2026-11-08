@@ -681,9 +681,7 @@ export class WorkspaceTabStateManager {
         renderCookies(containerElements?.cookiesDisplay, response.cookies);
 
         if (containerElements?.performanceDisplay) {
-            if (response.performanceHTML) {
-                containerElements.performanceDisplay.innerHTML = response.performanceHTML;
-            } else if (response.timings) {
+            if (response.timings) {
                 displayPerformanceMetrics(containerElements.performanceDisplay, response.timings, response.size);
             } else {
                 clearPerformanceMetrics(containerElements.performanceDisplay);

@@ -5,7 +5,7 @@
 
 import { resolveEffectiveAuthWithSource } from '../auth/authInheritance.js';
 import { ensureFreshOAuthToken, oauthRefreshKey } from '../auth/oauthRefresh.js';
-import { resolveAuthConfigVariables, withBearerFallback } from '../auth/authVariables.js';
+import { resolveAuthConfigVariables } from '../auth/authVariables.js';
 import { generateAuthData } from '../auth/authData.js';
 
 const REQUIRED_DEPS = Object.freeze([
@@ -33,7 +33,6 @@ export class RequestPipeline {
      * @param {Object} deps.requestBuilder
      * @param {Object} deps.mockServerService
      * @param {{getForHost: function(string): (Object|null), getItems?: function(): Promise<*>}|null} [deps.certificates]
-     * @param {{getCookieHeader: function(string): Promise<string|null>}|null} [deps.cookies]
      * @param {function({environmentId: (string|null), collectionId: (string|null)}): void|null} [deps.onVariablesChanged]
      */
     constructor(deps = {}) {
@@ -49,7 +48,6 @@ export class RequestPipeline {
         this.requestBuilder = deps.requestBuilder;
         this.mockServerService = deps.mockServerService;
         this.certificates = deps.certificates || null;
-        this.cookies = deps.cookies || null;
         this.onVariablesChanged = deps.onVariablesChanged || null;
     }
 
@@ -60,24 +58,22 @@ export class RequestPipeline {
      * @param {Object} options.variables
      * @param {Object} options.processor
      * @param {boolean} [options.refreshOAuth]
-     * @param {boolean} [options.bearerFallback]
      * @param {(function(Object, Object): (void|Promise<void>))|null} [options.persistRequestAuth]
      * @returns {Promise<{authData: Object, source: Object|null, warnings: string[]}>}
      */
-    async resolveAuth({ authConfig, endpoint = null, variables, processor, refreshOAuth = true, bearerFallback = false, persistRequestAuth = null }) {
+    async resolveAuth({ authConfig, endpoint = null, variables, processor, refreshOAuth = true, persistRequestAuth = null }) {
         const { authConfig: inherited, source } = await resolveEffectiveAuthWithSource(authConfig, {
             collectionId: endpoint?.collectionId,
             endpointId: endpoint?.endpointId,
             repository: this.collectionRepository
         });
-        const resolved = bearerFallback ? withBearerFallback(inherited, variables) : inherited;
-        const substituted = resolveAuthConfigVariables(resolved, variables, processor);
+        const substituted = resolveAuthConfigVariables(inherited, variables, processor);
         let effective = substituted.authConfig;
         const warnings = [];
 
-        if (refreshOAuth && source && resolved === inherited) {
+        if (refreshOAuth && source) {
             const renewal = await ensureFreshOAuthToken({
-                rawAuth: resolved,
+                rawAuth: inherited,
                 resolvedAuth: effective,
                 key: oauthRefreshKey(endpoint, source),
                 getToken: (request) => this.backendAPI.oauth2.getToken(request),

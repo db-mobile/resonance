@@ -50,7 +50,6 @@ export class ResponseContainerManager {
         this.parentContainer = document.getElementById('workspace-response-container');
         this.containers = new Map();
         this.activeTabId = null;
-        this.previewRepository = previewRepository;
         this.previewManager = new PreviewManager(previewRepository);
         this._scrollPinInstalled = false;
     }

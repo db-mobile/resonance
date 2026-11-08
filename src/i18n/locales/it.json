@@ -1,8 +1,4 @@
 {
-  "app": {
-    "title": "Resonance",
-    "tagline": "Test API semplificati"
-  },
   "header": {
     "settings": "Impostazioni"
   },
@@ -120,12 +116,9 @@
     "error_no_file": "Scegli un file da importare prima di continuare."
   },
   "collection": {
-    "rename": "Rinomina collezione",
     "delete": "Elimina collezione",
     "delete_title": "Elimina collezione",
     "confirm_delete": "Sei sicuro di voler eliminare la collezione \"{{name}}\"?\n\nQuesta azione non può essere annullata.",
-    "import_success": "Collezione importata con successo",
-    "import_error": "Errore nell'importazione della collezione",
     "close_title": "Chiudi raccolta",
     "confirm_close": "Rimuovere \"{{name}}\" dall'elenco?\n\nLa cartella e i suoi file restano sul disco e le credenziali salvate vengono mantenute. Potrai riaprirla più tardi.",
     "reveal_failed": "Impossibile mostrare la cartella della raccolta: {{message}}"
@@ -143,7 +136,6 @@
   "context_menu": {
     "new_collection": "Nuova collezione",
     "new_request": "Nuova richiesta",
-    "import_curl": "Importa cURL",
     "manage_variables": "Gestisci variabili",
     "edit_auth": "Modifica autenticazione",
     "export_openapi_json": "Esporta come OpenAPI (JSON)",
@@ -193,9 +185,7 @@
     "new_collection": "Crea nuova collezione",
     "collection_name": "Nome della nuova collezione",
     "collection_location": "Posizione della collezione",
-    "import": "Importa",
-    "error_invalid": "Comando cURL non valido",
-    "error_no_url": "Nessun URL trovato nel comando cURL"
+    "import": "Importa"
   },
   "new_request": {
     "title": "Crea nuova richiesta",
@@ -229,15 +219,10 @@
   "request": {
     "method": "Metodo",
     "url": "URL",
-    "send": "Invia",
-    "sending": "Invio in corso...",
     "headers": "Intestazioni",
-    "query_params": "Parametri query",
     "body": "Corpo",
-    "response": "Risposta",
     "status": "Stato",
     "time": "Tempo",
-    "size": "Dimensione",
     "disconnect": "Disconnetti",
     "cancel": "Annulla"
   },
@@ -251,8 +236,6 @@
     "grpc": "gRPC",
     "grpc_message": "Messaggio",
     "grpc_metadata": "Metadati",
-    "response_body": "Corpo",
-    "response_headers": "Intestazioni",
     "schema": "Schema",
     "mqtt": "MQTT",
     "websocket": "WebSocket",
@@ -260,25 +243,9 @@
   },
   "schema": {
     "title": "Schema di Risposta",
-    "description": "Definisci un JSON Schema per validare le risposte dell'API. Lo schema verrà compilato automaticamente dalle importazioni OpenAPI.",
     "infer_btn": "Inferisci dalla Risposta",
     "clear_btn": "Cancella",
-    "valid": "Schema Valido",
-    "invalid": "Schema Non Valido",
-    "no_response": "Nessuna risposta disponibile per inferire lo schema",
-    "not_json": "La risposta non è un JSON valido",
-    "inferred": "Schema inferito dalla risposta",
-    "cleared": "Schema cancellato"
-  },
-  "variables": {
-    "title": "Variabili",
-    "name": "Nome",
-    "value": "Valore",
-    "add": "Aggiungi variabile",
-    "save": "Salva",
-    "cancel": "Annulla",
-    "placeholder_name": "Nome variabile",
-    "placeholder_value": "Valore variabile"
+    "valid": "Schema Valido"
   },
   "settings": {
     "title": "Impostazioni",
@@ -328,9 +295,7 @@
     "proxy_test": "Testa Connessione",
     "close": "Chiudi",
     "save": "Salva",
-    "cancel": "Annulla",
     "tab_updates": "Aggiornamenti",
-    "auto_update": "Aggiornamenti Automatici",
     "check_updates_on_launch": "Controlla aggiornamenti all'avvio",
     "check_updates_on_launch_description": "Cerca automaticamente nuove versioni all'avvio dell'applicazione.",
     "manual_update": "Aggiornamento Manuale",
@@ -344,7 +309,6 @@
     "updates_not_available": "Aggiornamenti non disponibili in questa versione",
     "updates_managed_externally": "Gli aggiornamenti sono gestiti dal tuo gestore di pacchetti",
     "version_info": "Informazioni Versione",
-    "current_version": "Versione attuale",
     "retry_update": "Riprova",
     "proxy_testing": "Test in corso…",
     "proxy_save_failed": "Impossibile salvare le impostazioni del proxy: {{error}}",
@@ -369,20 +333,9 @@
     "save": "Salva",
     "delete": "Elimina",
     "rename": "Rinomina",
-    "edit": "Modifica",
-    "add": "Aggiungi",
-    "remove": "Rimuovi",
     "close": "Chiudi",
-    "yes": "Sì",
-    "no": "No",
     "create": "Crea",
     "clear": "Cancella"
-  },
-  "errors": {
-    "network": "Errore di rete",
-    "timeout": "Timeout della richiesta",
-    "invalid_url": "Formato URL non valido",
-    "unknown": "Si è verificato un errore sconosciuto"
   },
   "history": {
     "empty": "Nessuna cronologia delle richieste",
@@ -444,10 +397,8 @@
     "close": "Chiudi",
     "empty_collections": "Nessuna collezione disponibile.<br>Importa prima una collezione OpenAPI o Postman.",
     "endpoints": "endpoints",
-    "more_endpoints": "... e altri {{count}} endpoints",
     "show_all_endpoints": "Mostra tutti i {{count}} endpoints",
     "show_less": "Mostra meno",
-    "delay_ms": "ms",
     "delay": "Ritardo (ms)",
     "edit_response": "Modifica",
     "edit_response_tooltip": "Modifica risposta personalizzata",
@@ -463,7 +414,6 @@
     "log_status": "Stato",
     "log_time_ms": "Tempo (ms)",
     "status_code": "Codice di stato",
-    "ok": "OK",
     "error_toggle_server": "Impossibile attivare/disattivare il server",
     "error_update_port": "Impossibile aggiornare la porta",
     "error_toggle_collection": "Impossibile aggiornare la raccolta",
@@ -497,15 +447,12 @@
   },
   "runner": {
     "title": "Collection Runner",
-    "new": "Nuovo",
     "save": "Salva",
     "load": "Carica",
     "run": "Esegui",
     "stop": "Ferma",
-    "clear_all": "Cancella tutto",
     "available_requests": "Richieste disponibili",
     "selected_requests": "Richieste selezionate",
-    "post_response_script": "Script post-risposta",
     "edit_request": "Modifica richiesta",
     "tab_params": "Parametri",
     "tab_headers": "Intestazioni",
@@ -519,17 +466,13 @@
     "value": "Valore",
     "no_collections": "Nessuna collezione disponibile",
     "add_requests_hint": "Clicca sulle richieste nel pannello di sinistra per aggiungerle",
-    "select_request_for_script": "Seleziona una richiesta per modificare il suo script post-risposta",
     "stop_on_error": "Ferma in caso di errore",
-    "delay_between": "Ritardo:",
     "delay": "Ritardo",
     "results": "Risultati",
     "passed": "Superati",
     "failed": "Falliti",
     "total": "Totale",
-    "saved_runners": "Runner salvati",
     "no_saved_runners": "Nessun runner salvato",
-    "new_runner_tab": "Nuova scheda Runner",
     "body": "Corpo",
     "headers": "Intestazioni",
     "cookies": "Cookie",
@@ -566,17 +509,6 @@
     "error_already_running": "Un runner è già in esecuzione",
     "error_not_found": "Runner non trovato",
     "error_no_requests": "Il runner non contiene richieste da eseguire",
-    "error_request_failed": "Richiesta non riuscita",
-    "error_collection_missing": "La raccolta di questa richiesta non è aperta. Rimuovi la richiesta e aggiungila di nuovo da Richieste disponibili.",
-    "error_endpoint_missing": "\"{{name}}\" non esiste più in {{collection}}. Rimuovila e aggiungila di nuovo da Richieste disponibili.",
-    "error_protocol": "Il runner della raccolta non può eseguire richieste {{protocol}}",
-    "error_no_binary_file": "Nessun file selezionato per il corpo binario",
-    "error_invalid_body": "JSON del corpo non valido: {{message}}",
-    "error_invalid_graphql_variables": "JSON delle variabili GraphQL non valido: {{message}}",
-    "script_error": "Errore dello script: {{message}}",
-    "auth_stripped": "L’autenticazione non è stata inviata: lo script di pre-richiesta ha cambiato l’host della richiesta.",
-    "skip_stopped": "Esecuzione interrotta dall’utente",
-    "skip_previous_error": "Saltata a causa di un errore precedente",
     "no_response_body": "(Nessun corpo della risposta)",
     "no_headers": "Nessuna intestazione",
     "request_status": "Richiesta {{number}}: {{detail}}",
@@ -585,8 +517,6 @@
     "request_count_other": "{{count}} richieste",
     "running_requests_one": "Esecuzione di {{count}} richiesta...",
     "running_requests_other": "Esecuzione di {{count}} richieste...",
-    "tests_failed_one": "{{count}} test non riuscito",
-    "tests_failed_other": "{{count}} test non riusciti",
     "relinked_one": "{{count}} richiesta ricollegata all’interno della sua raccolta",
     "relinked_other": "{{count}} richieste ricollegate all’interno della loro raccolta",
     "missing_requests_one": "{{count}} richiesta in «{{name}}» non esiste più nella sua raccolta",
@@ -601,7 +531,6 @@
     "clear_data_file": "Rimuovi file di dati",
     "data_file_rows_one": "{{name}} · {{count}} riga",
     "data_file_rows_other": "{{name}} · {{count}} righe",
-    "data_file_error": "File di dati {{name}}: {{message}}",
     "data_file_empty": "Il file di dati {{name}} non contiene righe",
     "data_file_unusable": "Impossibile usare questo file di dati: {{message}}",
     "data_empty_header": "Riga 1: ogni colonna deve avere un nome",
@@ -621,7 +550,6 @@
     "history_failed": "{{count}} non riuscite",
     "history_source": "Esecuzione del {{date}}",
     "history_no_body": "La cronologia non conserva corpi di risposta, intestazioni e cookie",
-    "pre_request_failed": "Lo script pre-richiesta non è riuscito, la richiesta non è stata inviata: {{message}}",
     "flow": {
       "max_executions": "Esecuzioni max / iterazione",
       "invalid_limit": "Il massimo di esecuzioni deve essere un intero tra {{min}} e {{max}}.",
@@ -685,7 +613,6 @@
     "clean_session_needs_client_id": "Una sessione persistente (sessione pulita disattivata) richiede un ID client fisso"
   },
   "websocket": {
-    "title": "WebSocket",
     "section_connection": "Connessione",
     "protocols_label": "Sottoprotocolli",
     "protocols_placeholder": "graphql-transport-ws, chat",

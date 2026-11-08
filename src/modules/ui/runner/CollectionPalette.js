@@ -111,7 +111,6 @@ export class CollectionPalette {
         const endpointsContainer = el.querySelector('[data-role="endpoints-container"]');
 
         headerEl?.addEventListener('click', () => {
-            el.classList.toggle('is-expanded');
             endpointsContainer?.classList.toggle('is-hidden');
         });
 

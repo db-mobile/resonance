@@ -25,10 +25,6 @@ jest.mock('../../src/modules/statusDisplay.js', () => ({
     updateResponseTime: jest.fn(),
     updateResponseSize: jest.fn()
 }));
-jest.mock('../../src/modules/logger.js', () => ({
-    __esModule: true,
-    default: { scope: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }) }
-}));
 jest.mock('../../src/modules/performanceMetrics.js', () => ({
     displayPerformanceMetrics: jest.fn(),
     clearPerformanceMetrics: jest.fn()

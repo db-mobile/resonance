@@ -121,22 +121,6 @@ export class PreviewManager {
      * @param {string} content
      * @param {string} contentType
      */
-    updatePreview(tabId, content, contentType) {
-        const container = this.containers.get(tabId);
-        if (!container) {
-            return;
-        }
-
-        if (this.isPreviewMode(tabId)) {
-            container.renderer.render(content, contentType);
-        }
-    }
-
-    /**
-     * @param {string} tabId
-     * @param {string} content
-     * @param {string} contentType
-     */
     refreshPreviewContent(tabId, content, contentType) {
         const container = this.containers.get(tabId);
         if (!container) {

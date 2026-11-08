@@ -113,7 +113,6 @@ const ARRAY_PERSISTED_KINDS = ['pathParams', 'queryParams', 'headers'];
 export const PROTOCOLS = Object.freeze({
     [RequestMode.HTTP]: Object.freeze({
         id: RequestMode.HTTP,
-        label: 'HTTP',
         methodLabel: null,
         preservesHttpMethod: false,
         defaultMethod: 'GET',
@@ -154,7 +153,6 @@ export const PROTOCOLS = Object.freeze({
     }),
     [RequestMode.SSE]: Object.freeze({
         id: RequestMode.SSE,
-        label: 'SSE',
         methodLabel: 'SSE',
         preservesHttpMethod: true,
         defaultMethod: 'GET',
@@ -199,7 +197,6 @@ export const PROTOCOLS = Object.freeze({
     }),
     [RequestMode.WEBSOCKET]: Object.freeze({
         id: RequestMode.WEBSOCKET,
-        label: 'WebSocket',
         methodLabel: 'WS',
         preservesHttpMethod: false,
         defaultMethod: 'WS',
@@ -245,7 +242,6 @@ export const PROTOCOLS = Object.freeze({
     }),
     [RequestMode.GRAPHQL]: Object.freeze({
         id: RequestMode.GRAPHQL,
-        label: 'GraphQL',
         methodLabel: 'GQL',
         preservesHttpMethod: false,
         defaultMethod: 'POST',
@@ -292,7 +288,6 @@ export const PROTOCOLS = Object.freeze({
     }),
     [RequestMode.GRPC]: Object.freeze({
         id: RequestMode.GRPC,
-        label: 'gRPC',
         methodLabel: 'GRPC',
         preservesHttpMethod: false,
         defaultMethod: 'GRPC',
@@ -324,7 +319,6 @@ export const PROTOCOLS = Object.freeze({
     }),
     [RequestMode.MQTT]: Object.freeze({
         id: RequestMode.MQTT,
-        label: 'MQTT',
         methodLabel: 'MQTT',
         preservesHttpMethod: false,
         defaultMethod: 'MQTT',

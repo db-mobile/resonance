@@ -664,13 +664,13 @@ export class MockServerDialog extends BaseModal {
      * @returns {Promise<{success: boolean, message: string|undefined}>}
      */
     async _saveResponseOverrides(collection, endpoint, { delay, statusCode, response }) {
-        const delayResult = await this.controller.handleSetDelay(collection.id, endpoint.id, delay);
-        const statusCodeResult = await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode);
-        const responseResult = await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response);
-        return {
-            success: Boolean(responseResult.success && delayResult.success && statusCodeResult.success),
-            message: responseResult.message || delayResult.message || statusCodeResult.message
-        };
+        const results = [
+            await this.controller.handleSetDelay(collection.id, endpoint.id, delay),
+            await this.controller.handleSetCustomStatusCode(collection.id, endpoint.id, statusCode),
+            await this.controller.handleSetCustomResponse(collection.id, endpoint.id, response)
+        ];
+        const failed = results.find(result => !result?.success);
+        return { success: !failed, message: failed?.message };
     }
 
     /**

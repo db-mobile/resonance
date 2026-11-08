@@ -14,7 +14,12 @@ function makeController(tabs) {
 
 describe('WorkspaceTabController collection sync', () => {
     test('closeTabsForCollection closes every tab of that collection and swallows failures', async () => {
-        const controller = makeController([{ id: 't1', collectionId: 'c1' }, { id: 't2', collectionId: 'c2' }, { id: 't3', collectionId: 'c1' }]);
+        const controller = makeController([
+            { id: 't1', endpoint: { collectionId: 'c1', endpointId: 'e1' } },
+            { id: 't2', endpoint: { collectionId: 'c2', endpointId: 'e2' } },
+            { id: 't3', endpoint: { collectionId: 'c1', endpointId: 'e3' } },
+            { id: 't4' }
+        ]);
 
         await controller.closeTabsForCollection('c1');
         expect(controller.closeTabs).toHaveBeenCalledWith(['t1', 't3']);

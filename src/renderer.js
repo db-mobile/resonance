@@ -14,7 +14,6 @@ import { registerTabShortcuts } from './modules/tabShortcuts.js';
 import { initializeScriptSubTabs } from './modules/scriptSubTabs.js';
 import { updateStatusDisplay } from './modules/statusDisplay.js';
 import { handleSendRequest, handleCancelRequest, handleGenerateCurl, handleWebSocketConnectionAction } from './modules/apiHandler.js';
-import { getSettingsCache } from './modules/state/settingsCache.js';
 import { markTabModified } from './modules/state/tabModified.js';
 import { applyGrpcState, captureGrpcState, initGrpcUI } from './modules/grpcHandler.js';
 import { initRequestModeManager } from './modules/requestModeManager.js';
@@ -54,8 +53,6 @@ import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
 import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
-
-app.getApiHandlerSettingsCache = getSettingsCache;
 
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
@@ -329,14 +326,12 @@ function applyShortcutHints() {
 function createLazyEditor(container, options, changeCallback) {
     let instance = null;
     let loadStarted = false;
-    let destroyed = false;
     let pendingContent = null;
 
     function ensure() {
-        if (instance || destroyed || !container || loadStarted) { return; }
+        if (instance || !container || loadStarted) { return; }
         loadStarted = true;
         loadEditor('requestBody').then((RequestBodyEditor) => {
-            if (destroyed) { return; }
             instance = new RequestBodyEditor(container, options);
             if (pendingContent !== null) {
                 instance.setContent(pendingContent);
@@ -354,21 +349,8 @@ function createLazyEditor(container, options, changeCallback) {
             else { pendingContent = content; ensure(); }
         },
         getContent() { return instance ? instance.getContent() : (pendingContent ?? ''); },
-        clear() {
-            if (instance) { instance.clear(); }
-            else { pendingContent = ''; }
-        },
-        onChange(cb) {
-            changeCallback = cb;
-            if (instance) { instance.onChange(cb); }
-        },
         formatJSONWithFeedback() { instance?.formatJSONWithFeedback(); },
-        focus() {
-            if (instance) { instance.focus(); }
-            else { ensure(); }
-        },
-        ensure() { ensure(); },
-        destroy() { instance?.destroy(); instance = null; destroyed = true; pendingContent = null; }
+        ensure() { ensure(); }
     };
 }
 

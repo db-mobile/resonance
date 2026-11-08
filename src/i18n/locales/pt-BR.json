@@ -1,8 +1,4 @@
 {
-  "app": {
-    "title": "Resonance",
-    "tagline": "Teste de API Simplificado"
-  },
   "header": {
     "settings": "Configurações"
   },
@@ -120,12 +116,9 @@
     "error_no_file": "Escolha um arquivo de importação antes de continuar."
   },
   "collection": {
-    "rename": "Renomear Coleção",
     "delete": "Excluir Coleção",
     "delete_title": "Excluir Coleção",
     "confirm_delete": "Tem certeza de que deseja excluir a coleção \"{{name}}\"?\n\nEsta ação não pode ser desfeita.",
-    "import_success": "Coleção importada com sucesso",
-    "import_error": "Falha ao importar coleção",
     "close_title": "Fechar coleção",
     "confirm_close": "Remover \"{{name}}\" da lista?\n\nA pasta e seus arquivos permanecem no disco, e as credenciais salvas são mantidas. Você pode abri-la novamente depois.",
     "reveal_failed": "Não foi possível mostrar a pasta da coleção: {{message}}"
@@ -143,7 +136,6 @@
   "context_menu": {
     "new_collection": "Nova Coleção",
     "new_request": "Nova Requisição",
-    "import_curl": "Importar cURL",
     "manage_variables": "Gerenciar Variáveis",
     "edit_auth": "Editar autenticação",
     "export_openapi_json": "Exportar como OpenAPI (JSON)",
@@ -193,9 +185,7 @@
     "new_collection": "Criar Nova Coleção",
     "collection_name": "Nome da Nova Coleção",
     "collection_location": "Local da Coleção",
-    "import": "Importar",
-    "error_invalid": "Comando cURL inválido",
-    "error_no_url": "Nenhuma URL encontrada no comando cURL"
+    "import": "Importar"
   },
   "new_request": {
     "title": "Criar Nova Requisição",
@@ -229,15 +219,10 @@
   "request": {
     "method": "Método",
     "url": "URL",
-    "send": "Enviar",
-    "sending": "Enviando...",
     "headers": "Cabeçalhos",
-    "query_params": "Parâmetros de Consulta",
     "body": "Corpo",
-    "response": "Resposta",
     "status": "Status",
     "time": "Tempo",
-    "size": "Tamanho",
     "disconnect": "Desconectar",
     "cancel": "Cancelar"
   },
@@ -251,8 +236,6 @@
     "grpc": "gRPC",
     "grpc_message": "Mensagem",
     "grpc_metadata": "Metadados",
-    "response_body": "Corpo",
-    "response_headers": "Cabeçalhos",
     "schema": "Esquema",
     "mqtt": "MQTT",
     "websocket": "WebSocket",
@@ -260,25 +243,9 @@
   },
   "schema": {
     "title": "Esquema de Resposta",
-    "description": "Defina um JSON Schema para validar as respostas da API. O esquema será preenchido automaticamente a partir das importações OpenAPI.",
     "infer_btn": "Inferir da Resposta",
     "clear_btn": "Limpar",
-    "valid": "Esquema Válido",
-    "invalid": "Esquema Inválido",
-    "no_response": "Nenhuma resposta disponível para inferir o esquema",
-    "not_json": "A resposta não é um JSON válido",
-    "inferred": "Esquema inferido da resposta",
-    "cleared": "Esquema limpo"
-  },
-  "variables": {
-    "title": "Variáveis",
-    "name": "Nome",
-    "value": "Valor",
-    "add": "Adicionar Variável",
-    "save": "Salvar",
-    "cancel": "Cancelar",
-    "placeholder_name": "Nome da variável",
-    "placeholder_value": "Valor da variável"
+    "valid": "Esquema Válido"
   },
   "settings": {
     "title": "Configurações",
@@ -328,9 +295,7 @@
     "proxy_test": "Testar Conexão",
     "close": "Fechar",
     "save": "Salvar",
-    "cancel": "Cancelar",
     "tab_updates": "Atualizações",
-    "auto_update": "Atualizações Automáticas",
     "check_updates_on_launch": "Verificar atualizações ao iniciar",
     "check_updates_on_launch_description": "Verificar automaticamente novas versões quando o aplicativo iniciar.",
     "manual_update": "Atualização Manual",
@@ -344,7 +309,6 @@
     "updates_not_available": "Atualizações não disponíveis nesta versão",
     "updates_managed_externally": "As atualizações são gerenciadas pelo seu gerenciador de pacotes",
     "version_info": "Informações da Versão",
-    "current_version": "Versão atual",
     "retry_update": "Tentar novamente",
     "proxy_testing": "Testando…",
     "proxy_save_failed": "Falha ao salvar as configurações de proxy: {{error}}",
@@ -369,20 +333,9 @@
     "save": "Salvar",
     "delete": "Excluir",
     "rename": "Renomear",
-    "edit": "Editar",
-    "add": "Adicionar",
-    "remove": "Remover",
     "close": "Fechar",
-    "yes": "Sim",
-    "no": "Não",
     "create": "Criar",
     "clear": "Limpar"
-  },
-  "errors": {
-    "network": "Erro de rede",
-    "timeout": "Tempo limite da requisição esgotado",
-    "invalid_url": "Formato de URL inválido",
-    "unknown": "Ocorreu um erro desconhecido"
   },
   "history": {
     "empty": "Nenhum histórico de requisições",
@@ -444,10 +397,8 @@
     "close": "Fechar",
     "empty_collections": "Nenhuma coleção disponível.<br>Importe uma coleção OpenAPI ou Postman primeiro.",
     "endpoints": "endpoints",
-    "more_endpoints": "... e mais {{count}} endpoints",
     "show_all_endpoints": "Mostrar todos os {{count}} endpoints",
     "show_less": "Mostrar menos",
-    "delay_ms": "ms",
     "delay": "Atraso (ms)",
     "edit_response": "Editar",
     "edit_response_tooltip": "Editar resposta personalizada",
@@ -463,7 +414,6 @@
     "log_status": "Status",
     "log_time_ms": "Tempo (ms)",
     "status_code": "Código de Status",
-    "ok": "OK",
     "error_toggle_server": "Falha ao alternar servidor",
     "error_update_port": "Falha ao atualizar a porta",
     "error_toggle_collection": "Falha ao atualizar a coleção",
@@ -495,25 +445,14 @@
     "examples_count_other": "{{count}} exemplos salvos",
     "examples_badge_title": "O primeiro exemplo salvo bem-sucedido é servido, a menos que uma resposta personalizada esteja salva aqui. \"Prefer: example=nome\" escolhe um pelo nome."
   },
-  "preview": {
-    "toggle": "Alternar Visualização",
-    "toggle_code": "Mostrar Código",
-    "toggle_preview": "Mostrar Visualização",
-    "not_available": "Visualização não disponível para este tipo de conteúdo",
-    "supported_formats": "Formatos suportados: HTML, JSON, XML",
-    "parse_error": "Falha ao analisar o conteúdo para visualização"
-  },
   "runner": {
     "title": "Executor de Coleção",
-    "new": "Novo",
     "save": "Salvar",
     "load": "Carregar",
     "run": "Executar",
     "stop": "Parar",
-    "clear_all": "Limpar Tudo",
     "available_requests": "Requisições Disponíveis",
     "selected_requests": "Requisições Selecionadas",
-    "post_response_script": "Script Pós-Resposta",
     "edit_request": "Editar requisição",
     "tab_params": "Parâmetros",
     "tab_headers": "Cabeçalhos",
@@ -527,17 +466,13 @@
     "value": "Valor",
     "no_collections": "Nenhuma coleção disponível",
     "add_requests_hint": "Clique nas requisições no painel esquerdo para adicioná-las",
-    "select_request_for_script": "Selecione uma requisição para editar seu script pós-resposta",
     "stop_on_error": "Parar em caso de erro",
-    "delay_between": "Atraso entre requisições:",
     "delay": "Atraso",
     "results": "Resultados",
     "passed": "Aprovados",
     "failed": "Falharam",
     "total": "Total",
-    "saved_runners": "Executores Salvos",
     "no_saved_runners": "Nenhum executor salvo",
-    "new_runner_tab": "Nova Aba de Executor",
     "body": "Corpo",
     "headers": "Cabeçalhos",
     "cookies": "Cookies",
@@ -574,17 +509,6 @@
     "error_already_running": "Um runner já está em execução",
     "error_not_found": "Runner não encontrado",
     "error_no_requests": "O runner não tem requisições para executar",
-    "error_request_failed": "A requisição falhou",
-    "error_collection_missing": "A coleção desta requisição não está aberta. Remova a requisição e adicione-a novamente em Requisições disponíveis.",
-    "error_endpoint_missing": "\"{{name}}\" não existe mais em {{collection}}. Remova-a e adicione-a novamente em Requisições disponíveis.",
-    "error_protocol": "O runner de coleções não pode executar requisições {{protocol}}",
-    "error_no_binary_file": "Nenhum arquivo selecionado para o corpo binário",
-    "error_invalid_body": "JSON do corpo inválido: {{message}}",
-    "error_invalid_graphql_variables": "JSON de variáveis GraphQL inválido: {{message}}",
-    "script_error": "Erro de script: {{message}}",
-    "auth_stripped": "A autenticação não foi enviada: o script de pré-requisição alterou o host da requisição.",
-    "skip_stopped": "Execução interrompida pelo usuário",
-    "skip_previous_error": "Ignorada devido a um erro anterior",
     "no_response_body": "(Sem corpo de resposta)",
     "no_headers": "Sem cabeçalhos",
     "request_status": "Requisição {{number}}: {{detail}}",
@@ -593,8 +517,6 @@
     "request_count_other": "{{count}} requisições",
     "running_requests_one": "Executando {{count}} requisição...",
     "running_requests_other": "Executando {{count}} requisições...",
-    "tests_failed_one": "{{count}} teste falhou",
-    "tests_failed_other": "{{count}} testes falharam",
     "relinked_one": "{{count}} requisição revinculada dentro da sua coleção",
     "relinked_other": "{{count}} requisições revinculadas dentro da sua coleção",
     "missing_requests_one": "{{count}} requisição em “{{name}}” não existe mais na sua coleção",
@@ -609,7 +531,6 @@
     "clear_data_file": "Remover arquivo de dados",
     "data_file_rows_one": "{{name}} · {{count}} linha",
     "data_file_rows_other": "{{name}} · {{count}} linhas",
-    "data_file_error": "Arquivo de dados {{name}}: {{message}}",
     "data_file_empty": "O arquivo de dados {{name}} não tem linhas",
     "data_file_unusable": "Não foi possível usar este arquivo de dados: {{message}}",
     "data_empty_header": "Linha 1: cada coluna precisa de um nome",
@@ -629,7 +550,6 @@
     "history_failed": "{{count}} com falha",
     "history_source": "Execução de {{date}}",
     "history_no_body": "O histórico não guarda corpos de resposta, cabeçalhos nem cookies",
-    "pre_request_failed": "O script de pré-requisição falhou, então a requisição não foi enviada: {{message}}",
     "flow": {
       "max_executions": "Máx. execuções / iteração",
       "invalid_limit": "O máximo de execuções deve ser um inteiro entre {{min}} e {{max}}.",
@@ -693,7 +613,6 @@
     "clean_session_needs_client_id": "Uma sessão persistente (sessão limpa desativada) precisa de um ID de cliente fixo"
   },
   "websocket": {
-    "title": "WebSocket",
     "section_connection": "Conexão",
     "protocols_label": "Subprotocolos",
     "protocols_placeholder": "graphql-transport-ws, chat",

@@ -180,8 +180,6 @@ export class RunnerResultsPanel {
         if (!this.panel) {return;}
 
         this.dom = {
-            container: this.panel,
-            summary: this.panel.querySelector('[data-role="summary"]'),
             passed: this.panel.querySelector('[data-role="passed"]'),
             failed: this.panel.querySelector('[data-role="failed"]'),
             skipped: this.panel.querySelector('[data-role="skipped"]'),

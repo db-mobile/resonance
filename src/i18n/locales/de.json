@@ -1,8 +1,4 @@
 {
-  "app": {
-    "title": "Resonance",
-    "tagline": "API-Tests leicht gemacht"
-  },
   "header": {
     "settings": "Einstellungen"
   },
@@ -126,12 +122,9 @@
     "error_no_file": "Wählen Sie eine Importdatei, bevor Sie fortfahren."
   },
   "collection": {
-    "rename": "Sammlung umbenennen",
     "delete": "Sammlung löschen",
     "delete_title": "Sammlung löschen",
     "confirm_delete": "Sind Sie sicher, dass Sie die Sammlung \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
-    "import_success": "Sammlung erfolgreich importiert",
-    "import_error": "Fehler beim Importieren der Sammlung",
     "close_title": "Sammlung schließen",
     "confirm_close": "\"{{name}}\" aus der Liste entfernen?\n\nDer Ordner und seine Dateien bleiben erhalten, gespeicherte Zugangsdaten ebenfalls. Du kannst ihn später wieder öffnen.",
     "reveal_failed": "Der Sammlungsordner konnte nicht angezeigt werden: {{message}}"
@@ -149,7 +142,6 @@
   "context_menu": {
     "new_collection": "Neue Sammlung",
     "new_request": "Neue Anfrage",
-    "import_curl": "cURL importieren",
     "manage_variables": "Variablen verwalten",
     "edit_auth": "Auth bearbeiten",
     "export_openapi_json": "Als OpenAPI exportieren (JSON)",
@@ -199,9 +191,7 @@
     "new_collection": "Neue Sammlung erstellen",
     "collection_name": "Name der neuen Sammlung",
     "collection_location": "Speicherort der Sammlung",
-    "import": "Importieren",
-    "error_invalid": "Ungültiger cURL-Befehl",
-    "error_no_url": "Keine URL im cURL-Befehl gefunden"
+    "import": "Importieren"
   },
   "new_request": {
     "title": "Neue Anfrage erstellen",
@@ -235,15 +225,10 @@
   "request": {
     "method": "Methode",
     "url": "URL",
-    "send": "Senden",
-    "sending": "Wird gesendet...",
     "headers": "Header",
-    "query_params": "Query-Parameter",
     "body": "Body",
-    "response": "Antwort",
     "status": "Status",
     "time": "Zeit",
-    "size": "Größe",
     "disconnect": "Trennen",
     "cancel": "Abbrechen"
   },
@@ -257,8 +242,6 @@
     "grpc": "gRPC",
     "grpc_message": "Nachricht",
     "grpc_metadata": "Metadaten",
-    "response_body": "Body",
-    "response_headers": "Header",
     "schema": "Schema",
     "mqtt": "MQTT",
     "websocket": "WebSocket",
@@ -266,25 +249,9 @@
   },
   "schema": {
     "title": "Antwort-Schema",
-    "description": "Definieren Sie ein JSON-Schema zur Validierung von API-Antworten. Das Schema wird automatisch aus OpenAPI-Importen übernommen.",
     "infer_btn": "Aus Antwort ableiten",
     "clear_btn": "Löschen",
-    "valid": "Schema gültig",
-    "invalid": "Schema ungültig",
-    "no_response": "Keine Antwort verfügbar, um Schema abzuleiten",
-    "not_json": "Antwort ist kein gültiges JSON",
-    "inferred": "Schema aus Antwort abgeleitet",
-    "cleared": "Schema gelöscht"
-  },
-  "variables": {
-    "title": "Variablen",
-    "name": "Name",
-    "value": "Wert",
-    "add": "Variable hinzufügen",
-    "save": "Speichern",
-    "cancel": "Abbrechen",
-    "placeholder_name": "Variablenname",
-    "placeholder_value": "Variablenwert"
+    "valid": "Schema gültig"
   },
   "settings": {
     "title": "Einstellungen",
@@ -334,9 +301,7 @@
     "proxy_test": "Verbindung testen",
     "close": "Schließen",
     "save": "Speichern",
-    "cancel": "Abbrechen",
     "tab_updates": "Updates",
-    "auto_update": "Automatische Updates",
     "check_updates_on_launch": "Beim Start nach Updates suchen",
     "check_updates_on_launch_description": "Automatisch nach neuen Versionen suchen, wenn die Anwendung startet.",
     "manual_update": "Manuelles Update",
@@ -350,7 +315,6 @@
     "updates_not_available": "Updates in diesem Build nicht verfügbar",
     "updates_managed_externally": "Updates werden von Ihrem Paketmanager verwaltet",
     "version_info": "Versionsinformationen",
-    "current_version": "Aktuelle Version",
     "retry_update": "Erneut versuchen",
     "proxy_testing": "Wird getestet…",
     "proxy_save_failed": "Proxy-Einstellungen konnten nicht gespeichert werden: {{error}}",
@@ -375,20 +339,9 @@
     "save": "Speichern",
     "delete": "Löschen",
     "rename": "Umbenennen",
-    "edit": "Bearbeiten",
-    "add": "Hinzufügen",
-    "remove": "Entfernen",
     "close": "Schließen",
-    "yes": "Ja",
-    "no": "Nein",
     "create": "Erstellen",
     "clear": "Leeren"
-  },
-  "errors": {
-    "network": "Netzwerkfehler aufgetreten",
-    "timeout": "Anfrage-Timeout",
-    "invalid_url": "Ungültiges URL-Format",
-    "unknown": "Ein unbekannter Fehler ist aufgetreten"
   },
   "history": {
     "empty": "Kein Anfrageverlauf",
@@ -450,10 +403,8 @@
     "close": "Schließen",
     "empty_collections": "Keine Sammlungen verfügbar.<br>Importieren Sie zuerst eine OpenAPI- oder Postman-Sammlung.",
     "endpoints": "Endpunkte",
-    "more_endpoints": "... und {{count}} weitere Endpunkte",
     "show_all_endpoints": "Alle {{count}} Endpunkte anzeigen",
     "show_less": "Weniger anzeigen",
-    "delay_ms": "ms",
     "delay": "Verzögerung (ms)",
     "edit_response": "Bearbeiten",
     "edit_response_tooltip": "Benutzerdefinierte Antwort bearbeiten",
@@ -469,7 +420,6 @@
     "log_status": "Status",
     "log_time_ms": "Zeit (ms)",
     "status_code": "Statuscode",
-    "ok": "OK",
     "error_toggle_server": "Server konnte nicht umgeschaltet werden",
     "error_update_port": "Port konnte nicht aktualisiert werden",
     "error_toggle_collection": "Sammlung konnte nicht aktualisiert werden",
@@ -503,15 +453,12 @@
   },
   "runner": {
     "title": "Collection Runner",
-    "new": "Neu",
     "save": "Speichern",
     "load": "Laden",
     "run": "Ausführen",
     "stop": "Stopp",
-    "clear_all": "Alle löschen",
     "available_requests": "Verfügbare Anfragen",
     "selected_requests": "Ausgewählte Anfragen",
-    "post_response_script": "Post-Response-Skript",
     "edit_request": "Anfrage bearbeiten",
     "tab_params": "Parameter",
     "tab_headers": "Header",
@@ -525,17 +472,13 @@
     "value": "Wert",
     "no_collections": "Keine Sammlungen verfügbar",
     "add_requests_hint": "Klicken Sie auf Anfragen im linken Panel, um sie hinzuzufügen",
-    "select_request_for_script": "Wählen Sie eine Anfrage, um ihr Post-Response-Skript zu bearbeiten",
     "stop_on_error": "Bei Fehler stoppen",
-    "delay_between": "Verzögerung:",
     "delay": "Verzögerung",
     "results": "Ergebnisse",
     "passed": "Bestanden",
     "failed": "Fehlgeschlagen",
     "total": "Gesamt",
-    "saved_runners": "Gespeicherte Runner",
     "no_saved_runners": "Noch keine gespeicherten Runner",
-    "new_runner_tab": "Neuer Runner-Tab",
     "body": "Body",
     "headers": "Headers",
     "cookies": "Cookies",
@@ -572,17 +515,6 @@
     "error_already_running": "Ein Runner wird bereits ausgeführt",
     "error_not_found": "Runner nicht gefunden",
     "error_no_requests": "Der Runner enthält keine auszuführenden Anfragen",
-    "error_request_failed": "Anfrage fehlgeschlagen",
-    "error_collection_missing": "Die Sammlung dieser Anfrage ist nicht geöffnet. Entfernen Sie die Anfrage und fügen Sie sie unter „Verfügbare Anfragen“ erneut hinzu.",
-    "error_endpoint_missing": "„{{name}}“ existiert nicht mehr in {{collection}}. Entfernen Sie die Anfrage und fügen Sie sie unter „Verfügbare Anfragen“ erneut hinzu.",
-    "error_protocol": "{{protocol}}-Anfragen können vom Collection Runner nicht ausgeführt werden",
-    "error_no_binary_file": "Keine Datei für den Binär-Body ausgewählt",
-    "error_invalid_body": "Ungültiges Body-JSON: {{message}}",
-    "error_invalid_graphql_variables": "Ungültiges JSON der GraphQL-Variablen: {{message}}",
-    "script_error": "Skriptfehler: {{message}}",
-    "auth_stripped": "Die Authentifizierung wurde nicht gesendet: Das Pre-Request-Skript hat den Host der Anfrage geändert.",
-    "skip_stopped": "Ausführung vom Benutzer gestoppt",
-    "skip_previous_error": "Wegen eines vorherigen Fehlers übersprungen",
     "no_response_body": "(Kein Antwort-Body)",
     "no_headers": "Keine Header",
     "request_status": "Anfrage {{number}}: {{detail}}",
@@ -591,8 +523,6 @@
     "request_count_other": "{{count}} Anfragen",
     "running_requests_one": "{{count}} Anfrage wird ausgeführt...",
     "running_requests_other": "{{count}} Anfragen werden ausgeführt...",
-    "tests_failed_one": "{{count}} Test fehlgeschlagen",
-    "tests_failed_other": "{{count}} Tests fehlgeschlagen",
     "relinked_one": "{{count}} Anfrage innerhalb ihrer Sammlung neu verknüpft",
     "relinked_other": "{{count}} Anfragen innerhalb ihrer Sammlung neu verknüpft",
     "missing_requests_one": "{{count}} Anfrage in „{{name}}“ existiert in ihrer Sammlung nicht mehr",
@@ -607,7 +537,6 @@
     "clear_data_file": "Datendatei entfernen",
     "data_file_rows_one": "{{name}} · {{count}} Zeile",
     "data_file_rows_other": "{{name}} · {{count}} Zeilen",
-    "data_file_error": "Datendatei {{name}}: {{message}}",
     "data_file_empty": "Die Datendatei {{name}} enthält keine Zeilen",
     "data_file_unusable": "Diese Datendatei kann nicht verwendet werden: {{message}}",
     "data_empty_header": "Zeile 1: Jede Spalte braucht einen Namen",
@@ -627,7 +556,6 @@
     "history_failed": "{{count}} fehlgeschlagen",
     "history_source": "Ausführung vom {{date}}",
     "history_no_body": "Antwort-Bodies, Header und Cookies werden im Ausführungsverlauf nicht gespeichert",
-    "pre_request_failed": "Das Pre-Request-Skript ist fehlgeschlagen, die Anfrage wurde nicht gesendet: {{message}}",
     "flow": {
       "max_executions": "Max. Ausführungen / Iteration",
       "invalid_limit": "Maximale Ausführungen müssen eine ganze Zahl zwischen {{min}} und {{max}} sein.",
@@ -691,7 +619,6 @@
     "clean_session_needs_client_id": "Eine persistente Sitzung (saubere Sitzung aus) braucht eine feste Client-ID"
   },
   "websocket": {
-    "title": "WebSocket",
     "section_connection": "Verbindung",
     "protocols_label": "Subprotokolle",
     "protocols_placeholder": "graphql-transport-ws, chat",

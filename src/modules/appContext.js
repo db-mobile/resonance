@@ -28,7 +28,6 @@
  * @property {*} [i18n]
  * @property {Function} [captureGrpcState]
  * @property {Function} [applyGrpcState]
- * @property {Function} [getApiHandlerSettingsCache]
  */
 
 /** @type {AppContext} */

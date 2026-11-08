@@ -7,7 +7,6 @@
 const importers = {
     requestBody: () => import('./requestBodyEditor.bundle.js').then((m) => m.RequestBodyEditor),
     response: () => import('./responseEditor.bundle.js').then((m) => m.ResponseEditor),
-    json: () => import('./jsonEditor.bundle.js').then((m) => m.JSONEditor),
     graphql: () => import('./graphqlEditor.bundle.js').then((m) => m.GraphQLEditor),
     script: () => import('./scriptEditor.bundle.js').then((m) => m.ScriptEditor),
     schema: () => import('./schemaEditor.bundle.js').then((m) => m.SchemaEditor)
@@ -17,7 +16,7 @@ const importers = {
 const cache = {};
 
 /**
- * @param {'requestBody'|'response'|'json'|'graphql'} kind
+ * @param {'requestBody'|'response'|'graphql'|'script'|'schema'} kind
  * @returns {Promise<Function>}
  */
 export function loadEditor(kind) {
@@ -40,7 +39,7 @@ export function warmEditors() {
 const PASSTHROUGH_PROPS = new Set(['currentLanguage', 'view', 'changeCallback', 'then']);
 
 /**
- * @param {'requestBody'|'response'|'json'|'graphql'} kind
+ * @param {'requestBody'|'response'|'graphql'|'script'|'schema'} kind
  * @param {HTMLElement} container
  * @param {Array<*>} [ctorArgs=[]]
  * @returns {object}
@@ -72,9 +71,6 @@ export function createLazyEditorProxy(kind, container, ctorArgs = []) {
         get(_target, prop) {
             if (prop === '__ready') {
                 return ready;
-            }
-            if (prop === '__instance') {
-                return real;
             }
             if (real) {
                 const value = real[prop];

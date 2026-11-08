@@ -23,13 +23,9 @@ export class RunnerRepository {
         return sharedRepository;
     }
 
-    /**
-     * @param {Object} backendAPI
-     * @param {{listCollectionIds?: () => Promise<Array<string>>}} [deps]
-     */
-    constructor(backendAPI, { listCollectionIds = null } = {}) {
+    /** @param {Object} backendAPI */
+    constructor(backendAPI) {
         this.backendAPI = backendAPI;
-        this._listCollectionIds = listCollectionIds || (() => backendAPI.collections.list());
         this._byCollection = new Map();
         this._lastRuns = null;
         this._writeQueue = Promise.resolve();
@@ -55,7 +51,7 @@ export class RunnerRepository {
         }
         let collectionIds;
         try {
-            collectionIds = (await this._listCollectionIds()) || [];
+            collectionIds = (await this.backendAPI.collections.list()) || [];
         } catch {
             return [];
         }

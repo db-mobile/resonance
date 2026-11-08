@@ -9,7 +9,6 @@ export class ResponseEditor extends BaseCodeEditor {
     constructor(containerElement) {
         super(containerElement);
         this.currentLanguage = null;
-        this.currentContentType = null;
         this.manualLanguageOverride = null;
         this.languageChangeCallback = null;
     }
@@ -154,7 +153,6 @@ export class ResponseEditor extends BaseCodeEditor {
      * @param {string} [languageHint]
      */
     setContent(content, contentType = null, languageHint = undefined) {
-        this.currentContentType = contentType;
 
         if (this.manualLanguageOverride !== null) {
             this._updateEditorWithLanguage(content, this.manualLanguageOverride);

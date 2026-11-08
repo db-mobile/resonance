@@ -29,15 +29,6 @@ export class FeatureRegistry {
     }
 
     /**
-     * @param {string} name
-     * @param {*} value
-     * @returns {*}
-     */
-    provide(name, value) {
-        return this.ctx.provide(name, value);
-    }
-
-    /**
      * @param {FeatureDescriptor} descriptor
      * @returns {this}
      */

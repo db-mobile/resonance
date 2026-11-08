@@ -120,31 +120,6 @@ describe('VariableService', () => {
         });
     });
 
-    describe('processTemplate', () => {
-        test('should process template with variables', async () => {
-            const template = 'Hello {{ name }}!';
-            const variables = { name: 'World' };
-            const processedTemplate = 'Hello World!';
-
-            mockRepository.getVariablesForCollection.mockResolvedValue(variables);
-            mockProcessor.processTemplate.mockReturnValue(processedTemplate);
-
-            const result = await service.processTemplate(template, 'collection-1');
-
-            expect(result).toBe(processedTemplate);
-            expect(mockProcessor.processTemplate).toHaveBeenCalledWith(template, variables);
-        });
-
-        test('should return original template if processing fails', async () => {
-            const template = 'Hello {{ name }}!';
-            mockRepository.getVariablesForCollection.mockRejectedValue(new Error('Error'));
-
-            const result = await service.processTemplate(template, 'collection-1');
-
-            expect(result).toBe(template);
-        });
-    });
-
     describe('cleanupCollectionVariables', () => {
         test('should cleanup variables for collection', async () => {
             mockRepository.deleteAllVariablesForCollection.mockResolvedValue();

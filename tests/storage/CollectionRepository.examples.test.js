@@ -24,18 +24,6 @@ describe('CollectionRepository examples', () => {
         await expect(repository.getExamples('c1', 'e1')).rejects.toThrow('Failed to load examples');
     });
 
-    test('saveExamples writes through the backend and invalidates the by-id cache', async () => {
-        const { repository, backendAPI } = makeRepository();
-        const invalidate = jest.spyOn(repository, 'invalidateCache');
-
-        await repository.saveExamples('c1', 'e1', [{ id: 'ex2', name: 'B', status: 404 }]);
-
-        expect(backendAPI.collections.saveExamples).toHaveBeenCalledWith('c1', 'e1', [{ id: 'ex2', name: 'B', status: 404 }]);
-        expect(invalidate).toHaveBeenCalled();
-        backendAPI.collections.saveExamples.mockRejectedValueOnce(new Error('ro'));
-        await expect(repository.saveExamples('c1', 'e1', [])).rejects.toThrow('Failed to save examples');
-    });
-
     test('updateExamples reads, mutates a copy and saves the result', async () => {
         const { repository, backendAPI } = makeRepository();
 
@@ -55,7 +43,7 @@ describe('CollectionRepository examples', () => {
         });
 
         await Promise.all([
-            repository.saveExamples('c1', 'e1', [{ id: 'a', name: 'A', status: 200 }]),
+            repository.updateExamples('c1', 'e1', () => [{ id: 'a', name: 'A', status: 200 }]),
             repository.updateExamples('c1', 'e1', () => [])
         ]);
 

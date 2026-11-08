@@ -1,8 +1,4 @@
 {
-  "app": {
-    "title": "Resonance",
-    "tagline": "API Testing Made Simple"
-  },
   "header": {
     "settings": "Settings"
   },
@@ -126,12 +122,9 @@
     "error_no_file": "Choose an import file before continuing."
   },
   "collection": {
-    "rename": "Rename Collection",
     "delete": "Delete Collection",
     "delete_title": "Delete Collection",
     "confirm_delete": "Are you sure you want to delete the collection \"{{name}}\"?\n\nThis action cannot be undone.",
-    "import_success": "Collection imported successfully",
-    "import_error": "Failed to import collection",
     "close_title": "Close Collection",
     "confirm_close": "Remove \"{{name}}\" from the list?\n\nThe folder and its files stay on disk, and stored credentials are kept. You can open it again later.",
     "reveal_failed": "Could not show the collection folder: {{message}}"
@@ -149,7 +142,6 @@
   "context_menu": {
     "new_collection": "New Collection",
     "new_request": "New Request",
-    "import_curl": "Import cURL",
     "manage_variables": "Manage Variables",
     "edit_auth": "Edit Auth",
     "export_openapi_json": "Export as OpenAPI (JSON)",
@@ -199,9 +191,7 @@
     "new_collection": "Create New Collection",
     "collection_name": "New Collection Name",
     "collection_location": "Collection Location",
-    "import": "Import",
-    "error_invalid": "Invalid cURL command",
-    "error_no_url": "No URL found in cURL command"
+    "import": "Import"
   },
   "new_request": {
     "title": "Create New Request",
@@ -235,15 +225,10 @@
   "request": {
     "method": "Method",
     "url": "URL",
-    "send": "Send",
-    "sending": "Sending...",
     "headers": "Headers",
-    "query_params": "Query Parameters",
     "body": "Body",
-    "response": "Response",
     "status": "Status",
     "time": "Time",
-    "size": "Size",
     "connect": "Connect",
     "disconnecting": "Disconnecting…",
     "clear_response": "Clear",
@@ -261,8 +246,6 @@
     "grpc": "gRPC",
     "grpc_message": "Message",
     "grpc_metadata": "Metadata",
-    "response_body": "Body",
-    "response_headers": "Headers",
     "schema": "Schema",
     "mqtt": "MQTT",
     "websocket": "WebSocket",
@@ -270,25 +253,11 @@
   },
   "schema": {
     "title": "Response Schema",
-    "description": "Define a JSON Schema to validate API responses. Schema will be auto-populated from OpenAPI imports.",
     "infer_btn": "Infer from Response",
     "clear_btn": "Clear",
-    "valid": "Schema Valid",
-    "invalid": "Schema Invalid",
-    "no_response": "No response available to infer schema from",
-    "not_json": "Response is not valid JSON",
-    "inferred": "Schema inferred from response",
-    "cleared": "Schema cleared"
+    "valid": "Schema Valid"
   },
   "variables": {
-    "title": "Variables",
-    "name": "Name",
-    "value": "Value",
-    "add": "Add Variable",
-    "save": "Save",
-    "cancel": "Cancel",
-    "placeholder_name": "Variable name",
-    "placeholder_value": "Variable value",
     "scope": {
       "environment": "Environment",
       "collection": "Collection",
@@ -377,9 +346,7 @@
     "proxy_test": "Test Connection",
     "close": "Close",
     "save": "Save",
-    "cancel": "Cancel",
     "tab_updates": "Updates",
-    "auto_update": "Automatic Updates",
     "check_updates_on_launch": "Check for updates on launch",
     "check_updates_on_launch_description": "Automatically check for new versions when the application starts.",
     "manual_update": "Manual Update",
@@ -393,7 +360,6 @@
     "updates_not_available": "Updates not available in this build",
     "updates_managed_externally": "Updates are managed by your package manager",
     "version_info": "Version Information",
-    "current_version": "Current version",
     "retry_update": "Retry",
     "proxy_testing": "Testing…",
     "proxy_save_failed": "Failed to save proxy settings: {{error}}",
@@ -422,20 +388,9 @@
     "save": "Save",
     "delete": "Delete",
     "rename": "Rename",
-    "edit": "Edit",
-    "add": "Add",
-    "remove": "Remove",
     "close": "Close",
-    "yes": "Yes",
-    "no": "No",
     "create": "Create",
     "clear": "Clear"
-  },
-  "errors": {
-    "network": "Network error occurred",
-    "timeout": "Request timed out",
-    "invalid_url": "Invalid URL format",
-    "unknown": "An unknown error occurred"
   },
   "history": {
     "empty": "No request history",
@@ -497,10 +452,8 @@
     "close": "Close",
     "empty_collections": "No collections available.<br>Import an OpenAPI or Postman collection first.",
     "endpoints": "endpoints",
-    "more_endpoints": "... and {{count}} more endpoints",
     "show_all_endpoints": "Show all {{count}} endpoints",
     "show_less": "Show less",
-    "delay_ms": "ms",
     "delay": "Delay (ms)",
     "edit_response": "Edit",
     "edit_response_tooltip": "Edit custom response",
@@ -516,7 +469,6 @@
     "log_status": "Status",
     "log_time_ms": "Time (ms)",
     "status_code": "Status Code",
-    "ok": "OK",
     "error_toggle_server": "Failed to toggle server",
     "error_update_port": "Failed to update port",
     "error_toggle_collection": "Failed to update collection",
@@ -548,25 +500,14 @@
     "examples_count_other": "{{count}} saved examples",
     "examples_badge_title": "The first successful saved example is served unless a custom response is saved here. \"Prefer: example=name\" picks one by name."
   },
-  "preview": {
-    "toggle": "Toggle Preview",
-    "toggle_code": "Show Code",
-    "toggle_preview": "Show Preview",
-    "not_available": "Preview not available for this content type",
-    "supported_formats": "Supported formats: HTML, JSON, XML",
-    "parse_error": "Failed to parse content for preview"
-  },
   "runner": {
     "title": "Collection Runner",
-    "new": "New",
     "save": "Save",
     "load": "Load",
     "run": "Run",
     "stop": "Stop",
-    "clear_all": "Clear All",
     "available_requests": "Available Requests",
     "selected_requests": "Selected Requests",
-    "post_response_script": "Post-Response Script",
     "edit_request": "Edit Request",
     "tab_params": "Params",
     "tab_headers": "Headers",
@@ -580,17 +521,13 @@
     "value": "Value",
     "no_collections": "No collections available",
     "add_requests_hint": "Click requests from the left panel to add them",
-    "select_request_for_script": "Select a request to edit its post-response script",
     "stop_on_error": "Stop on error",
-    "delay_between": "Delay between requests:",
     "delay": "Delay",
     "results": "Results",
     "passed": "Passed",
     "failed": "Failed",
     "total": "Total",
-    "saved_runners": "Saved Runners",
     "no_saved_runners": "No saved runners yet",
-    "new_runner_tab": "New Runner Tab",
     "body": "Body",
     "headers": "Headers",
     "cookies": "Cookies",
@@ -627,17 +564,6 @@
     "error_already_running": "A runner is already executing",
     "error_not_found": "Runner not found",
     "error_no_requests": "Runner has no requests to execute",
-    "error_request_failed": "Request failed",
-    "error_collection_missing": "The collection this request came from is not open. Remove the request and add it again from Available Requests.",
-    "error_endpoint_missing": "\"{{name}}\" no longer exists in {{collection}}. Remove it and add it again from Available Requests.",
-    "error_protocol": "{{protocol}} requests cannot be run by the collection runner",
-    "error_no_binary_file": "No file selected for binary body",
-    "error_invalid_body": "Invalid Body JSON: {{message}}",
-    "error_invalid_graphql_variables": "Invalid GraphQL Variables JSON: {{message}}",
-    "script_error": "Script error: {{message}}",
-    "auth_stripped": "Authentication was not sent: the pre-request script changed the request host.",
-    "skip_stopped": "Execution stopped by user",
-    "skip_previous_error": "Skipped due to previous error",
     "no_response_body": "(No response body)",
     "no_headers": "No headers",
     "request_status": "Request {{number}}: {{detail}}",
@@ -646,8 +572,6 @@
     "request_count_other": "{{count}} requests",
     "running_requests_one": "Running {{count}} request...",
     "running_requests_other": "Running {{count}} requests...",
-    "tests_failed_one": "{{count}} test failed",
-    "tests_failed_other": "{{count}} tests failed",
     "relinked_one": "Re-linked {{count}} request within its collection",
     "relinked_other": "Re-linked {{count}} requests within its collection",
     "missing_requests_one": "{{count}} request in \"{{name}}\" no longer exists in its collection",
@@ -662,7 +586,6 @@
     "clear_data_file": "Remove data file",
     "data_file_rows_one": "{{name}} · {{count}} row",
     "data_file_rows_other": "{{name}} · {{count}} rows",
-    "data_file_error": "Data file {{name}}: {{message}}",
     "data_file_empty": "Data file {{name}} has no rows",
     "data_file_unusable": "Could not use this data file: {{message}}",
     "data_empty_header": "Line 1: every column needs a name",
@@ -682,7 +605,6 @@
     "history_failed": "{{count}} failed",
     "history_source": "Run from {{date}}",
     "history_no_body": "Response bodies, headers and cookies are not kept in run history",
-    "pre_request_failed": "Pre-request script failed, so the request was not sent: {{message}}",
     "flow": {
       "max_executions": "Max executions / iteration",
       "invalid_limit": "Maximum executions must be an integer between {{min}} and {{max}}.",
@@ -746,7 +668,6 @@
     "clean_session_needs_client_id": "A persistent session (clean session off) needs a fixed Client ID"
   },
   "websocket": {
-    "title": "WebSocket",
     "section_connection": "Connection",
     "protocols_label": "Sub-protocols",
     "protocols_placeholder": "graphql-transport-ws, chat",
@@ -871,7 +792,6 @@
     "delete_confirm": "Delete the example \"{{name}}\"? This cannot be undone.",
     "renamed": "Example renamed",
     "deleted": "Example deleted",
-    "preview_headers": "Headers",
     "preview_binary": "Binary body ({{bytes}} bytes, base64)",
     "load_failed": "Failed to load examples: {{message}}"
   }

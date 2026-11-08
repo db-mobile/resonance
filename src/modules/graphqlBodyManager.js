@@ -27,8 +27,7 @@ function isGraphQLUrlEvent(e) {
 }
 
 export class GraphQLBodyManager {
-    constructor(domElements) {
-        this.dom = domElements;
+    constructor() {
         this.graphqlEditor = null;
         this._initializingGql = null;
         this._pendingQuery = null;
@@ -561,24 +560,5 @@ export class GraphQLBodyManager {
     /** @returns {boolean} */
     isGraphQLMode() {
         return this.currentMode === 'graphql';
-    }
-
-
-    clear() {
-        this._pendingQuery = null;
-        this._variablesString = '';
-        if (this.graphqlEditor) {
-            this.graphqlEditor.clear();
-        }
-    }
-
-    destroy() {
-        this._pendingQuery = null;
-        this._variablesString = '';
-        this._initializingGql = null;
-        if (this.graphqlEditor) {
-            this.graphqlEditor.clear();
-            this.graphqlEditor = null;
-        }
     }
 }

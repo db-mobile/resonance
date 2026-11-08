@@ -17,33 +17,6 @@ if (isTauri) {
             setWindowTheme: (theme) => invoke('app_set_window_theme', { theme }),
             migrationStatus: () => invoke('data_migration_status')
         },
-        logger: {
-            error: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            warn: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            info: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            debug: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            },
-            verbose: (_scope, _message, _meta) => {
-                void _scope;
-                void _message;
-                void _meta;
-            }
-        },
         execution: {
             request: (input) => invoke('execute_request', { input }),
             run: (input) => invoke('execute_run', { input }),
