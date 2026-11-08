@@ -18,6 +18,8 @@ use std::sync::LazyLock;
 pub(crate) struct ImportedEnvironment {
     pub name: String,
     pub variables: serde_json::Map<String, Value>,
+    /// Insomnia's `confidentialKeys`: variables the user marked as secret.
+    pub secret_keys: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -39,15 +41,12 @@ pub(crate) fn parse_insomnia_export(doc: Value) -> Result<InsomniaImport, String
         return parse_v4(&doc);
     }
 
-    if let Some(doc_type) = doc.get("type").and_then(|t| t.as_str()) {
-        if doc_type.starts_with("collection.insomnia.rest/5") {
-            return parse_v5(&doc);
-        }
-        if doc_type.starts_with("environment.insomnia.rest/5") {
-            return Err(
-                "This is an Insomnia v5 environment export, not a collection. Import it via the environment manager after importing the collection.".to_string(),
-            );
-        }
+    if doc
+        .get("type")
+        .and_then(|t| t.as_str())
+        .is_some_and(|t| t.starts_with("collection.insomnia.rest/5"))
+    {
+        return parse_v5(&doc);
     }
 
     Err(
@@ -177,15 +176,12 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
                 continue;
             }
             environments.push(ImportedEnvironment {
-                name: sub
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("Imported Environment")
-                    .to_string(),
+                name: environment_name(sub, None),
                 variables: flatten_environment_data(sub.get("data"))
                     .into_iter()
                     .map(|(key, value)| (key, Value::String(value)))
                     .collect(),
+                secret_keys: Vec::new(),
             });
         }
     }
@@ -282,30 +278,11 @@ fn parse_v5(doc: &Value) -> Result<InsomniaImport, String> {
 
     let (endpoints, folders) = builder.finish();
 
-    let mut variables: Vec<VariableEntry> = Vec::new();
-    let mut environments: Vec<ImportedEnvironment> = Vec::new();
-    if let Some(envs) = doc.get("environments") {
-        variables.extend(
-            flatten_environment_data(envs.get("data"))
-                .into_iter()
-                .map(|(key, value)| VariableEntry { key, value }),
-        );
-        if let Some(subs) = envs.get("subEnvironments").and_then(|s| s.as_array()) {
-            for sub in subs {
-                environments.push(ImportedEnvironment {
-                    name: sub
-                        .get("name")
-                        .and_then(|n| n.as_str())
-                        .unwrap_or("Imported Environment")
-                        .to_string(),
-                    variables: flatten_environment_data(sub.get("data"))
-                        .into_iter()
-                        .map(|(key, value)| (key, Value::String(value)))
-                        .collect(),
-                });
-            }
-        }
-    }
+    let (base, environments) = v5_environments(doc.get("environments"));
+    let variables: Vec<VariableEntry> = base
+        .into_iter()
+        .map(|(key, value)| VariableEntry { key, value })
+        .collect();
 
     let base_url = variables
         .iter()
@@ -659,6 +636,112 @@ fn convert_scripts(request: &Value) -> Option<Value> {
     .ok()
 }
 
+/// A standalone v5 environment export (`type: environment.insomnia.rest/5`)
+/// has no collection to carry the base environment, so each sub-environment
+/// becomes one importable environment with the base's values underneath its
+/// own; without sub-environments the base itself is imported.
+pub(crate) fn parse_insomnia_environment_export(
+    doc: &Value,
+) -> Result<Vec<ImportedEnvironment>, String> {
+    let block = doc
+        .get("environments")
+        .filter(|b| b.is_object())
+        .ok_or_else(|| "Insomnia environment export has no environments block".to_string())?;
+    let base = flatten_environment_data(block.get("data"));
+    let base_secrets = confidential_keys(block);
+    let subs = block
+        .get("subEnvironments")
+        .and_then(|s| s.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    if subs.is_empty() {
+        return Ok(vec![ImportedEnvironment {
+            name: environment_name(block, doc.get("name")),
+            variables: base
+                .into_iter()
+                .map(|(key, value)| (key, Value::String(value)))
+                .collect(),
+            secret_keys: base_secrets,
+        }]);
+    }
+
+    Ok(subs
+        .iter()
+        .map(|sub| {
+            let mut variables: serde_json::Map<String, Value> = base
+                .iter()
+                .map(|(key, value)| (key.clone(), Value::String(value.clone())))
+                .collect();
+            for (key, value) in flatten_environment_data(sub.get("data")) {
+                variables.insert(key, Value::String(value));
+            }
+            let mut secret_keys = base_secrets.clone();
+            for key in confidential_keys(sub) {
+                if !secret_keys.contains(&key) {
+                    secret_keys.push(key);
+                }
+            }
+            ImportedEnvironment {
+                name: environment_name(sub, None),
+                variables,
+                secret_keys,
+            }
+        })
+        .collect())
+}
+
+/// The v5 `environments` block: the base environment's flattened `data`
+/// (collection variables when a collection is present) and its
+/// sub-environments.
+fn v5_environments(block: Option<&Value>) -> (Vec<(String, String)>, Vec<ImportedEnvironment>) {
+    let Some(block) = block else {
+        return (Vec::new(), Vec::new());
+    };
+    let base = flatten_environment_data(block.get("data"));
+    let subs = block
+        .get("subEnvironments")
+        .and_then(|s| s.as_array())
+        .map(|subs| {
+            subs.iter()
+                .map(|sub| ImportedEnvironment {
+                    name: environment_name(sub, None),
+                    variables: flatten_environment_data(sub.get("data"))
+                        .into_iter()
+                        .map(|(key, value)| (key, Value::String(value)))
+                        .collect(),
+                    secret_keys: confidential_keys(sub),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    (base, subs)
+}
+
+fn environment_name(entry: &Value, fallback: Option<&Value>) -> String {
+    entry
+        .get("name")
+        .or(fallback)
+        .and_then(|n| n.as_str())
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .unwrap_or("Imported Environment")
+        .to_string()
+}
+
+fn confidential_keys(entry: &Value) -> Vec<String> {
+    entry
+        .get("confidentialKeys")
+        .and_then(|k| k.as_array())
+        .map(|keys| {
+            keys.iter()
+                .filter_map(|k| k.as_str())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Environment `data` objects nest freely; flatten to dotted keys so the
 /// rewritten `{{ api.host }}` references resolve, stringifying non-string
 /// leaves the way the Postman importer does for variables.
@@ -974,8 +1057,62 @@ mod tests {
         assert!(
             parse_insomnia_export(json!({ "type": "environment.insomnia.rest/5.0" }))
                 .unwrap_err()
-                .contains("environment export")
+                .contains("Not a recognized Insomnia export")
         );
+    }
+
+    #[test]
+    fn standalone_environment_export_merges_base_under_each_sub_environment() {
+        let doc = json!({
+            "type": "environment.insomnia.rest/5.0",
+            "name": "Petstore",
+            "environments": {
+                "name": "Base Environment",
+                "data": { "host": "api.example.com", "token": "base", "api": { "version": "v1" } },
+                "confidentialKeys": ["token"],
+                "subEnvironments": [
+                    { "name": "Staging", "data": { "host": "staging.example.com", "key": "s3cr3t" }, "confidentialKeys": ["key"] },
+                    { "name": "Prod", "data": { "token": "prod" } }
+                ]
+            }
+        });
+
+        let envs = parse_insomnia_environment_export(&doc).unwrap();
+
+        assert_eq!(envs.len(), 2);
+        assert_eq!(envs[0].name, "Staging");
+        assert_eq!(envs[0].variables["host"], "staging.example.com");
+        assert_eq!(envs[0].variables["token"], "base");
+        assert_eq!(envs[0].variables["api.version"], "v1");
+        assert_eq!(envs[0].variables["key"], "s3cr3t");
+        assert_eq!(
+            envs[0].secret_keys,
+            vec!["token".to_string(), "key".to_string()]
+        );
+        assert_eq!(envs[1].name, "Prod");
+        assert_eq!(envs[1].variables["token"], "prod");
+        assert_eq!(envs[1].secret_keys, vec!["token".to_string()]);
+    }
+
+    #[test]
+    fn standalone_environment_export_without_sub_environments_imports_the_base() {
+        let doc = json!({
+            "type": "environment.insomnia.rest/5.0",
+            "name": "Petstore",
+            "environments": { "data": { "host": "api.example.com" } }
+        });
+
+        let envs = parse_insomnia_environment_export(&doc).unwrap();
+
+        assert_eq!(envs.len(), 1);
+        assert_eq!(envs[0].name, "Petstore");
+        assert_eq!(envs[0].variables["host"], "api.example.com");
+        assert!(envs[0].secret_keys.is_empty());
+
+        let err =
+            parse_insomnia_environment_export(&json!({ "type": "environment.insomnia.rest/5.0" }))
+                .unwrap_err();
+        assert!(err.contains("no environments block"));
     }
 
     #[test]

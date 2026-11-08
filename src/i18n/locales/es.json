@@ -44,8 +44,7 @@
     }
   },
   "import": {
-    "collection": "Archivo de colección",
-    "postman_environment": "Entorno Postman",
+    "collection": "Archivo de colección o entorno",
     "curl": "Comando cURL",
     "open_existing": "Carpeta existente"
   },
@@ -101,9 +100,9 @@
   },
   "import_dialog": {
     "title": "Importar colección",
-    "title_collection": "Importar colección",
+    "title_collection": "Importar archivo",
     "subtitle": "Elige un archivo de origen y dónde se debe almacenar la colección.",
-    "subtitle_collection": "Elige un archivo OpenAPI/Swagger, Postman, Insomnia o HAR — el formato se detecta automáticamente.",
+    "subtitle_collection": "Elige un archivo OpenAPI/Swagger, Postman, Insomnia o HAR, o una exportación de entorno de Postman o Insomnia — el formato se detecta automáticamente.",
     "source": "Origen",
     "import_file": "Archivo de importación",
     "choose_file_hint": "Elige el archivo a importar.",
@@ -114,7 +113,7 @@
     "collection_folder": "Carpeta de colección",
     "destination_hint": "Elige dónde se debe crear la carpeta de la colección importada.",
     "default_storage": "Almacenamiento predeterminado",
-    "destination_meta": "Elige la carpeta principal para la colección importada.",
+    "destination_meta": "Elige la carpeta principal para la colección importada. Los archivos de entorno la ignoran.",
     "choose_folder": "Elegir carpeta",
     "cancel": "Cancelar",
     "import": "Importar",
@@ -149,7 +148,6 @@
     "edit_auth": "Editar autenticación",
     "export_openapi_json": "Exportar como OpenAPI (JSON)",
     "export_openapi_yaml": "Exportar como OpenAPI (YAML)",
-    "export_postman": "Exportar como Postman",
     "generate_docs": "Generar documentación",
     "rename_collection": "Renombrar colección",
     "delete_collection": "Eliminar colección",

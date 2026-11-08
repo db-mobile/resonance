@@ -45,7 +45,7 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 ### Import, Export & Mocking
 
 - **Collection import** — OpenAPI 3.0/3.1 and Swagger 2.0 (YAML/JSON) with schema-based example generation, Postman v2.0/v2.1, Insomnia v4 JSON/v5 YAML, HAR captures, and pasted cURL commands; Postman and Insomnia environment import
-- **Collection export** — OpenAPI (YAML/JSON) and Postman collections; environment import/export through the environment manager
+- **Collection export** — OpenAPI (YAML/JSON); environment import/export through the environment manager
 - **Code generation in 9 languages** — cURL, Python, JavaScript (Fetch/Axios), Node.js, Go, PHP, Ruby, Java
 - **Documentation generation** — Markdown or HTML docs from any collection, with parameter tables, saved examples, and code samples
 - **Built-in mock server** — generates responses from OpenAPI schemas and examples, custom bodies, status codes and delays per endpoint, response templating (`{{request.params.id}}`, `{{request.body.field}}`, `{{$uuid}}` …), `Prefer: code=… / example=…` to pick a documented response, request logging
@@ -258,7 +258,7 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 - [x] Environment management (Dev, Staging, Production, custom)
 - [x] Keyboard shortcuts for all major actions
 - [x] Mock server with custom responses and delays
-- [x] Collection export (OpenAPI and Postman formats)
+- [x] Collection export (OpenAPI)
 - [x] cURL command import
 - [x] Documentation generation (Markdown/HTML)
 - [x] Pre-request and test scripts with JavaScript execution (Boa Engine)

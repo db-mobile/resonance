@@ -118,15 +118,13 @@ if (isTauri) {
             pickDirectory: (remember = true) => invoke('collections_pick_directory', { remember }),
             pickImportFile: (importKind) => invoke('collections_pick_import_file', { importKind }),
             importCollectionFile: (filePath = null, storageParentPath = null) => invoke('import_collection_file', { filePath, storageParentPath }),
-            importPostmanEnvironment: () => invoke('import_postman_environment'),
             runners: {
                 list: (collectionId) => invoke('collection_runners_list', { collectionId }),
                 save: (collectionId, runner) => invoke('collection_runners_save', { collectionId, runner }),
                 delete: (collectionId, runnerId) => invoke('collection_runners_delete', { collectionId, runnerId }),
                 readData: (collectionId, path) => invoke('collection_runner_data_read', { collectionId, path })
             },
-            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format }),
-            exportPostman: (collectionId) => invoke('export_postman', { collectionId })
+            exportOpenApi: (collectionId, format) => invoke('export_openapi', { collectionId, format })
         },
         environments: {
             saveJsonExport: (defaultFileName, content) => invoke('save_json_export', { defaultFileName, content })

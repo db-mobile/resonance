@@ -310,9 +310,9 @@ describe('CollectionDialogs', () => {
             const shown = dialogs.showCollectionImportDialog({ importKind: 'collection' });
             await flush();
 
-            expect(document.querySelector('#import-collection-title').textContent).toBe('Import Collection');
+            expect(document.querySelector('#import-collection-title').textContent).toBe('Import File');
             expect(document.querySelector('#import-collection-subtitle').textContent)
-                .toBe('Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.');
+                .toBe('Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file, or a Postman or Insomnia environment export — the format is detected automatically.');
             expect(document.querySelector('#import-source-file').textContent).toBe('No file selected');
             expect(document.querySelector('#import-destination-folder').textContent).toBe('/default/store');
 

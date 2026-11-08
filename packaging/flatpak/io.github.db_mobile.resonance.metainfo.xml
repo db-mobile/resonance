@@ -21,7 +21,7 @@
       <li>GraphQL with query and variables editors, schema introspection, an interactive query explorer and subscriptions over WebSocket</li>
       <li>gRPC with server reflection, local .proto files, all four RPC kinds and TLS/mTLS</li>
       <li>WebSocket, Server-Sent Events and MQTT connections with live status</li>
-      <li>Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI and Postman</li>
+      <li>Import from OpenAPI 3.x, Swagger 2.0, Postman, Insomnia, HAR captures and cURL commands; export to OpenAPI</li>
       <li>Code generation in 9 languages and Markdown/HTML documentation generation</li>
       <li>Built-in mock server with response templating, custom bodies, status codes and delays</li>
       <li>Pre-request and test scripts in sandboxed JavaScript with a Postman-compatible pm API</li>

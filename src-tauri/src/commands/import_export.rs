@@ -21,9 +21,9 @@ mod runner_report;
 mod storage;
 mod swagger2;
 
-use export::{collection_to_openapi, collection_to_postman, load_collection_for_export};
+use export::{collection_to_openapi, load_collection_for_export};
 use har::parse_har;
-use insomnia::parse_insomnia_export;
+use insomnia::{parse_insomnia_environment_export, parse_insomnia_export};
 use openapi::parse_openapi_spec;
 pub(crate) use openapi::{primary_type, schema_example};
 use postman::parse_postman_collection;
@@ -127,14 +127,17 @@ pub struct ImportedEnvironmentResult {
     pub secret_keys: Vec<String>,
 }
 
-/// Result of the consolidated collection import: the created collection tagged
-/// with the detected source format, plus the format-specific extras the
-/// frontend surfaces in the success toast.
+/// Result of the consolidated file import: the created collection tagged with
+/// the detected source format, plus the format-specific extras the frontend
+/// surfaces in the success toast. Environment files (Postman environment,
+/// standalone Insomnia environment export) yield no collection, only
+/// `environments`.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionImportResult {
     pub format: String,
-    pub collection: Collection,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collection: Option<Collection>,
     pub environments: Vec<ImportedEnvironmentResult>,
     pub skipped_requests: usize,
     pub skipped_assets: usize,
@@ -187,7 +190,7 @@ fn detect_import_format(doc: &Value) -> Result<ImportFormat, String> {
     if doc.get("values").is_some() && doc.get("name").is_some() && doc.get("info").is_none() {
         return Ok(ImportFormat::PostmanEnvironment);
     }
-    Err("Unrecognized import format. Supported: OpenAPI/Swagger, Postman collection, Insomnia export (v4 JSON or v5 YAML), HAR.".to_string())
+    Err("Unrecognized import format. Supported: OpenAPI/Swagger, Postman collection or environment, Insomnia export (v4 JSON or v5 YAML) or environment export, HAR.".to_string())
 }
 
 #[tauri::command]
@@ -217,36 +220,58 @@ pub async fn import_collection_file(
     let doc: Value = serde_yaml_ng::from_str(content)
         .map_err(|e| format!("Failed to parse import file: {}", e))?;
 
-    let result = match detect_import_format(&doc)? {
-        ImportFormat::OpenApi => CollectionImportResult {
-            format: "openapi".to_string(),
-            collection: parse_openapi_spec(doc)?,
-            environments: Vec::new(),
+    let source_name = resolved_file_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let result = convert_import(doc, &source_name)?;
+
+    if let Some(collection) = &result.collection {
+        save_collection_to_files(&app, collection, storage_parent_path)?;
+    }
+
+    Ok(Some(result))
+}
+
+/// Turn a parsed import document into the import result for its detected
+/// format. `source_name` is the file stem, used where the document carries no
+/// usable name of its own.
+fn convert_import(doc: Value, source_name: &str) -> Result<CollectionImportResult, String> {
+    let collection_only = |format: &str, collection: Collection| CollectionImportResult {
+        format: format.to_string(),
+        collection: Some(collection),
+        environments: Vec::new(),
+        skipped_requests: 0,
+        skipped_assets: 0,
+        deduped: 0,
+    };
+    let environments_only =
+        |format: &str, environments: Vec<ImportedEnvironmentResult>| CollectionImportResult {
+            format: format.to_string(),
+            collection: None,
+            environments,
             skipped_requests: 0,
             skipped_assets: 0,
             deduped: 0,
-        },
-        ImportFormat::Postman => CollectionImportResult {
-            format: "postman".to_string(),
-            collection: parse_postman_collection(doc)?,
-            environments: Vec::new(),
-            skipped_requests: 0,
-            skipped_assets: 0,
-            deduped: 0,
-        },
+        };
+    let insomnia_environment = |env: insomnia::ImportedEnvironment| ImportedEnvironmentResult {
+        name: env.name,
+        variables: Value::Object(env.variables),
+        secret_keys: env.secret_keys,
+    };
+
+    Ok(match detect_import_format(&doc)? {
+        ImportFormat::OpenApi => collection_only("openapi", parse_openapi_spec(doc)?),
+        ImportFormat::Postman => collection_only("postman", parse_postman_collection(doc)?),
         ImportFormat::Insomnia => {
             let import = parse_insomnia_export(doc)?;
             CollectionImportResult {
                 format: "insomnia".to_string(),
-                collection: import.collection,
+                collection: Some(import.collection),
                 environments: import
                     .environments
                     .into_iter()
-                    .map(|env| ImportedEnvironmentResult {
-                        name: env.name,
-                        variables: Value::Object(env.variables),
-                        secret_keys: Vec::new(),
-                    })
+                    .map(insomnia_environment)
                     .collect(),
                 skipped_requests: import.skipped_requests,
                 skipped_assets: 0,
@@ -254,14 +279,10 @@ pub async fn import_collection_file(
             }
         }
         ImportFormat::Har => {
-            let source_name = resolved_file_path
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let import = parse_har(doc, &source_name)?;
+            let import = parse_har(doc, source_name)?;
             CollectionImportResult {
                 format: "har".to_string(),
-                collection: import.collection,
+                collection: Some(import.collection),
                 environments: Vec::new(),
                 skipped_requests: 0,
                 skipped_assets: import.skipped_assets,
@@ -269,20 +290,24 @@ pub async fn import_collection_file(
             }
         }
         ImportFormat::PostmanEnvironment => {
-            return Err(
-                "This is a Postman environment file, not a collection. Use Import → Postman Environment instead.".to_string(),
-            );
+            let fallback_name = if source_name.is_empty() {
+                "Imported Environment"
+            } else {
+                source_name
+            };
+            environments_only(
+                "postman_environment",
+                vec![parse_postman_environment(&doc, fallback_name)?],
+            )
         }
-        ImportFormat::InsomniaEnvironment => {
-            return Err(
-                "This is an Insomnia environment export, not a collection. Import the collection export instead; its environments come along automatically.".to_string(),
-            );
-        }
-    };
-
-    save_collection_to_files(&app, &result.collection, storage_parent_path)?;
-
-    Ok(Some(result))
+        ImportFormat::InsomniaEnvironment => environments_only(
+            "insomnia_environment",
+            parse_insomnia_environment_export(&doc)?
+                .into_iter()
+                .map(insomnia_environment)
+                .collect(),
+        ),
+    })
 }
 
 /// Pick and parse a cookie-jar export. Shape validation happens on the
@@ -301,28 +326,6 @@ pub async fn import_cookie_file(app: AppHandle) -> Result<Option<Value>, String>
         serde_json::from_str(content).map_err(|e| format!("Failed to parse cookie file: {}", e))?;
 
     Ok(Some(doc))
-}
-
-#[tauri::command]
-pub async fn import_postman_environment(
-    app: AppHandle,
-) -> Result<Option<ImportedEnvironmentResult>, String> {
-    let Some(file_path) = pick_import_file_with_kind(&app, "postman_environment").await? else {
-        return Ok(None);
-    };
-
-    let content =
-        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
-
-    let env: Value = serde_json::from_str(content.trim_start_matches('\u{feff}'))
-        .map_err(|e| format!("Failed to parse Postman environment: {}", e))?;
-
-    let fallback_name = file_path
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .unwrap_or("Imported Environment");
-
-    parse_postman_environment(&env, fallback_name).map(Some)
 }
 
 /// Postman marks secrets with `type: "secret"`; disabled entries are skipped
@@ -470,36 +473,6 @@ pub async fn export_openapi(
         "success": true,
         "filePath": file_path,
         "format": format,
-        "skipped": {
-            "count": skipped.len(),
-            "items": skipped
-        }
-    }))
-}
-
-#[tauri::command]
-pub async fn export_postman(app: AppHandle, collection_id: String) -> Result<Value, String> {
-    let collection = load_collection_for_export(&app, &collection_id)?;
-
-    let Some(path) = pick_save_path(
-        &app,
-        format!("{}.postman_collection.json", collection.name),
-        "Postman Collection",
-        &["json"],
-    )
-    .await?
-    else {
-        return Ok(cancelled_export());
-    };
-
-    let (postman_collection, skipped) = collection_to_postman(&collection);
-    let content = serde_json::to_string_pretty(&postman_collection).map_err(|e| e.to_string())?;
-
-    let file_path = write_export(&app, &path, &content)?;
-
-    Ok(serde_json::json!({
-        "success": true,
-        "filePath": file_path,
         "skipped": {
             "count": skipped.len(),
             "items": skipped
@@ -749,6 +722,70 @@ mod tests {
             detect(json!({ "name": "Prod", "values": [] })),
             ImportFormat::PostmanEnvironment
         );
+    }
+
+    #[test]
+    fn environment_files_convert_to_environments_without_a_collection() {
+        let postman = convert_import(
+            json!({ "name": " ", "values": [
+                { "key": "host", "value": "api.example.com", "enabled": true },
+                { "key": "token", "value": "t0k", "type": "secret", "enabled": true }
+            ] }),
+            "dev.postman_environment",
+        )
+        .unwrap();
+        assert_eq!(postman.format, "postman_environment");
+        assert!(postman.collection.is_none());
+        assert_eq!(postman.environments.len(), 1);
+        assert_eq!(postman.environments[0].name, "dev.postman_environment");
+        assert_eq!(postman.environments[0].variables["host"], "api.example.com");
+        assert_eq!(
+            postman.environments[0].secret_keys,
+            vec!["token".to_string()]
+        );
+
+        let insomnia = convert_import(
+            json!({
+                "type": "environment.insomnia.rest/5.0",
+                "name": "Petstore",
+                "environments": {
+                    "data": { "host": "base" },
+                    "subEnvironments": [{ "name": "Prod", "data": { "host": "prod" }, "confidentialKeys": ["host"] }]
+                }
+            }),
+            "petstore",
+        )
+        .unwrap();
+        assert_eq!(insomnia.format, "insomnia_environment");
+        assert!(insomnia.collection.is_none());
+        assert_eq!(insomnia.environments[0].name, "Prod");
+        assert_eq!(insomnia.environments[0].variables["host"], "prod");
+        assert_eq!(
+            insomnia.environments[0].secret_keys,
+            vec!["host".to_string()]
+        );
+
+        let serialized = serde_json::to_value(&postman).unwrap();
+        assert!(serialized.get("collection").is_none());
+        assert_eq!(
+            serialized["environments"][0]["secretKeys"],
+            json!(["token"])
+        );
+    }
+
+    #[test]
+    fn collection_files_still_convert_to_a_collection() {
+        let result = convert_import(
+            json!({ "openapi": "3.0.3", "info": { "title": "Pets", "version": "1" }, "paths": {} }),
+            "pets",
+        )
+        .unwrap();
+        assert_eq!(result.format, "openapi");
+        assert_eq!(
+            result.collection.as_ref().map(|c| c.name.as_str()),
+            Some("Pets")
+        );
+        assert!(result.environments.is_empty());
     }
 
     #[test]

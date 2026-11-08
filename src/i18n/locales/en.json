@@ -50,8 +50,7 @@
     }
   },
   "import": {
-    "collection": "Collection File",
-    "postman_environment": "Postman Environment",
+    "collection": "Collection or Environment File",
     "curl": "cURL Command",
     "open_existing": "Existing Folder"
   },
@@ -107,9 +106,9 @@
   },
   "import_dialog": {
     "title": "Import Collection",
-    "title_collection": "Import Collection",
+    "title_collection": "Import File",
     "subtitle": "Choose a source file and where the collection should be stored.",
-    "subtitle_collection": "Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file — the format is detected automatically.",
+    "subtitle_collection": "Choose an OpenAPI/Swagger, Postman, Insomnia, or HAR file, or a Postman or Insomnia environment export — the format is detected automatically.",
     "source": "Source",
     "import_file": "Import File",
     "choose_file_hint": "Choose the file to import.",
@@ -120,7 +119,7 @@
     "collection_folder": "Collection Folder",
     "destination_hint": "Choose where the imported collection folder should be created.",
     "default_storage": "Default app storage",
-    "destination_meta": "Choose the parent folder for the imported collection.",
+    "destination_meta": "Choose the parent folder for the imported collection. Environment files ignore it.",
     "choose_folder": "Choose Folder",
     "cancel": "Cancel",
     "import": "Import",
@@ -155,7 +154,6 @@
     "edit_auth": "Edit Auth",
     "export_openapi_json": "Export as OpenAPI (JSON)",
     "export_openapi_yaml": "Export as OpenAPI (YAML)",
-    "export_postman": "Export as Postman",
     "generate_docs": "Generate Documentation",
     "rename_collection": "Rename Collection",
     "delete_collection": "Delete Collection",

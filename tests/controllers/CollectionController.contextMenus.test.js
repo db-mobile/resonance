@@ -3,7 +3,7 @@ import { endpointKey } from '../../src/modules/collections/collectionTree.js';
 
 const ROUTED = [
     'handleNewRequest', 'handleNewFolder', 'handleRunRequests', 'handleVariables', 'handleCollectionAuth',
-    'handleExportOpenApiJson', 'handleExportOpenApiYaml', 'handleExportPostman', 'handleGenerateDocumentation',
+    'handleExportOpenApiJson', 'handleExportOpenApiYaml', 'handleGenerateDocumentation',
     'handleRename', 'handleReveal', 'handleClose', 'handleDelete', 'handleTogglePinned', 'handleRenameRequest', 'handleEditTags', 'handleDuplicateRequest',
     'handleMoveRequest', 'handleDeleteRequest', 'handleRenameFolder', 'handleFolderAuth', 'handleDeleteFolder',
     'handleNewCollection', 'handleNewRequestInEmptySpace'
@@ -39,7 +39,7 @@ describe('collection context menu', () => {
 
         expect(keysOf(controller)).toEqual([
             'context_menu.new_request', 'context_menu.new_folder', 'context_menu.run_collection', 'context_menu.manage_variables',
-            'context_menu.edit_auth', 'context_menu.export_openapi_json', 'context_menu.export_openapi_yaml', 'context_menu.export_postman',
+            'context_menu.edit_auth', 'context_menu.export_openapi_json', 'context_menu.export_openapi_yaml',
             'context_menu.generate_docs', 'context_menu.rename_collection', 'context_menu.show_in_file_manager', 'context_menu.delete_collection'
         ]);
 
@@ -51,8 +51,8 @@ describe('collection context menu', () => {
         expect(controller.handleRunRequests).toHaveBeenCalledWith(collection, expect.arrayContaining([endpoint]), 'Petstore');
         click(controller, 'context_menu.edit_auth');
         expect(controller.handleCollectionAuth).toHaveBeenCalledWith(collection);
-        click(controller, 'context_menu.export_postman');
-        expect(controller.handleExportPostman).toHaveBeenCalledWith(collection);
+        click(controller, 'context_menu.export_openapi_json');
+        expect(controller.handleExportOpenApiJson).toHaveBeenCalledWith(collection);
         click(controller, 'context_menu.show_in_file_manager');
         expect(controller.handleReveal).toHaveBeenCalledWith(collection);
         click(controller, 'context_menu.delete_collection');

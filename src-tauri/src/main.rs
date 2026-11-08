@@ -34,9 +34,8 @@ use commands::{
     },
     grpc_streaming::{GrpcStreamingState, grpc_stream_cancel, grpc_stream_send, grpc_stream_start},
     import_export::{
-        collections_pick_import_file, export_openapi, export_postman, import_collection_file,
-        import_cookie_file, import_postman_environment, pick_runner_data_file, save_documentation,
-        save_json_export, save_runner_report,
+        collections_pick_import_file, export_openapi, import_collection_file, import_cookie_file,
+        pick_runner_data_file, save_documentation, save_json_export, save_runner_report,
     },
     mock_server::{
         mock_server_clear_logs, mock_server_logs, mock_server_reload_settings, mock_server_start,
@@ -153,10 +152,8 @@ fn main() {
             // Import/Export
             import_collection_file,
             import_cookie_file,
-            import_postman_environment,
             collections_pick_import_file,
             export_openapi,
-            export_postman,
             save_json_export,
             save_runner_report,
             pick_runner_data_file,

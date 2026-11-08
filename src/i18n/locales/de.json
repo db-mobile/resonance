@@ -50,8 +50,7 @@
     }
   },
   "import": {
-    "collection": "Sammlungsdatei",
-    "postman_environment": "Postman-Umgebung",
+    "collection": "Sammlungs- oder Umgebungsdatei",
     "curl": "cURL-Befehl",
     "open_existing": "Vorhandener Ordner"
   },
@@ -107,9 +106,9 @@
   },
   "import_dialog": {
     "title": "Sammlung importieren",
-    "title_collection": "Sammlung importieren",
+    "title_collection": "Datei importieren",
     "subtitle": "Wählen Sie eine Quelldatei und den Speicherort für die Sammlung.",
-    "subtitle_collection": "Wählen Sie eine OpenAPI/Swagger-, Postman-, Insomnia- oder HAR-Datei — das Format wird automatisch erkannt.",
+    "subtitle_collection": "Wählen Sie eine OpenAPI/Swagger-, Postman-, Insomnia- oder HAR-Datei oder einen Postman- bzw. Insomnia-Umgebungsexport — das Format wird automatisch erkannt.",
     "source": "Quelle",
     "import_file": "Importdatei",
     "choose_file_hint": "Wählen Sie die zu importierende Datei.",
@@ -120,7 +119,7 @@
     "collection_folder": "Sammlungsordner",
     "destination_hint": "Wählen Sie, wo der importierte Sammlungsordner erstellt werden soll.",
     "default_storage": "Standard-App-Speicher",
-    "destination_meta": "Wählen Sie den übergeordneten Ordner für die importierte Sammlung.",
+    "destination_meta": "Wählen Sie den übergeordneten Ordner für die importierte Sammlung. Umgebungsdateien ignorieren ihn.",
     "choose_folder": "Ordner wählen",
     "cancel": "Abbrechen",
     "import": "Importieren",
@@ -155,7 +154,6 @@
     "edit_auth": "Auth bearbeiten",
     "export_openapi_json": "Als OpenAPI exportieren (JSON)",
     "export_openapi_yaml": "Als OpenAPI exportieren (YAML)",
-    "export_postman": "Als Postman exportieren",
     "generate_docs": "Dokumentation generieren",
     "rename_collection": "Sammlung umbenennen",
     "delete_collection": "Sammlung löschen",

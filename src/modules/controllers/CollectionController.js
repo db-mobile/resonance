@@ -417,12 +417,6 @@ export class CollectionController {
                 onClick: () => this.handleExportOpenApiYaml(collection)
             },
             {
-                label: 'Export as Postman',
-                translationKey: 'context_menu.export_postman',
-                iconClass: ContextMenu.createExportIcon(),
-                onClick: () => this.handleExportPostman(collection)
-            },
-            {
                 label: 'Generate Documentation',
                 translationKey: 'context_menu.generate_docs',
                 iconClass: ContextMenu.createDocumentIcon(),
@@ -1094,10 +1088,6 @@ export class CollectionController {
         await this.importExportService.handleExportOpenApiYaml(collection);
     }
 
-    async handleExportPostman(collection) {
-        await this.importExportService.handleExportPostman(collection);
-    }
-
     /**
      * @param {Object} collection
      * @returns {Promise<void>}
@@ -1192,11 +1182,6 @@ export class CollectionController {
     /** @returns {Promise<Object|null>} */
     async importCollectionFile() {
         return this.importExportService.importCollectionFile();
-    }
-
-    /** @returns {Promise<Object|null>} */
-    async importPostmanEnvironment() {
-        return this.importExportService.importPostmanEnvironment();
     }
 
     /**
