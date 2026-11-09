@@ -30,7 +30,7 @@ grade: stable
 confinement: strict
 icon: assets/icons/icon_256x256.png
 
-contact: mailto:dennis.bluemer@ducart.de
+contact: https://matrix.to/#/#resonance:matrix.org
 license: MIT
 website: https://db-mobile.github.io/resonance
 source-code: https://github.com/db-mobile/resonance

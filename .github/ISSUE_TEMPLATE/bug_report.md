@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+<!-- Questions or general discussion? Join the Matrix room: https://matrix.to/#/#resonance:matrix.org -->
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 

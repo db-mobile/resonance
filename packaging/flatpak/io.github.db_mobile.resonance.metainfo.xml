@@ -88,6 +88,7 @@
   <url type="homepage">https://github.com/db-mobile/resonance</url>
   <url type="bugtracker">https://github.com/db-mobile/resonance/issues</url>
   <url type="vcs-browser">https://github.com/db-mobile/resonance</url>
+  <url type="contact">https://matrix.to/#/#resonance:matrix.org</url>
 
   <categories>
     <category>Development</category>

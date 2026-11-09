@@ -12,8 +12,9 @@ No account. No cloud sync. No telemetry. Your collections are plain YAML files o
 [![Flathub](https://img.shields.io/flathub/downloads/io.github.db_mobile.resonance?label=flathub&color=1257ab)](https://flathub.org/apps/io.github.db_mobile.resonance)
 [![CI](https://img.shields.io/github/actions/workflow/status/db-mobile/resonance/ci.yml?branch=main&label=CI)](https://github.com/db-mobile/resonance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/db-mobile/resonance)](LICENSE)
+[![Chat on Matrix](https://img.shields.io/badge/chat-%23resonance%3Amatrix.org-1257ab?logo=matrix)](https://matrix.to/#/#resonance:matrix.org)
 
-[Installation](#installation) · [Features](#features) · [Command line](#command-line) · [Screenshots](#screenshots) · [Documentation](https://db-mobile.github.io/resonance/) · [Scripting](SCRIPTS.md) · [Contributing](#contributing)
+[Installation](#installation) · [Features](#features) · [Command line](#command-line) · [Screenshots](#screenshots) · [Documentation](https://db-mobile.github.io/resonance/) · [Scripting](SCRIPTS.md) · [Contributing](#contributing) · [Chat](https://matrix.to/#/#resonance:matrix.org)
 
 <a href="https://flathub.org/apps/io.github.db_mobile.resonance"><img height="52" alt="Get it on Flathub" src="https://flathub.org/api/badge?svg&locale=en"></a>
 &nbsp;
@@ -230,6 +231,7 @@ User documentation lives on the **[Resonance website](https://db-mobile.github.i
 - **[Scripting Reference](SCRIPTS.md)** — pre-request/test script API with examples ([also on the website](https://db-mobile.github.io/resonance/scripts.html))
 - **[Command-line guide](crates/resonance-cli/README.md)** — installing and running `resonance` in CI, options, variables, exit codes
 - **[Architecture](docs/ARCHITECTURE.md)** — project structure and technology stack for contributors
+- **[Matrix room](https://matrix.to/#/#resonance:matrix.org)** — `#resonance:matrix.org` for questions, help and discussion
 
 ## Roadmap
 
@@ -289,7 +291,7 @@ Contributions are welcome!
 3. Run `npm run lint`, `npm test` and `cargo test --workspace --locked` before committing
 4. Open a Pull Request
 
-Found a bug or have a feature request? [Open an issue](https://github.com/db-mobile/resonance/issues) — please check existing issues first and include as much detail as possible.
+Found a bug or have a feature request? [Open an issue](https://github.com/db-mobile/resonance/issues) — please check existing issues first and include as much detail as possible. For questions and general discussion, join the [Matrix room](https://matrix.to/#/#resonance:matrix.org).
 
 ## License
 
