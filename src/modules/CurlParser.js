@@ -39,11 +39,13 @@ const VALUE_OPTIONS = {
     '--data-binary': appendBody,
     '--data-urlencode': (request, value, parser) => appendBody(request, parser.encodeDataUrlencodeToken(value)),
     '-u': (request, value) => {
-        const [username, password] = value.split(':');
+        const separator = value.indexOf(':');
         request.auth = {
             type: 'basic',
-            username: username || '',
-            password: password || ''
+            config: {
+                username: separator === -1 ? value : value.slice(0, separator),
+                password: separator === -1 ? '' : value.slice(separator + 1)
+            }
         };
     },
     '-A': setHeader('User-Agent'),

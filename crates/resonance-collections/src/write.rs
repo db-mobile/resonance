@@ -155,6 +155,24 @@ pub fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
     })
 }
 
+/// Points every descendant's `source` at the directory its folder moved to,
+/// so the recursive write sees each file where it now lives instead of
+/// treating it as a stranger that has claimed the name.
+fn rebase_sources(node: &mut FolderNode, from: &Path, to: &Path) {
+    let rebase = |source: &mut Option<PathBuf>| {
+        if let Some(rest) = source.as_deref().and_then(|p| p.strip_prefix(from).ok()) {
+            *source = Some(to.join(rest));
+        }
+    };
+    for entry in &mut node.requests {
+        rebase(&mut entry.source);
+    }
+    for child in &mut node.folders {
+        rebase(&mut child.source);
+        rebase_sources(child, from, to);
+    }
+}
+
 /// Writes one folder's requests and recurses into its subfolders.
 ///
 /// Returns every path it wrote or kept, so the caller can tell which files in
@@ -205,6 +223,7 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
             && current_path.exists()
         {
             relocate(current_path, &desired)?;
+            rebase_sources(folder, current_path, &desired);
         }
 
         folder.source = Some(desired.clone());
@@ -323,6 +342,31 @@ mod tests {
             requests,
             folders: Vec::new(),
         }
+    }
+
+    #[test]
+    fn renaming_a_folder_moves_its_subtree_without_copies() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![]);
+        let mut pets = folder("f1", "Pets", vec![request("r1", "List")]);
+        pets.folders
+            .push(folder("f2", "Sub", vec![request("r2", "Item")]));
+        written.root.folders.push(pets);
+        write_collection_dir(temp.path(), &mut written).unwrap();
+
+        let mut read = read_collection_dir(temp.path()).unwrap();
+        read.root.folders[0].meta.as_mut().unwrap().name = "Animals".into();
+        write_collection_dir(temp.path(), &mut read).unwrap();
+
+        assert!(temp.path().join("animals/list.yaml").exists());
+        assert!(temp.path().join("animals/sub/item.yaml").exists());
+        assert!(!temp.path().join("animals/list-2.yaml").exists());
+        assert!(!temp.path().join("animals/sub-2").exists());
+        assert!(!temp.path().join("pets").exists());
+        let reread = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(reread.requests().len(), 2);
+        assert_eq!(reread.root.folders.len(), 1);
+        assert_eq!(reread.root.folders[0].folders.len(), 1);
     }
 
     #[test]

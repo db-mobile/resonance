@@ -1338,10 +1338,24 @@ pub async fn collection_save_variables(
         }
     }
 
-    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    save_variables_in(&paths.dir, variables)
+}
+
+/// Replaces a collection's variables on disk. The directory writer skips an
+/// empty list, so clearing the last variable removes the file here; otherwise
+/// the old values would come back on the next uncached read.
+fn save_variables_in(dir: &Path, variables: Vec<Value>) -> Result<(), String> {
+    let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
     loaded.variables = variables;
-    write::write_collection_dir(&paths.dir, &mut loaded)?;
-    collection_cache().refresh(&paths.dir, &loaded);
+    write::write_collection_dir(dir, &mut loaded)?;
+    if loaded.variables.is_empty() {
+        let file = dir.join(layout::VARIABLES_YAML);
+        if file.exists() {
+            fs::remove_file(&file)
+                .map_err(|e| format!("Failed to remove {}: {}", file.display(), e))?;
+        }
+    }
+    collection_cache().refresh(dir, &loaded);
     Ok(())
 }
 
@@ -1639,6 +1653,39 @@ mod saves_on_disk {
 
     /// Import writes the tree, its variables and the per-request payloads in
     /// one pass, so the imported scripts and GraphQL bodies land in the files.
+    #[test]
+    fn clearing_all_variables_removes_the_file() {
+        let temp = TempDir::new().unwrap();
+        let incoming = Collection {
+            id: "c1".into(),
+            name: "Vars".into(),
+            base_url: String::new(),
+            endpoints: vec![],
+            folders: vec![],
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            can_close: false,
+            git_branch: None,
+        };
+        write_v2_collection_seeded(temp.path(), &incoming, None, &HashMap::new(), None).unwrap();
+
+        save_variables_in(temp.path(), vec![json!({"key": "a", "value": "1"})]).unwrap();
+        assert!(temp.path().join(layout::VARIABLES_YAML).exists());
+
+        save_variables_in(temp.path(), vec![]).unwrap();
+        assert!(!temp.path().join(layout::VARIABLES_YAML).exists());
+        assert!(
+            read::read_collection_dir(temp.path())
+                .unwrap()
+                .variables
+                .is_empty()
+        );
+    }
+
     #[test]
     fn a_seeded_write_stores_variables_and_request_state() {
         let temp = TempDir::new().unwrap();

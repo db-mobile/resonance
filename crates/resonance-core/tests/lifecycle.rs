@@ -202,3 +202,46 @@ async fn inherited_oauth_renews_once_and_reuses_credentials_without_frontend_cal
     assert!(effects[0]["changes"].get("clientId").is_none());
     server.abort();
 }
+
+#[tokio::test]
+async fn a_renewed_token_that_expires_mid_run_is_renewed_again() {
+    let tokens = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = tokens.clone();
+    let (url, server) = serve(Router::new().fallback(any(
+        move |request: axum::extract::Request| {
+            let counter = counter.clone();
+            async move {
+                if request.uri().path() == "/token" {
+                    let n = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                    let body = axum::body::to_bytes(request.into_body(), 8192)
+                        .await
+                        .unwrap();
+                    let body = String::from_utf8(body.to_vec()).unwrap();
+                    let expected = if n == 1 { "refresh-0" } else { "refresh-1" };
+                    assert!(body.contains(&format!("refresh_token={expected}")), "{body}");
+                    json!({"access_token":format!("fresh-{n}"),"refresh_token":format!("refresh-{n}"),"expires_in":1})
+                        .to_string()
+                } else {
+                    request.headers()["authorization"]
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                }
+            }
+        },
+    )))
+    .await;
+    let auth = json!({"type":"oauth2","config":{"token":"expired","expiresAt":1,"grantType":"authorization_code","refreshToken":"refresh-0","clientId":"id","tokenUrl":format!("{url}/token")}});
+    let request =
+        json!({"collectionId":"c","endpointId":"e","url":format!("{url}/api"),"auth":auth});
+    let input: RunInput = serde_json::from_value(json!({"executionId":"oauth-expiry","runnerName":"oauth","context":{},"requests":[request,request]})).unwrap();
+    let result = execute_run(input, Cancellation::default(), |_| {}).await;
+    let result = serde_json::to_value(result).unwrap();
+    assert_eq!(result["passed"], 2, "{result}");
+    assert_eq!(tokens.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert_eq!(
+        result["requests"][1]["apiResponse"]["data"],
+        "Bearer fresh-2"
+    );
+    server.abort();
+}

@@ -4728,6 +4728,7 @@ dependencies = [
  "bytes",
  "chrono",
  "encoding_rs",
+ "getrandom 0.4.3",
  "hex",
  "hmac 0.13.0",
  "http",

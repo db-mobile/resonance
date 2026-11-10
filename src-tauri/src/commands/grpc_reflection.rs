@@ -624,27 +624,43 @@ pub async fn grpc_get_input_skeleton(
 }
 
 pub(crate) fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor) -> Value {
+    message_skeleton(desc, &mut Vec::new())
+}
+
+/// Builds one message's skeleton. `visiting` holds the messages on the current
+/// path; a message that refers back to one of them (directly, or through the
+/// mutually recursive `google.protobuf.Struct`/`Value`) becomes `{}` instead of
+/// recursing until the stack overflows.
+fn message_skeleton(desc: &prost_reflect::MessageDescriptor, visiting: &mut Vec<String>) -> Value {
+    if visiting.iter().any(|name| name == desc.full_name()) {
+        return Value::Object(serde_json::Map::new());
+    }
+    visiting.push(desc.full_name().to_string());
+
     let mut obj = serde_json::Map::new();
 
     for field in desc.fields() {
         let field_name = field.name().to_string();
-        let field_value = generate_field_skeleton(&field);
 
-        if field.is_list() {
-            obj.insert(field_name, Value::Array(vec![field_value]));
-        } else if field.is_map() {
+        if field.is_map() {
             let mut map_obj = serde_json::Map::new();
             map_obj.insert("key".to_string(), Value::String("value".to_string()));
             obj.insert(field_name, Value::Object(map_obj));
+        } else if field.is_list() {
+            obj.insert(
+                field_name,
+                Value::Array(vec![field_skeleton(&field, visiting)]),
+            );
         } else {
-            obj.insert(field_name, field_value);
+            obj.insert(field_name, field_skeleton(&field, visiting));
         }
     }
 
+    visiting.pop();
     Value::Object(obj)
 }
 
-fn generate_field_skeleton(field: &prost_reflect::FieldDescriptor) -> Value {
+fn field_skeleton(field: &prost_reflect::FieldDescriptor, visiting: &mut Vec<String>) -> Value {
     use prost_reflect::Kind;
 
     match field.kind() {
@@ -656,7 +672,7 @@ fn generate_field_skeleton(field: &prost_reflect::FieldDescriptor) -> Value {
         Kind::Bool => Value::Bool(false),
         Kind::String => Value::String(String::new()),
         Kind::Bytes => Value::String(String::new()),
-        Kind::Message(msg_desc) => generate_message_skeleton(&msg_desc),
+        Kind::Message(msg_desc) => message_skeleton(&msg_desc, visiting),
         Kind::Enum(enum_desc) => {
             if let Some(first_value) = enum_desc.values().next() {
                 Value::String(first_value.name().to_string())

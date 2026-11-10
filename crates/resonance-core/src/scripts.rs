@@ -250,8 +250,12 @@ fn execute_script(
             }
             Ok(())
         }
-        Err(ScriptRunError::Js(_)) if ctx.borrow().execution.skipped => Ok(()),
+        Err(ScriptRunError::Js(_)) if ctx.borrow().execution.skipped => {
+            collect_test_results(&mut context, &ctx);
+            Ok(())
+        }
         Err(ScriptRunError::Js(e)) => {
+            collect_test_results(&mut context, &ctx);
             ctx.borrow_mut().execution.next = NextRequest::Unchanged;
             if capture_request {
                 let _ = capture_request_mutations(&mut context, &ctx, baseline.as_deref());
@@ -2471,6 +2475,20 @@ mod tests {
                 .iter()
                 .map(|r| (r.passed, r.message.clone()))
                 .collect()
+        }
+
+        #[test]
+        fn tests_that_ran_before_a_throw_are_reported() {
+            let script = r#"
+                pm.test("status", function () { pm.expect(pm.response.code).to.equal(200); });
+                JSON.parse("not json");
+            "#;
+            let result = run_test_script(script, ok_response(), &[]);
+            assert!(!result.success);
+            assert_eq!(
+                results(&result),
+                vec![(true, results(&result)[0].1.clone())]
+            );
         }
 
         #[test]

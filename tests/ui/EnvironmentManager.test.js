@@ -191,6 +191,41 @@ describe('EnvironmentManager', () => {
         manager.close();
     });
 
+    test('changing the colour of a non-active environment keeps it selected for edits', async () => {
+        const { manager } = await openManager(service);
+        await manager.selectEnvironment('prod');
+        const colorInput = document.querySelector('#env-color-input');
+
+        colorInput.value = '#00ff00';
+        colorInput.dispatchEvent(new Event('change'));
+        for (let i = 0; i < 6; i++) {
+            await flush();
+        }
+
+        expect(service.updateEnvironment).toHaveBeenCalledWith('prod', { color: '#00FF00' });
+        expect(manager.currentEnvironmentId).toBe('prod');
+        expect(document.querySelector('.env-list-item.is-selected').dataset.envId).toBe('prod');
+
+        manager.close();
+    });
+
+    test('renaming a non-active environment keeps it selected', async () => {
+        const { manager } = await openManager(service);
+        await manager.selectEnvironment('prod');
+        const nameInput = document.querySelector('#env-name-input');
+
+        nameInput.value = 'Production';
+        nameInput.dispatchEvent(new Event('blur'));
+        for (let i = 0; i < 6; i++) {
+            await flush();
+        }
+
+        expect(service.updateEnvironment).toHaveBeenCalledWith('prod', { name: 'Production' });
+        expect(manager.currentEnvironmentId).toBe('prod');
+
+        manager.close();
+    });
+
     test('clearing the colour saves null and resets the preview', async () => {
         const { manager } = await openManager(service);
 

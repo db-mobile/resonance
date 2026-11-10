@@ -537,11 +537,13 @@ fn index_requests(loaded: &LoadedCollection) -> HashMap<String, RequestEntry> {
 }
 
 /// Indexes an existing tree's folders by id, to keep their directories.
+///
+/// A directory without `_folder.yaml` is indexed under its derived id, the
+/// same one the frontend was given, so a save finds it instead of creating a
+/// suffixed sibling.
 fn index_folders(node: &FolderNode, out: &mut HashMap<String, FolderNode>) {
     for folder in &node.folders {
-        if let Some(meta) = &folder.meta {
-            out.insert(meta.id.clone(), folder.clone());
-        }
+        out.insert(folder_id(folder), folder.clone());
         index_folders(folder, out);
     }
 }
@@ -737,7 +739,10 @@ fn folder_from_ipc(
                         .and_then(|f| f.meta.as_ref())
                         .and_then(|m| m.auth.clone())
                 }),
-            extra: Map::new(),
+            extra: previous
+                .and_then(|f| f.meta.as_ref())
+                .map(|m| m.extra.clone())
+                .unwrap_or_default(),
         }),
         source: previous.and_then(|f| f.source.clone()),
         requests: Vec::new(),
@@ -1499,6 +1504,60 @@ mod save_path {
         assert_eq!(
             root.folders[0].source.as_ref().unwrap(),
             &std::path::PathBuf::from("/c/pets")
+        );
+    }
+
+    #[test]
+    fn a_folder_without_metadata_keeps_its_directory() {
+        let mut existing = existing_with_state();
+        existing.root.folders.push(FolderNode {
+            meta: None,
+            source: Some(std::path::PathBuf::from("/c/pets")),
+            requests: Vec::new(),
+            folders: Vec::new(),
+        });
+        let id = folder_id(&existing.root.folders[0]);
+
+        let incoming = ipc_collection(
+            vec![],
+            vec![json!({"id": id, "name": "pets", "endpoints": []})],
+        );
+        let root = tree_from_ipc(&incoming, Some(&existing));
+
+        assert_eq!(
+            root.folders[0].source.as_ref().unwrap(),
+            &std::path::PathBuf::from("/c/pets")
+        );
+    }
+
+    #[test]
+    fn unknown_folder_keys_survive_a_save() {
+        let mut existing = existing_with_state();
+        let mut extra = Map::new();
+        extra.insert("color".into(), json!("red"));
+        existing.root.folders.push(FolderNode {
+            meta: Some(crate::model::FolderDoc {
+                format: FORMAT_VERSION,
+                id: "f1".into(),
+                name: "pets".into(),
+                seq: 10,
+                auth: None,
+                extra,
+            }),
+            source: Some(std::path::PathBuf::from("/c/pets")),
+            requests: Vec::new(),
+            folders: Vec::new(),
+        });
+
+        let incoming = ipc_collection(
+            vec![],
+            vec![json!({"id": "f1", "name": "pets", "endpoints": []})],
+        );
+        let root = tree_from_ipc(&incoming, Some(&existing));
+
+        assert_eq!(
+            root.folders[0].meta.as_ref().unwrap().extra["color"],
+            json!("red")
         );
     }
 

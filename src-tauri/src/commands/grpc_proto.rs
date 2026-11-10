@@ -284,6 +284,35 @@ service Billing { rpc Get (Invoice) returns (Invoice); }
     }
 
     #[test]
+    fn skeletons_of_recursive_messages_terminate() {
+        let dir = TempDir::new().unwrap();
+        let service = dir.path().join("tree.proto");
+        fs::write(
+            &service,
+            r#"syntax = "proto3";
+package tree;
+import "google/protobuf/struct.proto";
+message Node { Node child = 1; repeated Node children = 2; map<string, Node> named = 3; string label = 4; }
+message Input { Node root = 1; google.protobuf.Struct meta = 2; }
+"#,
+        )
+        .unwrap();
+        let pool =
+            parse_proto_file(service.to_str().unwrap(), &[dir.path().to_path_buf()]).unwrap();
+        let input = pool.get_message_by_name("tree.Input").unwrap();
+
+        let skeleton = crate::commands::grpc_reflection::generate_message_skeleton(&input);
+
+        assert_eq!(skeleton["root"]["label"], "");
+        assert_eq!(skeleton["root"]["child"], serde_json::json!({}));
+        assert_eq!(
+            skeleton["root"]["named"],
+            serde_json::json!({"key": "value"})
+        );
+        assert!(skeleton["meta"].is_object());
+    }
+
+    #[test]
     fn a_missing_import_is_reported() {
         let dir = TempDir::new().unwrap();
         let service = dir.path().join("svc.proto");

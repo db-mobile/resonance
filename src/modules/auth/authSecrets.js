@@ -14,7 +14,7 @@ export const SECRET_AUTH_FIELDS = Object.freeze(Object.fromEntries(
  * @param {*} value
  * @returns {boolean}
  */
-function isTemplateRef(value) {
+export function isTemplateRef(value) {
     return typeof value === 'string' && /\{\{.*\}\}/.test(value);
 }
 

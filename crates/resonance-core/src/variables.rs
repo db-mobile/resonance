@@ -107,7 +107,9 @@ impl VariableProcessor {
     }
 }
 fn random() -> f64 {
-    (uuid::Uuid::new_v4().as_u128() as u64 >> 11) as f64 / ((1u64 << 53) as f64)
+    let mut bytes = [0u8; 8];
+    getrandom::fill(&mut bytes).expect("OS random number generator unavailable");
+    (u64::from_le_bytes(bytes) >> 11) as f64 / ((1u64 << 53) as f64)
 }
 fn int(min: i64, max: i64) -> i64 {
     min + (random() * (max as f64 - min as f64 + 1.0)).floor() as i64
@@ -328,3 +330,16 @@ const LOREM_WORDS: &[&str] = &[
     "nisi",
     "aliquip",
 ];
+
+#[cfg(test)]
+mod random_tests {
+    use super::random;
+
+    #[test]
+    fn random_covers_the_whole_unit_interval() {
+        let samples: Vec<f64> = (0..10_000).map(|_| random()).collect();
+        assert!(samples.iter().all(|v| (0.0..1.0).contains(v)));
+        assert!(samples.iter().any(|v| *v < 0.25));
+        assert!(samples.iter().any(|v| *v >= 0.75));
+    }
+}
