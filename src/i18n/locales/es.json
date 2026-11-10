@@ -646,16 +646,6 @@
     "format": "Formatear",
     "format_title": "Formatear JSON (Mayús+Alt+F)"
   },
-  "data_migration": {
-    "title": "Conversión de datos",
-    "failed": "La conversión de tus datos al formato actual falló en \"{{step}}\": {{message}}. No se eliminó nada y la conversión se repetirá la próxima vez que se inicie Resonance.",
-    "too_old": "Tus datos se guardaron con una versión de Resonance que esta versión ya no puede convertir, así que no se modificaron. Instala Resonance {{release}}, ábrelo una vez y vuelve a actualizar.",
-    "global_store_collections": "Tu configuración todavía contiene colecciones guardadas con una versión de Resonance anterior a marzo de 2026. Esta versión ya no puede convertirlas, así que no se modificaron. Instala Resonance {{release}}, ábrelo una vez y vuelve a actualizar.",
-    "v1_collections": "Algunas colecciones siguen guardadas en el formato de carpetas de las versiones de Resonance anteriores a agosto de 2026. Esta versión ya no puede convertirlas, así que se dejaron sin cambios. Instala Resonance {{release}}, abre cada una y guarda cualquier cambio, luego actualiza de nuevo.",
-    "store_runners": "Los runners guardados por una versión de Resonance anterior a octubre de 2026 siguen en tu configuración. Esta versión ya no puede moverlos a sus colecciones, así que se dejaron sin cambios. Instala Resonance {{release}}, inícialo una vez con esas colecciones abiertas, luego actualiza de nuevo.",
-    "store_scripts": "Los scripts guardados por una versión de Resonance anterior a abril de 2026 siguen en tu configuración. Esta versión ya no puede moverlos a sus solicitudes, así que se dejaron sin cambios. Instala Resonance {{release}}, abre cada solicitud afectada una vez, luego actualiza de nuevo.",
-    "unknown": "No se pudieron convertir por completo tus datos al formato actual."
-  },
   "environment_manager": {
     "create_default_name": "Nuevo entorno",
     "create_title": "Crear entorno",

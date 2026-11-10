@@ -652,16 +652,6 @@
     "format": "Formatieren",
     "format_title": "JSON formatieren (Umschalt+Alt+F)"
   },
-  "data_migration": {
-    "title": "Datenkonvertierung",
-    "failed": "Die Konvertierung Ihrer Daten in das aktuelle Format ist bei „{{step}}“ fehlgeschlagen: {{message}}. Es wurde nichts entfernt; die Konvertierung läuft beim nächsten Start von Resonance erneut.",
-    "too_old": "Ihre Daten stammen aus einer Resonance-Version, die diese Version nicht mehr konvertieren kann. Sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
-    "global_store_collections": "In Ihren Einstellungen liegen noch Collections aus einer Resonance-Version vor März 2026. Diese Version kann sie nicht mehr konvertieren; sie wurden nicht verändert. Installieren Sie Resonance {{release}}, starten Sie es einmal und aktualisieren Sie dann erneut.",
-    "v1_collections": "Einige Sammlungen liegen noch im Ordnerformat von Resonance-Versionen vor August 2026 vor. Diese Version kann sie nicht mehr umwandeln, daher wurden sie unverändert gelassen. Installiere Resonance {{release}}, öffne jede davon und speichere eine beliebige Änderung, dann aktualisiere erneut.",
-    "store_runners": "Gespeicherte Runner einer Resonance-Version vor Oktober 2026 befinden sich noch in deinen Einstellungen. Diese Version kann sie nicht mehr in ihre Sammlungen verschieben, daher wurden sie unverändert gelassen. Installiere Resonance {{release}}, starte es einmal mit diesen geöffneten Sammlungen, dann aktualisiere erneut.",
-    "store_scripts": "Skripte einer Resonance-Version vor April 2026 befinden sich noch in deinen Einstellungen. Diese Version kann sie nicht mehr in ihre Anfragen verschieben, daher wurden sie unverändert gelassen. Installiere Resonance {{release}}, öffne jede betroffene Anfrage einmal, dann aktualisiere erneut.",
-    "unknown": "Ihre Daten konnten nicht vollständig in das aktuelle Format konvertiert werden."
-  },
   "environment_manager": {
     "create_default_name": "Neue Umgebung",
     "create_title": "Umgebung erstellen",
