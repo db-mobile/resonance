@@ -3,8 +3,6 @@
  * @module utils/requestOverrides
  */
 
-export const OVERRIDES_VERSION = 2;
-
 /** @type {ReadonlyArray<string>} */
 const ROW_FIELDS = Object.freeze(['pathParams', 'queryParams', 'headers']);
 

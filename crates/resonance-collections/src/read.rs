@@ -11,44 +11,19 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::layout::{
-    COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML, is_reserved_dir,
-};
+use super::layout::{COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML, is_reserved_dir};
 use super::model::{
     CollectionDoc, FORMAT_VERSION, FolderDoc, FormatProbe, RequestDoc, probe_format,
 };
 use super::runners::{RunnerEntry, read_runners};
 
-/// Which on-disk format a collection directory uses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Layout {
-    /// `collection.json` plus a flat `requests/` directory.
-    V1,
-    /// `collection.yaml` plus one file per request, folders as directories.
-    V2,
-}
-
-impl Layout {
-    /// Identifies a collection directory by its marker file.
-    ///
-    /// V2 wins when both markers are present, which is what an interrupted
-    /// conversion leaves behind: the v2 tree is complete by then, and the v1
-    /// files are stale leftovers the next save removes.
-    ///
-    /// @param dir - Directory to inspect
-    /// @returns The layout, or None when this is not a collection directory
-    pub fn detect(dir: &Path) -> Option<Self> {
-        if !dir.is_dir() {
-            return None;
-        }
-        if dir.join(COLLECTION_YAML).exists() {
-            return Some(Layout::V2);
-        }
-        if dir.join(COLLECTION_JSON).exists() {
-            return Some(Layout::V1);
-        }
-        None
-    }
+/// Reports whether a directory holds a collection, marked by its
+/// `collection.yaml`.
+///
+/// @param dir - Directory to inspect
+/// @returns True when the marker file is present
+pub fn is_collection_dir(dir: &Path) -> bool {
+    dir.is_dir() && dir.join(COLLECTION_YAML).exists()
 }
 
 /// One request, paired with the file it came from so a later write can rename
@@ -282,7 +257,7 @@ fn read_folder(dir: &Path, at_root: bool) -> Result<FolderNode, String> {
                 }
                 continue;
             }
-            if Layout::detect(&path).is_some() {
+            if is_collection_dir(&path) {
                 return Err(format!(
                     "{} contains a nested collection at {}; open it on its own instead",
                     dir.display(),
@@ -457,34 +432,18 @@ mod tests {
     }
 
     #[test]
-    fn detects_a_v2_directory_by_its_marker() {
+    fn detects_a_collection_directory_by_its_marker() {
         let temp = TempDir::new().unwrap();
         minimal_collection(temp.path());
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V2));
-    }
-
-    #[test]
-    fn detects_a_v1_directory_by_its_marker() {
-        let temp = TempDir::new().unwrap();
-        write(temp.path(), COLLECTION_JSON, "{}");
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V1));
-    }
-
-    /// An interrupted conversion leaves both markers. The v2 tree is complete
-    /// by that point, so it wins and the next save clears the v1 leftovers.
-    #[test]
-    fn v2_wins_when_both_markers_are_present() {
-        let temp = TempDir::new().unwrap();
-        minimal_collection(temp.path());
-        write(temp.path(), COLLECTION_JSON, "{}");
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V2));
+        assert!(is_collection_dir(temp.path()));
     }
 
     #[test]
     fn an_ordinary_directory_is_not_a_collection() {
         let temp = TempDir::new().unwrap();
         write(temp.path(), "notes.txt", "hello");
-        assert_eq!(Layout::detect(temp.path()), None);
+        write(temp.path(), "collection.json", "{}");
+        assert!(!is_collection_dir(temp.path()));
     }
 
     #[test]
@@ -933,19 +892,6 @@ mod tests {
 
         let error = read_collection_dir(temp.path()).unwrap_err();
         assert!(error.contains("nested collection"), "{}", error);
-    }
-
-    #[test]
-    fn a_nested_v1_collection_is_also_refused() {
-        let temp = TempDir::new().unwrap();
-        minimal_collection(temp.path());
-        write(temp.path(), "inner/collection.json", "{}");
-
-        assert!(
-            read_collection_dir(temp.path())
-                .unwrap_err()
-                .contains("nested collection")
-        );
     }
 
     /// Same seq and same name used to fall back to fs::read_dir order, which

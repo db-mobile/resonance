@@ -572,12 +572,6 @@
     "in_collection": "em {{name}}",
     "no_collection": "Adicione uma requisição primeiro para que o runner pertença a uma coleção",
     "data_file_not_portable": "Fora da pasta da coleção: este caminho só funciona nesta máquina",
-    "migration_moved_one": "{{count}} runner salvo movido para a pasta da sua coleção",
-    "migration_moved_other": "{{count}} runners salvos movidos para as pastas das suas coleções",
-    "migration_dropped_one": "{{count}} runner perdeu requisições de outras coleções: {{names}}",
-    "migration_dropped_other": "{{count}} runners perderam requisições de outras coleções: {{names}}",
-    "migration_skipped_one": "{{count}} runner salvo não tem requisições e não foi movido",
-    "migration_skipped_other": "{{count}} runners salvos não têm requisições e não foram movidos",
     "tags": "Tags",
     "tags_include": "Incluir tags",
     "tags_exclude": "Excluir tags",
@@ -657,6 +651,9 @@
     "failed": "A conversão dos seus dados para o formato atual falhou em \"{{step}}\": {{message}}. Nada foi removido, e a conversão será executada novamente na próxima vez que o Resonance iniciar.",
     "too_old": "Seus dados foram salvos por uma versão do Resonance que esta versão não consegue mais converter, então não foram alterados. Instale o Resonance {{release}}, abra-o uma vez e atualize novamente.",
     "global_store_collections": "Suas configurações ainda contêm coleções salvas por uma versão do Resonance anterior a março de 2026. Esta versão não consegue mais convertê-las, então não foram alteradas. Instale o Resonance {{release}}, abra-o uma vez e atualize novamente.",
+    "v1_collections": "Algumas coleções ainda estão armazenadas no formato de pastas das versões do Resonance anteriores a agosto de 2026. Esta versão não consegue mais convertê-las, então foram deixadas sem alterações. Instale o Resonance {{release}}, abra cada uma delas e salve qualquer alteração, depois atualize novamente.",
+    "store_runners": "Runners salvos por uma versão do Resonance anterior a outubro de 2026 ainda estão nas suas configurações. Esta versão não consegue mais movê-los para suas coleções, então foram deixados sem alterações. Instale o Resonance {{release}}, inicie-o uma vez com essas coleções abertas, depois atualize novamente.",
+    "store_scripts": "Scripts salvos por uma versão do Resonance anterior a abril de 2026 ainda estão nas suas configurações. Esta versão não consegue mais movê-los para suas requisições, então foram deixados sem alterações. Instale o Resonance {{release}}, abra cada requisição afetada uma vez, depois atualize novamente.",
     "unknown": "Não foi possível converter completamente seus dados para o formato atual."
   },
   "environment_manager": {

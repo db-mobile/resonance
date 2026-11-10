@@ -161,9 +161,7 @@ Runner startup uses `backendAPI.collections.captureExecutionSnapshot(targets)`
 native blocking pool and loads each collection once. `snapshot.rs` projects
 selected endpoints, persisted data, scripts and closest-folder-first auth sources
 alongside one compact collection metadata object and its variable entries. It
-never sends the collection tree or sibling OpenAPI document per request. Legacy
-collections retain their metadata and sidecar precedence without conversion;
-legacy global scripts are a read-only fallback.
+never sends the collection tree or sibling OpenAPI document per request.
 
 Repositories hydrate keychain values from the supplied data. Repeated auth secret
 scopes share an in-flight read only for this capture; collection variables bypass
@@ -193,10 +191,7 @@ in-memory runner (`storage/runnerDoc.js`), re-attaching `collectionId` and
 `endpointId` so execution capture is unchanged. Desktop-local state stays in
 the store: `runnerLastRuns` (last-run timestamps), `runnerRunHistory` and the
 `lastRunnerId` setting. `runner.feature.js` wires the shared repositories and
-`RunnerBookkeeping`, which runs the resumable migration from the legacy
-`collectionRunners` store key on every collections load (markers in
-`runnersMigratedCollections`, backup in `collectionRunnersLegacyBackup`) and
-clears local state when a collection is deleted. The runner tab binds to the
+`RunnerBookkeeping`, which clears local state when a collection is deleted. The runner tab binds to the
 collection of its first queued request; the palette then offers only that
 collection and the saved-runner dropdown groups runners by collection.
 

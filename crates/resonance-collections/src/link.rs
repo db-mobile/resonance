@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::read::Layout;
+use super::read::is_collection_dir;
 
 /// Store key holding `{collectionId: absolutePath}` for linked collections.
 pub const LINKED_COLLECTIONS_KEY: &str = "linkedCollections";
@@ -142,7 +142,7 @@ pub fn discover_collection_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
         return Err(format!("{} is not a directory", root.display()));
     }
 
-    if Layout::detect(root).is_some() {
+    if is_collection_dir(root) {
         return Ok(vec![root.to_path_buf()]);
     }
 
@@ -164,7 +164,7 @@ pub fn discover_collection_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
             continue;
         }
 
-        if Layout::detect(&path).is_some() {
+        if is_collection_dir(&path) {
             found.push(path);
         }
     }
@@ -189,7 +189,7 @@ pub fn classify_open(id: &str, path: &Path, index: &HashMap<String, String>) -> 
 
         // A stale entry is not a conflict: the collection was moved or
         // deleted, and re-registering is exactly what the user wants.
-        if Layout::detect(&registered_path).is_some() {
+        if is_collection_dir(&registered_path) {
             return Decision::Conflict {
                 existing: registered_path,
                 same_path_different_id: false,
@@ -227,11 +227,6 @@ mod tests {
         .unwrap();
     }
 
-    fn v1_collection(dir: &Path) {
-        fs::create_dir_all(dir).unwrap();
-        fs::write(dir.join("collection.json"), "{}").unwrap();
-    }
-
     fn index_of(pairs: &[(&str, &Path)]) -> HashMap<String, String> {
         pairs
             .iter()
@@ -251,14 +246,6 @@ mod tests {
                 discover_collection_dirs(temp.path()).unwrap(),
                 vec![temp.path().to_path_buf()]
             );
-        }
-
-        #[test]
-        fn a_v1_directory_is_returned_as_itself() {
-            let temp = TempDir::new().unwrap();
-            v1_collection(temp.path());
-
-            assert_eq!(discover_collection_dirs(temp.path()).unwrap().len(), 1);
         }
 
         #[test]

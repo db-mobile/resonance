@@ -572,12 +572,6 @@
     "in_collection": "in {{name}}",
     "no_collection": "Aggiungi prima una richiesta in modo che il runner appartenga a una raccolta",
     "data_file_not_portable": "Fuori dalla cartella della raccolta: questo percorso funziona solo su questo computer",
-    "migration_moved_one": "{{count}} runner salvato spostato nella cartella della sua raccolta",
-    "migration_moved_other": "{{count}} runner salvati spostati nelle cartelle delle loro raccolte",
-    "migration_dropped_one": "{{count}} runner ha perso richieste di altre raccolte: {{names}}",
-    "migration_dropped_other": "{{count}} runner hanno perso richieste di altre raccolte: {{names}}",
-    "migration_skipped_one": "{{count}} runner salvato non ha richieste e non è stato spostato",
-    "migration_skipped_other": "{{count}} runner salvati non hanno richieste e non sono stati spostati",
     "tags": "Tag",
     "tags_include": "Includi tag",
     "tags_exclude": "Escludi tag",
@@ -657,6 +651,9 @@
     "failed": "La conversione dei tuoi dati nel formato attuale non è riuscita al passaggio \"{{step}}\": {{message}}. Non è stato rimosso nulla e la conversione verrà ripetuta al prossimo avvio di Resonance.",
     "too_old": "I tuoi dati sono stati salvati da una versione di Resonance che questa versione non può più convertire, quindi non sono stati modificati. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
     "global_store_collections": "Le tue impostazioni contengono ancora collezioni salvate da una versione di Resonance precedente a marzo 2026. Questa versione non può più convertirle, quindi non sono state modificate. Installa Resonance {{release}}, avvialo una volta e poi aggiorna di nuovo.",
+    "v1_collections": "Alcune raccolte sono ancora salvate nel formato a cartelle delle versioni di Resonance precedenti ad agosto 2026. Questa versione non può più convertirle, quindi sono state lasciate invariate. Installa Resonance {{release}}, apri ciascuna di esse e salva una modifica qualsiasi, poi aggiorna di nuovo.",
+    "store_runners": "I runner salvati da una versione di Resonance precedente a ottobre 2026 sono ancora nelle impostazioni. Questa versione non può più spostarli nelle loro raccolte, quindi sono stati lasciati invariati. Installa Resonance {{release}}, avvialo una volta con quelle raccolte aperte, poi aggiorna di nuovo.",
+    "store_scripts": "Gli script salvati da una versione di Resonance precedente ad aprile 2026 sono ancora nelle impostazioni. Questa versione non può più spostarli nelle loro richieste, quindi sono stati lasciati invariati. Installa Resonance {{release}}, apri una volta ogni richiesta interessata, poi aggiorna di nuovo.",
     "unknown": "Non è stato possibile convertire completamente i tuoi dati nel formato attuale."
   },
   "environment_manager": {

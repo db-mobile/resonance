@@ -800,12 +800,8 @@ pub fn find_request<'a>(loaded: &'a LoadedCollection, request_id: &str) -> Optio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::legacy::v1_to_v2;
     use crate::model::{FORMAT_VERSION, FolderDoc};
-    use crate::read::{RequestEntry, read_collection_dir};
-    use crate::write::write_collection_dir;
-    use std::collections::HashMap;
-    use tempfile::TempDir;
+    use crate::read::RequestEntry;
 
     fn request(id: &str, name: &str) -> RequestEntry {
         RequestEntry::new(RequestDoc::new(id.into(), name.into()))
@@ -1146,69 +1142,6 @@ mod tests {
             let doc = RequestDoc::new("r1".into(), "X".into());
             assert!(request_to_endpoint_data(&doc).scripts.is_none());
         }
-    }
-
-    /// The step-9 promise: a v2 directory written by a teammate opens
-    /// correctly in a build that still writes v1.
-    #[test]
-    fn a_v2_directory_on_disk_reads_back_through_the_ipc_shape() {
-        let v1 = Collection {
-            id: "c1".into(),
-            name: "Petstore".into(),
-            base_url: "https://api.example.com".into(),
-            endpoints: vec![
-                json!({"id": "custom_1", "name": "Health", "method": "GET", "path": "/health"}),
-                json!({"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}),
-            ],
-            folders: vec![json!({
-                "id": "folder_pets",
-                "name": "pets",
-                "endpoints": [{"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}]
-            })],
-            default_headers: json!({"Accept": "application/json"}),
-            auth_config: None,
-            open_api_spec: None,
-            storage_path: None,
-            storage_parent_path: None,
-            linked: false,
-            can_close: false,
-            git_branch: None,
-        };
-
-        let mut data = HashMap::new();
-        data.insert(
-            "custom_2".to_string(),
-            EndpointData {
-                modified_body: Some("{\"name\": \"Rex\"}".into()),
-                headers: vec![json!({"key": "Accept", "value": "*/*"})],
-                ..Default::default()
-            },
-        );
-
-        let temp = TempDir::new().unwrap();
-        let mut converted = v1_to_v2(&v1, &data);
-        write_collection_dir(temp.path(), &mut converted).unwrap();
-
-        let reread = read_collection_dir(temp.path()).unwrap();
-        let ipc = to_ipc_collection(&reread, &temp.path().to_string_lossy(), false);
-
-        assert_eq!(ipc.id, "c1");
-        assert_eq!(ipc.default_headers["Accept"], "application/json");
-
-        // Both requests are reachable, and the foldered one is in both views.
-        assert_eq!(ipc.endpoints.len(), 2);
-        assert_eq!(ipc.folders.len(), 1);
-        assert_eq!(ipc.folders[0]["endpoints"].as_array().unwrap().len(), 1);
-        assert_eq!(ipc.folders[0]["endpoints"][0]["id"], "custom_2");
-
-        // The per-request data survives the trip through the files.
-        let request = find_request(&reread, "custom_2").unwrap();
-        let endpoint_data = request_to_endpoint_data(request);
-        assert_eq!(
-            endpoint_data.modified_body.as_deref(),
-            Some("{\"name\": \"Rex\"}")
-        );
-        assert_eq!(endpoint_data.headers.len(), 1);
     }
 }
 

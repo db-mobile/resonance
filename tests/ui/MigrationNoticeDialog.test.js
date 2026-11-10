@@ -25,13 +25,27 @@ describe('MigrationNoticeDialog', () => {
     });
 
     test('too-old data points at the last release that still converts every data version', () => {
-        expect(describeMigrationIssue({ kind: 'tooOld', found: 0, min: 2 })).toContain('Install Resonance 3.5.8');
+        expect(describeMigrationIssue({ kind: 'tooOld', found: 0, min: 2 })).toContain('Install Resonance 3.6.0');
     });
 
     test('global-store collections point at the last release that still read them', () => {
         const text = describeMigrationIssue({ kind: 'unsupported', data: 'globalStoreCollections' });
         expect(text).toContain('before March 2026');
         expect(text).toContain('Install Resonance 3.3.0');
+    });
+
+    test.each([
+        ['v1Collections', 'folder layout'],
+        ['collectionRunners', 'Saved runners'],
+        ['storeScripts', 'Scripts saved']
+    ])('leftover %s points at the last release that still converted it', (data, phrase) => {
+        const text = describeMigrationIssue({ kind: 'unsupported', data });
+        expect(text).toContain(phrase);
+        expect(text).toContain('Install Resonance 3.6.0');
+    });
+
+    test('an unknown leftover falls back to the generic notice', () => {
+        expect(describeMigrationIssue({ kind: 'unsupported', data: 'somethingElse' })).toContain('could not be fully converted');
     });
 
     test('no dialog opens when the migration reported nothing', async () => {
