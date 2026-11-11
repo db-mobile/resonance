@@ -123,15 +123,15 @@ async fn bail_stops_after_the_first_failure_and_skips_the_rest() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_v1_collection_and_a_plain_directory_are_refused() {
+async fn a_directory_without_a_collection_yaml_is_refused() {
     let server = Server::start().await;
-    let legacy = Collection::new("Legacy");
-    std::fs::remove_file(legacy.path().join("collection.yaml")).unwrap();
-    legacy.write("collection.json", "{}");
-    let cli = run(&legacy, &server, &[]);
+    let unmarked = Collection::new("Unmarked");
+    std::fs::remove_file(unmarked.path().join("collection.yaml")).unwrap();
+    unmarked.write("collection.json", "{}");
+    let cli = run(&unmarked, &server, &[]);
     assert_eq!(cli.code(), 2);
     assert!(
-        cli.stderr().contains("open it in Resonance once"),
+        cli.stderr().contains("no collection.yaml"),
         "{}",
         cli.stderr()
     );

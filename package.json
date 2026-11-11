@@ -1,6 +1,6 @@
 {
   "name": "resonance",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "description": "Resonance - A local-first, zero-account API client with excellent user experience",
   "license": "MIT",
   "engines": {
@@ -50,7 +50,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
     "@lezer/highlight": "^1.2.3",
-    "cm6-graphql": "^0.2.1",
+    "cm6-graphql": "^1.0.0",
     "graphql": "^17.0.2"
   }
 }

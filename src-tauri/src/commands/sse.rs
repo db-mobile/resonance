@@ -133,6 +133,7 @@ struct PartialEvent {
 }
 
 impl PartialEvent {
+    #[cfg(test)]
     fn is_empty(&self) -> bool {
         self.event.is_none() && self.data.is_empty() && self.id.is_none() && self.retry.is_none()
     }
@@ -481,10 +482,9 @@ async fn stream_loop<R: Runtime>(
             silent_reconnects += 1;
         }
 
-        // Flush any trailing partial event if the stream ended on a non-empty buffer.
-        if !partial.is_empty() {
-            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
-        }
+        // An event cut off by the end of the stream is dropped with `partial`,
+        // as the spec requires: dispatching it would show a truncated message
+        // and advance Last-Event-ID past an event the server never finished.
 
         if silent_reconnects >= MAX_SILENT_RECONNECTS {
             emit_error(app, tab_id, url, None, give_up_message());

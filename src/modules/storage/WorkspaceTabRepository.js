@@ -5,6 +5,55 @@
 
 import { truncateBody } from '../utils/truncateBody.js';
 import { generateId } from '../utils/ids.js';
+import { getSecretAuthFields, isTemplateRef } from '../auth/authSecrets.js';
+
+/** @type {string} */
+const MQTT_PASSWORD_KEY = 'mqttPassword';
+
+/** @type {string} */
+const AUTH_KEY_PREFIX = 'auth.';
+
+/**
+ * @param {Object} request
+ * @returns {string[]}
+ */
+function authSecretFields(request) {
+    const config = request?.authConfig;
+    if (!config || typeof config !== 'object') {
+        return [];
+    }
+    return getSecretAuthFields(request.authType).filter((field) => {
+        const value = config[field];
+        return typeof value === 'string' && value !== '' && !isTemplateRef(value);
+    });
+}
+
+/**
+ * @param {Object} tab
+ * @returns {Object<string, string>}
+ */
+function tabSecrets(tab) {
+    const request = tab?.request;
+    const secrets = {};
+    if (!request) {
+        return secrets;
+    }
+    if (typeof request.password === 'string' && request.password !== '') {
+        secrets[MQTT_PASSWORD_KEY] = request.password;
+    }
+    for (const field of authSecretFields(request)) {
+        secrets[AUTH_KEY_PREFIX + field] = request.authConfig[field];
+    }
+    return secrets;
+}
+
+/**
+ * @param {Object} tab
+ * @returns {boolean}
+ */
+function hasPlaintextSecrets(tab) {
+    return Object.keys(tabSecrets(tab)).length > 0;
+}
 
 export class WorkspaceTabRepository {
     /**
@@ -64,10 +113,25 @@ export class WorkspaceTabRepository {
      * @returns {Object}
      */
     _withoutSecrets(tab) {
-        if (!tab?.request || !('password' in tab.request)) {
+        const request = tab?.request;
+        if (!request) {
             return tab;
         }
-        return { ...tab, request: { ...tab.request, password: '' } };
+        const authFields = authSecretFields(request);
+        if (!('password' in request) && authFields.length === 0) {
+            return tab;
+        }
+        const scrubbed = { ...request };
+        if ('password' in request) {
+            scrubbed.password = '';
+        }
+        if (authFields.length > 0) {
+            scrubbed.authConfig = { ...request.authConfig };
+            for (const field of authFields) {
+                scrubbed.authConfig[field] = '';
+            }
+        }
+        return { ...tab, request: scrubbed };
     }
 
     /**
@@ -78,16 +142,20 @@ export class WorkspaceTabRepository {
         const liveIds = new Set();
         for (const tab of tabs) {
             liveIds.add(tab.id);
-            const password = tab.request?.password || '';
-            if (this._syncedSecrets.get(tab.id) === password) {
-                continue;
+            const next = tabSecrets(tab);
+            const previous = this._syncedSecrets.get(tab.id) || {};
+            const scope = this._secretScope(tab.id);
+            for (const key of Object.keys(previous)) {
+                if (!(key in next)) {
+                    await this.secretStore.delete(scope, key);
+                }
             }
-            if (password) {
-                await this.secretStore.set(this._secretScope(tab.id), 'mqttPassword', password);
-            } else {
-                await this.secretStore.delete(this._secretScope(tab.id), 'mqttPassword');
+            for (const [key, value] of Object.entries(next)) {
+                if (previous[key] !== value) {
+                    await this.secretStore.set(scope, key, value);
+                }
             }
-            this._syncedSecrets.set(tab.id, password);
+            this._syncedSecrets.set(tab.id, next);
         }
         for (const tabId of [...this._syncedSecrets.keys()]) {
             if (!liveIds.has(tabId)) {
@@ -107,16 +175,31 @@ export class WorkspaceTabRepository {
         }
         const hydrated = [];
         for (const tab of tabs) {
-            if (tab?.request?.protocol !== 'mqtt') {
+            if (!tab?.request) {
                 hydrated.push(tab);
                 continue;
             }
-            const stored = await this.secretStore.get(this._secretScope(tab.id), 'mqttPassword');
-            if (stored !== undefined && stored !== null) {
+            const stored = await this.secretStore.getScope(this._secretScope(tab.id));
+            if (Object.keys(stored).length > 0) {
                 this._syncedSecrets.set(tab.id, stored);
             }
-            const password = stored ?? tab.request.password ?? '';
-            hydrated.push({ ...tab, request: { ...tab.request, password } });
+            const request = { ...tab.request };
+            if (MQTT_PASSWORD_KEY in stored) {
+                request.password = stored[MQTT_PASSWORD_KEY];
+            } else if (request.protocol === 'mqtt') {
+                request.password = request.password ?? '';
+            }
+            for (const [key, value] of Object.entries(stored)) {
+                if (!key.startsWith(AUTH_KEY_PREFIX)) {
+                    continue;
+                }
+                const field = key.slice(AUTH_KEY_PREFIX.length);
+                const config = request.authConfig && typeof request.authConfig === 'object' ? request.authConfig : {};
+                if (config[field] === '' || config[field] === undefined || config[field] === null) {
+                    request.authConfig = { ...config, [field]: value };
+                }
+            }
+            hydrated.push({ ...tab, request });
         }
         return hydrated;
     }
@@ -145,7 +228,7 @@ export class WorkspaceTabRepository {
             } catch {
             }
             this._tabsCache = hydrated;
-            if (this.secretStore && data.some(tab => tab?.request?.password)) {
+            if (this.secretStore && data.some(hasPlaintextSecrets)) {
                 this._queueStoreWrite(this.STORE_KEY, hydrated).catch(() => { });
             }
             return [...hydrated];

@@ -20,7 +20,10 @@ pub fn header(cookies: &[Cookie], url: &str) -> Option<String> {
         .filter(|c| domain_matches(&c.domain, &host, c.host_only))
         .filter(|c| {
             let path = c.path.as_deref().unwrap_or("/");
-            path == "/" || url.path() == path || url.path().starts_with(&format!("{path}/"))
+            path == "/"
+                || url.path() == path
+                || (path.ends_with('/') && url.path().starts_with(path))
+                || url.path().starts_with(&format!("{path}/"))
         })
         .map(|c| format!("{}={}", c.name, c.value))
         .collect();
@@ -161,6 +164,16 @@ mod tests {
         );
         assert_eq!(header(&jar, "http://example.test/api"), None);
         assert_eq!(header(&jar, "https://example.test/apix"), None);
+        let mut slash = vec![];
+        apply(
+            &mut slash,
+            &response_changes(&["s=1; Path=/api/".into()], "https://example.test/api/"),
+        );
+        assert_eq!(
+            header(&slash, "https://example.test/api/users"),
+            Some("s=1".into())
+        );
+        assert_eq!(header(&slash, "https://example.test/api"), None);
         apply(
             &mut jar,
             &response_changes(

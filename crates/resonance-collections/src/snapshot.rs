@@ -4,16 +4,10 @@
 use resonance_core::scripts::ScriptData;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    path::Path,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ipc::{self, Collection, EndpointData},
-    layout,
-    legacy::read_json_file,
+    ipc::{self, EndpointData},
     read::{FolderNode, LoadedCollection, folder_display_name},
 };
 
@@ -59,7 +53,7 @@ impl CollectionSnapshot {
             variables: Vec::new(),
             targets: endpoint_ids
                 .iter()
-                .map(|id| target(id, None, EndpointData::default(), Vec::new(), None))
+                .map(|id| target(id, None, EndpointData::default(), Vec::new()))
                 .collect(),
         }
     }
@@ -95,13 +89,11 @@ fn target(
     endpoint: Option<Value>,
     mut persisted: EndpointData,
     inherited_auth: Vec<Value>,
-    fallback: Option<&ScriptData>,
 ) -> TargetSnapshot {
     let scripts = persisted
         .scripts
         .take()
         .and_then(|value| serde_json::from_value(value).ok())
-        .or_else(|| fallback.cloned())
         .unwrap_or_else(|| ScriptData {
             pre_request_script: String::new(),
             test_script: String::new(),
@@ -120,12 +112,7 @@ fn auth(source: Value, config: Option<&Value>, default: &str) -> Value {
         .unwrap_or_else(|| json!({"type": default, "config": {}})) })
 }
 
-pub fn from_loaded(
-    id: &str,
-    loaded: &LoadedCollection,
-    ids: &[String],
-    scripts: &HashMap<String, ScriptData>,
-) -> CollectionSnapshot {
+pub fn from_loaded(id: &str, loaded: &LoadedCollection, ids: &[String]) -> CollectionSnapshot {
     let wanted: HashSet<&str> = ids.iter().map(String::as_str).collect();
     let mut found = HashMap::new();
     let collection_auth = auth(
@@ -158,13 +145,7 @@ pub fn from_loaded(
                 let (endpoint, persisted, mut parents) =
                     found.remove(endpoint_id).unwrap_or_default();
                 parents.push(collection_auth.clone());
-                target(
-                    endpoint_id,
-                    endpoint,
-                    persisted,
-                    parents,
-                    scripts.get(&format!("{id}_{endpoint_id}")),
-                )
+                target(endpoint_id, endpoint, persisted, parents)
             })
             .collect(),
     }
@@ -203,129 +184,6 @@ fn visit(
         path.push(folder_display_name(folder));
         visit(folder, wanted, parents, path, found);
         path.pop();
-        parents.pop();
-    }
-}
-
-/// The legacy path preserves metadata verbatim rather than converting through
-/// v2, which would lose legacy endpoint headers/security. Enumerate sidecars
-/// once, retaining the old exact-name-before-suffix lookup precedence.
-pub fn read_v1(
-    id: &str,
-    dir: &Path,
-    ids: &[String],
-    scripts: &HashMap<String, ScriptData>,
-) -> Result<CollectionSnapshot, String> {
-    let collection: Collection = read_json_file(&dir.join(layout::COLLECTION_JSON))?;
-    let mut found = HashMap::new();
-    legacy_folders(&collection.folders, &mut Vec::new(), &mut found);
-    for endpoint in &collection.endpoints {
-        if let Some(id) = endpoint["id"].as_str() {
-            found
-                .entry(id.into())
-                .or_insert_with(|| (Some(endpoint.clone()), EndpointData::default(), Vec::new()));
-        }
-    }
-    let requests = dir.join("requests");
-    let files = if requests.exists() {
-        fs::read_dir(&requests)
-            .map_err(|e| e.to_string())
-            .and_then(|entries| {
-                entries
-                    .map(|entry| {
-                        entry
-                            .map(|e| {
-                                let path = e.path();
-                                let is_file = path.is_file();
-                                (path, is_file)
-                            })
-                            .map_err(|e| e.to_string())
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-    } else {
-        Ok(Vec::new())
-    };
-    let collection_auth = auth(
-        json!({"kind":"collection"}),
-        collection.auth_config.as_ref(),
-        "none",
-    );
-    Ok(CollectionSnapshot {
-        collection_id: id.into(),
-        collection: Some(CollectionMetadata {
-            id: collection.id,
-            base_url: collection.base_url,
-            default_headers: collection.default_headers,
-        }),
-        variables: read_json_file(&dir.join("variables.json")).unwrap_or_default(),
-        targets: ids
-            .iter()
-            .map(|endpoint_id| {
-                let exact = format!("{endpoint_id}.json");
-                let suffix = format!("--{}.json", layout::sanitize_file_component(endpoint_id));
-                let read = match &files {
-                    Ok(files) => {
-                        let file = files
-                            .iter()
-                            .find(|(p, _)| p.file_name().and_then(|s| s.to_str()) == Some(&exact))
-                            .or_else(|| {
-                                files.iter().find(|(p, is_file)| {
-                                    *is_file
-                                        && p.file_name()
-                                            .and_then(|s| s.to_str())
-                                            .is_some_and(|s| s.ends_with(&suffix))
-                                })
-                            });
-                        file.map(|(path, _)| read_json_file::<EndpointData>(path))
-                            .transpose()
-                    }
-                    // A failed inventory is a per-request data read failure,
-                    // not a missing collection. Exact legacy paths can still
-                    // be readable when directory enumeration is denied.
-                    Err(_) => layout::find_endpoint_data_file(&requests, endpoint_id)
-                        .and_then(|file| file.map(|path| read_json_file(&path)).transpose()),
-                };
-                let fallback = read
-                    .is_ok()
-                    .then(|| scripts.get(&format!("{id}_{endpoint_id}")))
-                    .flatten();
-                let persisted = read.ok().flatten().unwrap_or_default();
-                let (endpoint, _, mut parents) = found.remove(endpoint_id).unwrap_or_default();
-                parents.push(collection_auth.clone());
-                target(endpoint_id, endpoint, persisted, parents, fallback)
-            })
-            .collect(),
-    })
-}
-
-fn legacy_folders(
-    folders: &[Value],
-    parents: &mut Vec<Value>,
-    found: &mut HashMap<String, Selected>,
-) {
-    for folder in folders {
-        parents.push(auth(
-            json!({"kind":"folder", "folderId":folder["id"]}),
-            folder.get("authConfig"),
-            "inherit",
-        ));
-        if let Some(endpoints) = folder["endpoints"].as_array() {
-            for endpoint in endpoints {
-                if let Some(id) = endpoint["id"].as_str() {
-                    found.entry(id.into()).or_insert_with(|| {
-                        (
-                            Some(endpoint.clone()),
-                            EndpointData::default(),
-                            parents.iter().rev().cloned().collect(),
-                        )
-                    });
-                }
-            }
-        }
-        if let Some(children) = folder["folders"].as_array() {
-            legacy_folders(children, parents, found);
-        }
         parents.pop();
     }
 }

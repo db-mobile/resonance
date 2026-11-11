@@ -128,9 +128,7 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
                 ""
             }
         );
-        if let Some(auth) = self.refreshed.get(&key) {
-            return auth.clone();
-        }
+        let raw = self.refreshed.get(&key).cloned().unwrap_or(raw);
         let resolved = processor.value(&raw, vars);
         let config = &resolved["config"];
         if resolved["type"] != "oauth2"

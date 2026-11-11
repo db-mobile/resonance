@@ -572,12 +572,6 @@
     "in_collection": "dans {{name}}",
     "no_collection": "Ajoutez d’abord une requête pour que le runner appartienne à une collection",
     "data_file_not_portable": "Hors du dossier de la collection : ce chemin ne fonctionne que sur cette machine",
-    "migration_moved_one": "{{count}} runner enregistré déplacé dans le dossier de sa collection",
-    "migration_moved_other": "{{count}} runners enregistrés déplacés dans les dossiers de leurs collections",
-    "migration_dropped_one": "{{count}} runner a perdu des requêtes d’autres collections : {{names}}",
-    "migration_dropped_other": "{{count}} runners ont perdu des requêtes d’autres collections : {{names}}",
-    "migration_skipped_one": "{{count}} runner enregistré n’a aucune requête et n’a pas été déplacé",
-    "migration_skipped_other": "{{count}} runners enregistrés n’ont aucune requête et n’ont pas été déplacés",
     "tags": "Tags",
     "tags_include": "Inclure des tags",
     "tags_exclude": "Exclure des tags",
@@ -651,13 +645,6 @@
   "body_editor": {
     "format": "Formater",
     "format_title": "Formater le JSON (Maj+Alt+F)"
-  },
-  "data_migration": {
-    "title": "Conversion des données",
-    "failed": "La conversion de vos données au format actuel a échoué à l’étape « {{step}} » : {{message}}. Rien n’a été supprimé et la conversion sera relancée au prochain démarrage de Resonance.",
-    "too_old": "Vos données ont été enregistrées par une version de Resonance que cette version ne peut plus convertir ; elles n’ont pas été modifiées. Installez Resonance {{release}}, lancez-le une fois, puis mettez à jour de nouveau.",
-    "global_store_collections": "Vos paramètres contiennent encore des collections enregistrées par une version de Resonance antérieure à mars 2026. Cette version ne peut plus les convertir ; elles n’ont pas été modifiées. Installez Resonance {{release}}, lancez-le une fois, puis mettez à jour de nouveau.",
-    "unknown": "Vos données n’ont pas pu être entièrement converties au format actuel."
   },
   "environment_manager": {
     "create_default_name": "Nouvel environnement",

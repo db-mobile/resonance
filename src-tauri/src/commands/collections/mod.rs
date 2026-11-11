@@ -10,22 +10,17 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
-use legacy::{list_collection_endpoints, read_json_file};
-use resonance_collections::fs_secure::{restrict_dir, restrict_file};
+use resonance_collections::fs_secure::restrict_dir;
 pub use resonance_collections::ipc::{Collection, EndpointData};
 use resonance_collections::model::ExampleDoc;
-use resonance_collections::{
-    cache, git, ipc, layout, legacy, link, model, read, runners, secrets, write,
-};
+use resonance_collections::{cache, git, ipc, layout, link, model, read, runners, secrets, write};
 
 use cache::{CollectionCache, read_collection_dir_cached};
 
 use ipc::to_ipc_collection;
-use read::Layout;
+use read::is_collection_dir;
 
-pub(crate) use layout::{desired_endpoint_file_name, find_endpoint_data_file};
 use layout::{find_available_dir, slugify};
-pub(crate) use resonance_collections::startup::{absorb_store_scripts, convert_v1_dir};
 use secrets::redact_auth_secrets;
 
 /// The process-wide parsed-collection cache.
@@ -42,7 +37,7 @@ fn collection_cache() -> &'static CollectionCache {
 
 use super::store_files::MAIN_STORE as STORE_FILE;
 pub(crate) const COLLECTIONS_DIR: &str = "collections";
-const COLLECTION_INDEX_KEY: &str = "collectionIndex";
+pub(crate) const COLLECTION_INDEX_KEY: &str = "collectionIndex";
 const LAST_COLLECTION_DIR_KEY: &str = "lastCollectionDirectory";
 
 fn get_default_collections_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -62,8 +57,7 @@ pub(crate) fn ensure_default_collections_dir(app: &AppHandle) -> Result<PathBuf,
     Ok(dir)
 }
 
-/// The on-disk layout of one collection, resolved once so the filenames live in
-/// a single place rather than being re-joined at every call site.
+/// One registered collection's directory.
 pub(crate) struct CollectionPaths {
     pub dir: PathBuf,
 }
@@ -75,40 +69,6 @@ impl CollectionPaths {
         let dir = resolve_collection_dir(app, collection_id)?
             .ok_or_else(|| format!("Collection {} not found", collection_id))?;
         Ok(Self { dir })
-    }
-
-    pub(crate) fn from_dir(dir: PathBuf) -> Self {
-        Self { dir }
-    }
-
-    fn of(dir: &Path) -> Self {
-        Self::from_dir(dir.to_path_buf())
-    }
-
-    pub(crate) fn collection_json(&self) -> PathBuf {
-        self.dir.join("collection.json")
-    }
-
-    pub(crate) fn requests(&self) -> PathBuf {
-        self.dir.join("requests")
-    }
-
-    pub(crate) fn variables_json(&self) -> PathBuf {
-        self.dir.join("variables.json")
-    }
-
-    /// Create the requests directory if it is missing, and restrict it either
-    /// way. Restricting unconditionally is deliberate: a directory that already
-    /// exists may predate the hardening, or have been created by an older
-    /// version under a looser umask.
-    pub(crate) fn ensure_requests(&self) -> Result<PathBuf, String> {
-        let requests = self.requests();
-        if !requests.exists() {
-            fs::create_dir_all(&requests)
-                .map_err(|e| format!("Failed to create requests dir: {}", e))?;
-        }
-        restrict_dir(&requests);
-        Ok(requests)
     }
 }
 
@@ -182,48 +142,20 @@ fn save_last_collection_directory(app: &AppHandle, dir: &Path) {
     }
 }
 
-pub(crate) fn write_json_file<T: Serialize>(path: &PathBuf, data: &T) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(data)
-        .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
-    fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
-    restrict_file(path);
-    Ok(())
-}
-
-fn is_collection_dir(path: &Path) -> bool {
-    Layout::detect(path).is_some()
-}
-
-/// Reads a collection directory in whichever layout it uses.
-///
-/// A v2 tree is projected back into the shape the frontend expects, so reading
-/// the new format is invisible to the renderer.
+/// Reads a collection directory, projected back into the shape the frontend
+/// expects.
 fn read_collection_from_dir(path: &Path) -> Result<Collection, String> {
-    let mut collection = match Layout::detect(path) {
-        Some(Layout::V2) => {
-            let loaded = read_collection_dir_cached(collection_cache(), path)?;
-            to_ipc_collection(&loaded, &path.to_string_lossy(), false)
-        }
-        Some(Layout::V1) => {
-            let mut collection: Collection =
-                read_json_file(&CollectionPaths::of(path).collection_json())?;
-            collection.storage_path = Some(path.to_string_lossy().to_string());
-            collection
-        }
-        None => return Err(format!("{} is not a collection directory", path.display())),
-    };
+    if !is_collection_dir(path) {
+        return Err(format!("{} is not a collection directory", path.display()));
+    }
+    let loaded = read_collection_dir_cached(collection_cache(), path)?;
+    let mut collection = to_ipc_collection(&loaded, &path.to_string_lossy(), false);
 
     // Every read of a collection off disk funnels through here, and the branch
     // is as much a fn(&Path) as the rest of the read, so one call covers list,
     // get, and open alike.
     collection.git_branch = git::branch_for_dir(path);
     Ok(collection)
-}
-
-fn find_endpoint_name_in_collection(collection: &Collection, endpoint_id: &str) -> Option<String> {
-    list_collection_endpoints(collection)
-        .into_iter()
-        .find_map(|(id, name)| if id == endpoint_id { Some(name) } else { None })
 }
 
 pub(crate) fn resolve_collection_dir(
@@ -438,23 +370,18 @@ fn folder_request_ids(folder: &read::FolderNode, out: &mut Vec<String>) {
     }
 }
 
-/// Loads whatever is already stored for a collection, in either layout.
-///
-/// A v1 directory is converted on the way in, so a save always merges onto the
-/// v2 model regardless of what is on disk.
+/// Loads whatever is already stored for a collection.
 ///
 /// @param dir - The collection directory
 /// @returns The stored collection, or None for a directory with nothing in it
 fn load_existing(dir: &Path) -> Result<Option<read::LoadedCollection>, String> {
-    match Layout::detect(dir) {
-        Some(Layout::V2) => Ok(Some(read_collection_dir_cached(collection_cache(), dir)?)),
-        Some(Layout::V1) => Ok(Some(legacy::load_v1_dir(dir)?)),
-        None => Ok(None),
+    if !is_collection_dir(dir) {
+        return Ok(None);
     }
+    Ok(Some(read_collection_dir_cached(collection_cache(), dir)?))
 }
 
-/// Writes a collection as a v2 tree, converting it first when the directory
-/// still holds v1 files.
+/// Writes a collection as a v2 tree.
 ///
 /// The per-request state already on disk is carried over: `collection_save`
 /// only ever carries structure, so a folder rename must not blank the bodies
@@ -468,8 +395,7 @@ fn write_v2_collection(dir: &Path, incoming: &Collection) -> Result<(), String> 
 /// not carried by the IPC collection.
 ///
 /// Import needs this: it produces a whole collection plus its variables and
-/// per-endpoint payloads in one go, and writing those as separate v1 files
-/// beside a v2 tree would leave artifacts the next save deletes.
+/// per-endpoint payloads in one go.
 ///
 /// @param dir - The collection directory
 /// @param incoming - The collection structure
@@ -749,43 +675,18 @@ pub(crate) fn load_for_export(
 
     let collection = read_collection_from_dir(&dir)?;
 
-    match Layout::detect(&dir) {
-        Some(Layout::V2) => {
-            let loaded = read_collection_dir_cached(collection_cache(), &dir)?;
-            let data = loaded
-                .requests()
-                .into_iter()
-                .map(|entry| {
-                    (
-                        entry.doc.id.clone(),
-                        ipc::request_to_endpoint_data(&entry.doc),
-                    )
-                })
-                .collect();
-            Ok((collection, loaded.variables, data))
-        }
-        _ => {
-            let paths = CollectionPaths::of(&dir);
-
-            let variables = if paths.variables_json().exists() {
-                read_json_file(&paths.variables_json()).unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-
-            let requests_dir = paths.requests();
-            let mut data = HashMap::new();
-            for (endpoint_id, _) in list_collection_endpoints(&collection) {
-                if let Some(file) = find_endpoint_data_file(&requests_dir, &endpoint_id)?
-                    && let Ok(endpoint_data) = read_json_file::<EndpointData>(&file)
-                {
-                    data.insert(endpoint_id, endpoint_data);
-                }
-            }
-
-            Ok((collection, variables, data))
-        }
-    }
+    let loaded = read_collection_dir_cached(collection_cache(), &dir)?;
+    let data = loaded
+        .requests()
+        .into_iter()
+        .map(|entry| {
+            (
+                entry.doc.id.clone(),
+                ipc::request_to_endpoint_data(&entry.doc),
+            )
+        })
+        .collect();
+    Ok((collection, loaded.variables, data))
 }
 
 /// One collection that could not be opened, and why.
@@ -1295,7 +1196,6 @@ pub async fn collection_delete(app: AppHandle, collection_id: String) -> Result<
     }
 
     unregister_collection_path(&app, &collection_id)?;
-    super::scripts::purge_store_scripts_for_collection(&app, &collection_id);
     Ok(())
 }
 
@@ -1307,20 +1207,10 @@ pub async fn collection_get_endpoint_data(
 ) -> Result<EndpointData, String> {
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
-    if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        return Ok(ipc::find_request(&loaded, &endpoint_id)
-            .map(ipc::request_to_endpoint_data)
-            .unwrap_or_default());
-    }
-
-    let requests_dir = paths.requests();
-
-    let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? else {
-        return Ok(EndpointData::default());
-    };
-
-    read_json_file(&endpoint_file)
+    let loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    Ok(ipc::find_request(&loaded, &endpoint_id)
+        .map(ipc::request_to_endpoint_data)
+        .unwrap_or_default())
 }
 
 #[tauri::command]
@@ -1336,31 +1226,9 @@ pub async fn collection_save_endpoint_data(
     }
 
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
-    if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        save_endpoint_data_v2(&paths.dir, &mut loaded, &endpoint_id, &data)?;
-        collection_cache().refresh(&paths.dir, &loaded);
-        return Ok(());
-    }
-
-    let collection = read_collection_from_dir(&paths.dir)?;
-    let requests_dir = paths.ensure_requests()?;
-
-    let endpoint_name = find_endpoint_name_in_collection(&collection, &endpoint_id)
-        .unwrap_or_else(|| endpoint_id.clone());
-    let desired_file = requests_dir.join(desired_endpoint_file_name(&endpoint_name, &endpoint_id));
-
-    if let Some(current_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-        if current_file != desired_file && !desired_file.exists() {
-            fs::rename(&current_file, &desired_file)
-                .map_err(|e| format!("Failed to rename endpoint data file: {}", e))?;
-        } else if current_file != desired_file && desired_file.exists() {
-            fs::remove_file(&current_file)
-                .map_err(|e| format!("Failed to remove old endpoint data file: {}", e))?;
-        }
-    }
-
-    write_json_file(&desired_file, &data)?;
+    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    save_endpoint_data_v2(&paths.dir, &mut loaded, &endpoint_id, &data)?;
+    collection_cache().refresh(&paths.dir, &loaded);
     Ok(())
 }
 
@@ -1388,9 +1256,6 @@ pub async fn collection_save_examples(
 ) -> Result<(), String> {
     validate_examples(&examples)?;
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
-    if Layout::detect(&paths.dir) != Some(Layout::V2) {
-        return Err("Saving examples requires the current collection format".into());
-    }
     let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
     save_examples_v2(&paths.dir, &mut loaded, &endpoint_id, examples)?;
     collection_cache().refresh(&paths.dir, &loaded);
@@ -1405,32 +1270,20 @@ pub async fn collection_delete_endpoint_data(
 ) -> Result<(), String> {
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
-    if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        let request_file = loaded
-            .requests()
-            .into_iter()
-            .find(|entry| entry.doc.id == endpoint_id)
-            .and_then(|entry| entry.source.clone());
+    let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
+    let request_file = loaded
+        .requests()
+        .into_iter()
+        .find(|entry| entry.doc.id == endpoint_id)
+        .and_then(|entry| entry.source.clone());
 
-        if remove_request_from_tree(&mut loaded.root, &endpoint_id) {
-            write::write_collection_dir(&paths.dir, &mut loaded)?;
-            if let Some(file) = request_file {
-                let _ = fs::remove_file(file);
-            }
-            // After the removal, so the fingerprint matches what is now on disk.
-            collection_cache().refresh(&paths.dir, &loaded);
+    if remove_request_from_tree(&mut loaded.root, &endpoint_id) {
+        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        if let Some(file) = request_file {
+            let _ = fs::remove_file(file);
         }
-        return Ok(());
+        collection_cache().refresh(&paths.dir, &loaded);
     }
-
-    let requests_dir = paths.requests();
-
-    if let Some(endpoint_file) = find_endpoint_data_file(&requests_dir, &endpoint_id)? {
-        fs::remove_file(&endpoint_file)
-            .map_err(|e| format!("Failed to delete endpoint data: {}", e))?;
-    }
-
     Ok(())
 }
 
@@ -1444,13 +1297,6 @@ pub async fn collection_delete_folder(
     folder_id: String,
 ) -> Result<Vec<String>, String> {
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
-    if Layout::detect(&paths.dir) != Some(Layout::V2) {
-        return Err(
-            "This collection is still in the legacy format. Make any change to it first so it is converted, then delete the folder again."
-                .to_string(),
-        );
-    }
-
     let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
     let folder = take_folder_from_tree(&mut loaded.root, &folder_id)
         .ok_or_else(|| format!("Folder {} not found in collection", folder_id))?;
@@ -1471,17 +1317,7 @@ pub async fn collection_get_variables(
 ) -> Result<Vec<Value>, String> {
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
 
-    if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        return Ok(read_collection_dir_cached(collection_cache(), &paths.dir)?.variables);
-    }
-
-    let variables_file = paths.variables_json();
-
-    if !variables_file.exists() {
-        return Ok(vec![]);
-    }
-
-    read_json_file(&variables_file)
+    Ok(read_collection_dir_cached(collection_cache(), &paths.dir)?.variables)
 }
 
 #[tauri::command]
@@ -1502,29 +1338,32 @@ pub async fn collection_save_variables(
         }
     }
 
-    if Layout::detect(&paths.dir) == Some(Layout::V2) {
-        let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-        loaded.variables = variables;
-        write::write_collection_dir(&paths.dir, &mut loaded)?;
-        collection_cache().refresh(&paths.dir, &loaded);
-        return Ok(());
-    }
-
-    write_json_file(&paths.variables_json(), &variables)?;
-
-    Ok(())
+    save_variables_in(&paths.dir, variables)
 }
 
-const LEGACY_RUNNER_LAYOUT: &str = "This collection is still in the legacy format. Make any change to it first so it is converted, then save the runner again.";
+/// Replaces a collection's variables on disk. The directory writer skips an
+/// empty list, so clearing the last variable removes the file here; otherwise
+/// the old values would come back on the next uncached read.
+fn save_variables_in(dir: &Path, variables: Vec<Value>) -> Result<(), String> {
+    let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
+    loaded.variables = variables;
+    write::write_collection_dir(dir, &mut loaded)?;
+    if loaded.variables.is_empty() {
+        let file = dir.join(layout::VARIABLES_YAML);
+        if file.exists() {
+            fs::remove_file(&file)
+                .map_err(|e| format!("Failed to remove {}: {}", file.display(), e))?;
+        }
+    }
+    collection_cache().refresh(dir, &loaded);
+    Ok(())
+}
 
 /// Lists a collection's runners, persisting any id the reader had to re-mint.
 ///
 /// Without the write-back a merge-duplicated id would get a different fresh id
 /// on every read, and nothing stored against it could ever resolve.
 fn list_runners_at(dir: &Path) -> Result<Vec<model::RunnerDoc>, String> {
-    if Layout::detect(dir) != Some(Layout::V2) {
-        return Ok(Vec::new());
-    }
     let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
     if !loaded.reassigned_runner_ids.is_empty() {
         let fresh: HashSet<String> = loaded
@@ -1554,9 +1393,6 @@ fn save_runner_at(
     collection_id: &str,
     runner: model::RunnerDoc,
 ) -> Result<model::RunnerDoc, String> {
-    if Layout::detect(dir) != Some(Layout::V2) {
-        return Err(LEGACY_RUNNER_LAYOUT.to_string());
-    }
     let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
     let stored = runners::upsert_runner(dir, &mut loaded.runners, runner, collection_id)?;
     collection_cache().refresh(dir, &loaded);
@@ -1564,9 +1400,6 @@ fn save_runner_at(
 }
 
 fn delete_runner_at(dir: &Path, runner_id: &str) -> Result<bool, String> {
-    if Layout::detect(dir) != Some(Layout::V2) {
-        return Err(LEGACY_RUNNER_LAYOUT.to_string());
-    }
     let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
     let removed = runners::delete_runner(dir, &mut loaded.runners, runner_id)?;
     collection_cache().refresh(dir, &loaded);
@@ -1692,7 +1525,7 @@ pub async fn collections_git_status(
         if status.changes.is_empty() {
             continue;
         }
-        let loaded = (Layout::detect(dir) == Some(Layout::V2))
+        let loaded = is_collection_dir(dir)
             .then(|| read_collection_dir_cached(collection_cache(), dir).ok())
             .flatten();
         let entry = match &loaded {
@@ -1750,47 +1583,50 @@ pub async fn collections_pick_directory(
 }
 
 #[cfg(test)]
-mod convert_on_save {
+mod saves_on_disk {
     use super::read::read_collection_dir;
     use super::*;
     use serde_json::json;
     use tempfile::TempDir;
 
-    fn v1_on_disk(dir: &Path) {
-        let collection = json!({
-            "id": "c1",
-            "name": "Petstore",
-            "baseUrl": "https://api.example.com",
-            "endpoints": [
-                {"id": "custom_1", "name": "Health", "method": "GET", "path": "/health"},
-                {"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}
+    fn seeded_on_disk(dir: &Path) {
+        let incoming = Collection {
+            id: "c1".into(),
+            name: "Petstore".into(),
+            base_url: "https://api.example.com".into(),
+            endpoints: vec![
+                json!({"id": "custom_1", "name": "Health", "method": "GET", "path": "/health"}),
+                json!({"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}),
             ],
-            "folders": [{
+            folders: vec![json!({
                 "id": "folder_pets",
                 "name": "pets",
-                "endpoints": [
-                    {"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}
-                ]
-            }],
-            "defaultHeaders": {"Accept": "application/json"}
-        });
-
-        fs::write(
-            dir.join("collection.json"),
-            serde_json::to_string_pretty(&collection).unwrap(),
-        )
-        .unwrap();
-
-        fs::write(
-            dir.join("variables.json"),
-            r#"[{"key":"baseUrl","value":"x"}]"#,
-        )
-        .unwrap();
-
-        fs::create_dir(dir.join("requests")).unwrap();
-        fs::write(
-            dir.join("requests/create-pet--custom_2.json"),
-            r#"{"modifiedBody":"{\"name\":\"Rex\"}","headers":[{"key":"Accept","value":"*/*"}],"pathParams":[],"queryParams":[]}"#,
+                "endpoints": [{"id": "custom_2", "name": "Create Pet", "method": "POST", "path": "/pets"}]
+            })],
+            default_headers: json!({"Accept": "application/json"}),
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            can_close: false,
+            git_branch: None,
+        };
+        let mut seed = HashMap::new();
+        seed.insert(
+            "custom_2".to_string(),
+            EndpointData {
+                modified_body: Some("{\"name\":\"Rex\"}".into()),
+                headers: vec![json!({"key": "Accept", "value": "*/*"})],
+                ..Default::default()
+            },
+        );
+        write_v2_collection_seeded(
+            dir,
+            &incoming,
+            Some(vec![json!({"key": "baseUrl", "value": "x"})]),
+            &seed,
+            None,
         )
         .unwrap();
     }
@@ -1799,119 +1635,13 @@ mod convert_on_save {
         read_collection_from_dir(dir).unwrap()
     }
 
-    #[test]
-    fn a_v1_directory_is_still_read_as_v1_before_any_save() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V1));
-        assert_eq!(ipc_from_disk(temp.path()).endpoints.len(), 2);
-    }
-
-    #[test]
-    fn saving_converts_the_directory_to_v2() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V2));
-        assert!(temp.path().join("collection.yaml").exists());
-        assert!(temp.path().join("health.yaml").exists());
-        assert!(temp.path().join("pets/create-pet.yaml").exists());
-    }
-
-    #[test]
-    fn the_v1_files_are_removed_once_the_v2_tree_is_complete() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        assert!(!temp.path().join("collection.json").exists());
-        assert!(!temp.path().join("variables.json").exists());
-        assert!(!temp.path().join("requests").exists());
-    }
-
-    #[test]
-    fn conversion_carries_the_per_request_state_across() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        let loaded = read_collection_dir(temp.path()).unwrap();
-        let created = ipc::find_request(&loaded, "custom_2").unwrap();
-        let data = ipc::request_to_endpoint_data(created);
-
-        assert_eq!(data.modified_body.as_deref(), Some("{\"name\":\"Rex\"}"));
-        assert_eq!(data.headers.len(), 1);
-    }
-
-    #[test]
-    fn conversion_carries_the_variables_across() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        let loaded = read_collection_dir(temp.path()).unwrap();
-        assert_eq!(loaded.variables.len(), 1);
-        assert_eq!(loaded.variables[0]["key"], "baseUrl");
-    }
-
-    #[test]
-    fn conversion_preserves_endpoint_ids() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        let loaded = read_collection_dir(temp.path()).unwrap();
-        let ids: HashSet<_> = loaded
-            .requests()
-            .iter()
-            .map(|entry| entry.doc.id.clone())
-            .collect();
-
-        assert!(ids.contains("custom_1"));
-        assert!(ids.contains("custom_2"));
-    }
-
-    #[test]
-    fn the_collection_still_reads_the_same_over_ipc_after_converting() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let before = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &before).unwrap();
-        let after = ipc_from_disk(temp.path());
-
-        assert_eq!(before.id, after.id);
-        assert_eq!(before.name, after.name);
-        assert_eq!(before.endpoints.len(), after.endpoints.len());
-        assert_eq!(before.folders.len(), after.folders.len());
-        assert_eq!(
-            before.folders[0]["endpoints"].as_array().unwrap().len(),
-            after.folders[0]["endpoints"].as_array().unwrap().len()
-        );
-    }
-
     /// A name already taken by a directory must not fail the write: the
     /// writer suffixes past it rather than giving up or deleting anything.
     #[test]
     fn an_obstructed_file_name_is_routed_around() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
         fs::create_dir(temp.path().join("health.yaml")).unwrap();
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
+        seeded_on_disk(temp.path());
 
         assert!(temp.path().join("health-2.yaml").is_file());
         assert!(temp.path().join("health.yaml").is_dir());
@@ -1921,75 +1651,43 @@ mod convert_on_save {
         );
     }
 
-    /// The guarantee behind convert-on-save: until `collection.yaml` exists,
-    /// the directory still reads as a complete v1 collection. Stray v2 files
-    /// from an interrupted write are inert, so a crash mid-conversion costs
-    /// nothing.
-    ///
-    /// (A simulated write failure is not used here: the writer suffixes past
-    /// an obstructed name, and `restrict_dir` resets a directory's mode on
-    /// every write, so neither is a reachable failure.)
+    /// Import writes the tree, its variables and the per-request payloads in
+    /// one pass, so the imported scripts and GraphQL bodies land in the files.
     #[test]
-    fn a_partial_conversion_still_reads_as_a_complete_v1_collection() {
+    fn clearing_all_variables_removes_the_file() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
+        let incoming = Collection {
+            id: "c1".into(),
+            name: "Vars".into(),
+            base_url: String::new(),
+            endpoints: vec![],
+            folders: vec![],
+            default_headers: Value::Null,
+            auth_config: None,
+            open_api_spec: None,
+            storage_path: None,
+            storage_parent_path: None,
+            linked: false,
+            can_close: false,
+            git_branch: None,
+        };
+        write_v2_collection_seeded(temp.path(), &incoming, None, &HashMap::new(), None).unwrap();
 
-        // Some v2 files landed, but the marker never did.
-        fs::write(
-            temp.path().join("health.yaml"),
-            "resonanceFormat: 2\nid: custom_1\nname: Health\n",
-        )
-        .unwrap();
-        fs::create_dir(temp.path().join("pets")).unwrap();
-        fs::write(
-            temp.path().join("pets/create-pet.yaml"),
-            "resonanceFormat: 2\nid: custom_2\nname: Create Pet\n",
-        )
-        .unwrap();
+        save_variables_in(temp.path(), vec![json!({"key": "a", "value": "1"})]).unwrap();
+        assert!(temp.path().join(layout::VARIABLES_YAML).exists());
 
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V1));
-
-        let collection = ipc_from_disk(temp.path());
-        assert_eq!(collection.endpoints.len(), 2);
-        assert_eq!(collection.folders.len(), 1);
-
-        // And the v1 per-request state is still the source of truth.
-        let requests_dir = CollectionPaths::of(temp.path()).requests();
-        let file = find_endpoint_data_file(&requests_dir, "custom_2")
-            .unwrap()
-            .unwrap();
-        let data: EndpointData = read_json_file(&file).unwrap();
-        assert_eq!(data.modified_body.as_deref(), Some("{\"name\":\"Rex\"}"));
+        save_variables_in(temp.path(), vec![]).unwrap();
+        assert!(!temp.path().join(layout::VARIABLES_YAML).exists());
+        assert!(
+            read::read_collection_dir(temp.path())
+                .unwrap()
+                .variables
+                .is_empty()
+        );
     }
 
-    /// The leftovers of an interrupted conversion are cleared by the next
-    /// successful save, rather than lingering in both formats forever.
     #[test]
-    fn an_interrupted_conversion_heals_on_the_next_save() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        // Simulate a crash after some v2 files landed but before the marker.
-        fs::write(
-            temp.path().join("health.yaml"),
-            "resonanceFormat: 2\nid: custom_1\nname: Health\n",
-        )
-        .unwrap();
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V1));
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        assert_eq!(Layout::detect(temp.path()), Some(Layout::V2));
-        assert!(!temp.path().join("collection.json").exists());
-        assert!(!temp.path().join("requests").exists());
-    }
-
-    /// Import writes a v2 tree directly. Writing its variables and per-request
-    /// payloads as v1 files beside it would leave artifacts the next save
-    /// deletes, taking the imported scripts and GraphQL bodies with them.
-    #[test]
-    fn a_seeded_write_leaves_no_v1_artifacts() {
+    fn a_seeded_write_stores_variables_and_request_state() {
         let temp = TempDir::new().unwrap();
 
         let incoming = Collection {
@@ -2029,8 +1727,6 @@ mod convert_on_save {
         )
         .unwrap();
 
-        assert!(!temp.path().join("variables.json").exists());
-        assert!(!temp.path().join("requests").exists());
         assert!(temp.path().join("variables.yaml").exists());
 
         let loaded = read_collection_dir(temp.path()).unwrap();
@@ -2043,35 +1739,10 @@ mod convert_on_save {
         assert_eq!(data.graphql_data.unwrap()["query"], "{ me }");
     }
 
-    /// Export must read the same content whichever layout the collection uses.
-    #[test]
-    fn export_sees_the_same_content_before_and_after_conversion() {
-        let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let requests_dir = CollectionPaths::of(temp.path()).requests();
-        let before_file = find_endpoint_data_file(&requests_dir, "custom_2")
-            .unwrap()
-            .unwrap();
-        let before: EndpointData = read_json_file(&before_file).unwrap();
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
-
-        let loaded = read_collection_dir(temp.path()).unwrap();
-        let after = ipc::request_to_endpoint_data(ipc::find_request(&loaded, "custom_2").unwrap());
-
-        assert_eq!(before.modified_body, after.modified_body);
-        assert_eq!(before.headers, after.headers);
-    }
-
     #[test]
     fn a_second_save_is_a_no_op_on_disk() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
+        seeded_on_disk(temp.path());
         let first = fs::read_to_string(temp.path().join("health.yaml")).unwrap();
 
         let reread = ipc_from_disk(temp.path());
@@ -2082,12 +1753,9 @@ mod convert_on_save {
     }
 
     #[test]
-    fn renaming_a_request_after_conversion_moves_only_that_file() {
+    fn renaming_a_request_moves_only_that_file() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-
-        let incoming = ipc_from_disk(temp.path());
-        write_v2_collection(temp.path(), &incoming).unwrap();
+        seeded_on_disk(temp.path());
 
         let created_before = fs::read_to_string(temp.path().join("pets/create-pet.yaml")).unwrap();
 
@@ -2110,8 +1778,7 @@ mod convert_on_save {
     #[test]
     fn saving_endpoint_data_rewrites_only_that_request() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        seeded_on_disk(temp.path());
 
         let mut loaded = read_collection_dir(temp.path()).unwrap();
         let unrelated = temp.path().join("pets/create-pet.yaml");
@@ -2154,8 +1821,7 @@ mod convert_on_save {
     #[test]
     fn examples_round_trip_through_the_request_file() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        seeded_on_disk(temp.path());
         let mut loaded = read_collection_dir(temp.path()).unwrap();
 
         save_examples_v2(
@@ -2177,8 +1843,7 @@ mod convert_on_save {
     #[test]
     fn saving_examples_rewrites_only_that_request_file() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        seeded_on_disk(temp.path());
         let mut loaded = read_collection_dir(temp.path()).unwrap();
         let unrelated = temp.path().join("pets/create-pet.yaml");
         let marked = format!("{}# marker\n", fs::read_to_string(&unrelated).unwrap());
@@ -2270,8 +1935,7 @@ mod convert_on_save {
     #[test]
     fn saving_endpoint_data_for_an_unknown_request_is_an_error() {
         let temp = TempDir::new().unwrap();
-        v1_on_disk(temp.path());
-        write_v2_collection(temp.path(), &ipc_from_disk(temp.path())).unwrap();
+        seeded_on_disk(temp.path());
 
         let mut loaded = read_collection_dir(temp.path()).unwrap();
         let result = save_endpoint_data_v2(
@@ -2329,11 +1993,11 @@ mod load_errors {
     use super::*;
     use tempfile::TempDir;
 
-    fn v1_collection(dir: &Path, id: &str) {
+    fn collection_on_disk(dir: &Path, id: &str) {
         fs::create_dir_all(dir).unwrap();
         fs::write(
-            dir.join("collection.json"),
-            format!(r#"{{"id":"{id}","name":"{id}","endpoints":[],"folders":[]}}"#),
+            dir.join("collection.yaml"),
+            format!("resonanceFormat: 2\nid: {id}\nname: {id}\n"),
         )
         .unwrap();
     }
@@ -2342,7 +2006,7 @@ mod load_errors {
     fn an_import_in_a_custom_folder_can_be_closed_without_a_linked_record() {
         let root = TempDir::new().unwrap();
         let managed = root.path().join("managed");
-        v1_collection(&managed.join("default"), "default");
+        collection_on_disk(&managed.join("default"), "default");
         let imported = root.path().join("custom");
         fs::create_dir(&imported).unwrap();
         let metadata = imported.join("collection.yaml");
@@ -2380,12 +2044,12 @@ mod load_errors {
     #[test]
     fn unreadable_and_duplicate_collections_are_reported_without_hiding_others() {
         let root = TempDir::new().unwrap();
-        v1_collection(&root.path().join("a"), "col-a");
-        v1_collection(&root.path().join("a-copy"), "col-a");
-        v1_collection(&root.path().join("b"), "col-b");
+        collection_on_disk(&root.path().join("a"), "col-a");
+        collection_on_disk(&root.path().join("a-copy"), "col-a");
+        collection_on_disk(&root.path().join("b"), "col-b");
         let broken = root.path().join("broken");
         fs::create_dir_all(&broken).unwrap();
-        fs::write(broken.join("collection.json"), "{ not json").unwrap();
+        fs::write(broken.join("collection.yaml"), "{ not yaml").unwrap();
 
         let mut index = HashMap::new();
         let scan = scan_collections(root.path(), &mut index);
@@ -2410,14 +2074,14 @@ mod load_errors {
         fs::create_dir_all(&managed).unwrap();
         let broken_managed = managed.join("broken");
         fs::create_dir_all(&broken_managed).unwrap();
-        fs::write(broken_managed.join("collection.json"), "{ nope").unwrap();
+        fs::write(broken_managed.join("collection.yaml"), "{ nope").unwrap();
 
         let elsewhere = TempDir::new().unwrap();
         let empty_linked = elsewhere.path().join("empty");
         fs::create_dir_all(&empty_linked).unwrap();
         let broken_linked = elsewhere.path().join("broken");
         fs::create_dir_all(&broken_linked).unwrap();
-        fs::write(broken_linked.join("collection.json"), "{ nope").unwrap();
+        fs::write(broken_linked.join("collection.yaml"), "{ nope").unwrap();
 
         let mut index = HashMap::from([
             (
@@ -2470,8 +2134,8 @@ mod load_errors {
     #[test]
     fn a_moved_collection_is_found_from_its_parent_folder_by_id() {
         let root = TempDir::new().unwrap();
-        v1_collection(&root.path().join("other"), "col-other");
-        v1_collection(&root.path().join("moved"), "col-a");
+        collection_on_disk(&root.path().join("other"), "col-other");
+        collection_on_disk(&root.path().join("moved"), "col-a");
 
         let (dir, collection) = find_collection_dir(root.path(), "col-a").unwrap();
         assert!(dir.ends_with("moved"));
@@ -2484,7 +2148,7 @@ mod load_errors {
     #[test]
     fn a_folder_holding_a_different_collection_is_rejected() {
         let root = TempDir::new().unwrap();
-        v1_collection(&root.path().join("other"), "col-other");
+        collection_on_disk(&root.path().join("other"), "col-other");
 
         let error = find_collection_dir(&root.path().join("other"), "col-a").unwrap_err();
         assert!(error.contains("col-other"), "{error}");
@@ -2653,26 +2317,6 @@ mod runner_commands {
             "{}",
             on_disk
         );
-    }
-
-    #[test]
-    fn saving_a_runner_into_a_legacy_collection_is_refused() {
-        let temp = TempDir::new().unwrap();
-        fs::write(
-            temp.path().join("collection.json"),
-            "{\"id\":\"c1\",\"name\":\"P\"}",
-        )
-        .unwrap();
-
-        let error = save_runner_at(
-            temp.path(),
-            "c1",
-            model::RunnerDoc::new(String::new(), "Smoke".into()),
-        )
-        .unwrap_err();
-        assert!(error.contains("legacy format"), "{}", error);
-        assert!(list_runners_at(temp.path()).unwrap().is_empty());
-        assert!(!temp.path().join("runners").exists());
     }
 
     #[test]

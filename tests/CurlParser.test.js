@@ -68,3 +68,23 @@ describe('CurlParser data flags', () => {
         expect(parsed.body).toBe('raw=1&q=a%20b');
     });
 });
+
+describe('CurlParser basic auth', () => {
+    test('-u produces the {type, config} auth shape the app persists', () => {
+        const parsed = CurlParser.parse('curl -u alice:s3cret https://api.test');
+
+        expect(parsed.auth).toEqual({ type: 'basic', config: { username: 'alice', password: 's3cret' } });
+    });
+
+    test('a colon inside the password is kept', () => {
+        const parsed = CurlParser.parse('curl --user user:pa:ss https://api.test');
+
+        expect(parsed.auth.config).toEqual({ username: 'user', password: 'pa:ss' });
+    });
+
+    test('a user without a password gets an empty password', () => {
+        const parsed = CurlParser.parse('curl -u alice https://api.test');
+
+        expect(parsed.auth.config).toEqual({ username: 'alice', password: '' });
+    });
+});

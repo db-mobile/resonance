@@ -20,7 +20,6 @@ use commands::{
         collections_get_path, collections_git_branches, collections_git_status, collections_list,
         collections_load_errors, collections_open_existing, collections_pick_directory,
     },
-    data_migrations::{MigrationStatus, data_migration_status},
     graphql_subscription::{
         GraphqlSubscriptionState, graphql_subscription_close, graphql_subscription_send,
     },
@@ -91,7 +90,6 @@ fn main() {
         .manage(MqttState::default())
         .manage(PendingUpdate::default())
         .manage(OAuth2State::default())
-        .manage(MigrationStatus::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 use tauri::Manager;
@@ -112,8 +110,9 @@ fn main() {
 
                 // Data migrations run before anything reads the store: the
                 // webview loads theme, tabs and collections during boot.
-                let issues = commands::data_migrations::run(&dir);
-                *app.state::<MigrationStatus>().0.lock().unwrap() = issues;
+                for issue in commands::data_migrations::run(&dir) {
+                    eprintln!("data migration issue: {:?}", issue);
+                }
 
                 for file in commands::store_files::ALL_STORES {
                     commands::fs_secure::restrict_file(&dir.join(file));
@@ -126,7 +125,6 @@ fn main() {
             // App
             app_get_version,
             app_set_window_theme,
-            data_migration_status,
             // Store
             store_get,
             store_set,

@@ -128,3 +128,68 @@ describe('copying and deleting request data', () => {
         expect(await repo.secretStore.get('auth:c1:__folder__:f1', 'token')).toBeUndefined();
     });
 });
+
+const httpTab = (id, authType, authConfig) => ({
+    id,
+    name: 'HTTP',
+    request: { protocol: 'http', url: 'https://x.test', authType, authConfig },
+    response: {},
+    endpoint: null
+});
+
+describe('workspace tabs keep auth secrets out of the plaintext store', () => {
+    test('a bearer token is persisted only in the secret store and hydrates back', async () => {
+        const api = makeBackend();
+        const repo = new WorkspaceTabRepository(api, new SecretStore(api));
+
+        await repo.saveTabs([httpTab('t1', 'bearer', { token: 'tok-1' })]);
+
+        expect(api.__store['workspace-tabs'][0].request.authConfig.token).toBe('');
+        expect(api.__chain.get('tab:t1|auth.token')).toBe('tok-1');
+
+        const reloaded = new WorkspaceTabRepository(api, new SecretStore(api));
+        const tabs = await reloaded.getTabs();
+        expect(tabs[0].request.authConfig.token).toBe('tok-1');
+    });
+
+    test('only secret fields are scrubbed and template references stay in place', async () => {
+        const api = makeBackend();
+        const repo = new WorkspaceTabRepository(api, new SecretStore(api));
+
+        await repo.saveTabs([
+            httpTab('t1', 'basic', { username: 'alice', password: 'pw' }),
+            httpTab('t2', 'bearer', { token: '{{token}}' })
+        ]);
+
+        const [basic, bearer] = api.__store['workspace-tabs'];
+        expect(basic.request.authConfig).toEqual({ username: 'alice', password: '' });
+        expect(bearer.request.authConfig).toEqual({ token: '{{token}}' });
+        expect(api.__chain.has('tab:t2|auth.token')).toBe(false);
+    });
+
+    test('legacy plaintext auth secrets are migrated and scrubbed on load', async () => {
+        const api = makeBackend();
+        api.__store['workspace-tabs'] = [httpTab('t1', 'api-key', { keyName: 'X-Key', keyValue: 'k-1' })];
+        const repo = new WorkspaceTabRepository(api, new SecretStore(api));
+
+        const tabs = await repo.getTabs();
+        await repo._writeChain;
+
+        expect(tabs[0].request.authConfig.keyValue).toBe('k-1');
+        expect(api.__store['workspace-tabs'][0].request.authConfig.keyValue).toBe('');
+        expect(api.__chain.get('tab:t1|auth.keyValue')).toBe('k-1');
+    });
+
+    test('clearing a secret removes it and closing the tab removes the rest', async () => {
+        const api = makeBackend();
+        const repo = new WorkspaceTabRepository(api, new SecretStore(api));
+        await repo.saveTabs([httpTab('t1', 'oauth2', { clientSecret: 's', token: 't' })]);
+
+        await repo.saveTabs([httpTab('t1', 'oauth2', { clientSecret: '', token: 't' })]);
+        expect(api.__chain.has('tab:t1|auth.clientSecret')).toBe(false);
+        expect(api.__chain.get('tab:t1|auth.token')).toBe('t');
+
+        await repo.deleteTab('t1');
+        expect(api.__chain.has('tab:t1|auth.token')).toBe(false);
+    });
+});

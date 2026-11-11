@@ -64,7 +64,11 @@ export class EnvironmentManager extends BaseModal {
         exportAllBtn.addEventListener('click', () => this.handleExportAll());
     }
 
-    async loadEnvironments() {
+    /**
+     * @param {string|null} [preferredId]
+     * @returns {Promise<void>}
+     */
+    async loadEnvironments(preferredId = null) {
         try {
             const environments = await this.service.getAllEnvironments();
             const activeEnvId = await this.service.getActiveEnvironmentId();
@@ -77,7 +81,8 @@ export class EnvironmentManager extends BaseModal {
                 listContainer.appendChild(item);
             });
 
-            const envToSelect = activeEnvId || environments[0]?.id;
+            const keepPreferred = preferredId && environments.some(env => env.id === preferredId);
+            const envToSelect = keepPreferred ? preferredId : (activeEnvId || environments[0]?.id);
             if (envToSelect) {
                 await this.selectEnvironment(envToSelect);
             }
@@ -218,7 +223,7 @@ export class EnvironmentManager extends BaseModal {
             if (newName && newName !== environment.name) {
                 try {
                     await this.service.updateEnvironment(environment.id, { name: newName });
-                    await this.loadEnvironments();
+                    await this.loadEnvironments(environment.id);
                 } catch (error) {
                     toast.error(error.message);
                     nameInput.value = environment.name;
@@ -246,8 +251,7 @@ export class EnvironmentManager extends BaseModal {
                 if (colorInput) {
                     colorInput.dataset.savedColor = color || '';
                 }
-                await this.loadEnvironments();
-                await this.loadEnvironmentDetails(environment.id);
+                await this.loadEnvironments(environment.id);
             } catch (error) {
                 toast.error(error.message);
                 this._renderColorState(environment.color);

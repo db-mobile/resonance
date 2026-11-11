@@ -813,9 +813,15 @@ export class WorkspaceTabController {
             return;
         }
         try {
+            if (tab.id !== await this.service.getActiveTabId()) {
+                await this.switchTab(tab.id);
+                if (tab.id !== await this.service.getActiveTabId()) {
+                    return;
+                }
+                tab = (await this.getActiveTab()) || tab;
+            }
             const bound = tab.endpoint?.collectionId && tab.endpoint?.endpointId ? tab.endpoint : null;
-            const activeTabId = await this.service.getActiveTabId();
-            const endpoint = bound || (tab.id === activeTabId ? getCurrentEndpoint() : null);
+            const endpoint = bound || getCurrentEndpoint();
 
             if (endpoint) {
                 await this.collectionRequests.saveAllRequestModifications(endpoint.collectionId, endpoint.endpointId);

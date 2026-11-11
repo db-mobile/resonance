@@ -13,17 +13,13 @@ export const runnerFeature = {
     create(ctx) {
         const repository = RunnerRepository.shared(ctx.backendAPI);
         const historyRepository = RunnerHistoryRepository.shared(ctx.backendAPI);
-        const bookkeeping = new RunnerBookkeeping({ backendAPI: ctx.backendAPI, repository, historyRepository });
+        const bookkeeping = new RunnerBookkeeping({ repository, historyRepository });
         return { repository, historyRepository, bookkeeping };
     },
     globals: { runnerBookkeeping: 'bookkeeping' },
-    init({ repository, bookkeeping }, ctx) {
+    init({ repository }, ctx) {
         const collectionController = ctx.get('collectionController');
-        const collectionRepository = ctx.get('collectionRepository');
-        collectionController?.onCollectionsLoaded((collections) => {
-            repository.invalidate();
-            bookkeeping.runMigrationPass(collections, collectionRepository);
-        });
+        collectionController?.onCollectionsLoaded(() => repository.invalidate());
         window.addEventListener('focus', () => repository.invalidate());
     }
 };

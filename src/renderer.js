@@ -52,7 +52,6 @@ import { keyboardShortcuts } from './modules/keyboardShortcuts.js';
 import { loadEditor, warmEditors } from './modules/editorLoader.js';
 import { UrlAutocomplete } from './modules/ui/UrlAutocomplete.js';
 import { toast } from './modules/ui/Toast.js';
-import { showDataMigrationIssues } from './modules/ui/MigrationNoticeDialog.js';
 
 const statusDisplayAdapter = new StatusDisplayAdapter(updateStatusDisplay);
 
@@ -623,12 +622,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initMqttHandler();
 
         await initGrpcStreamHandler();
-
-        try {
-            await showDataMigrationIssues();
-        } catch (error) {
-            toast.error(`Migration check failed: ${error.message}`);
-        }
     }, 2000);
 
     scheduleIdleTask(() => {

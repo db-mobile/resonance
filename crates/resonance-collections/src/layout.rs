@@ -1,6 +1,5 @@
 //! Naming rules for the files and directories a collection occupies.
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 /// File names reserved inside a collection directory. A request whose name
@@ -9,10 +8,6 @@ pub const COLLECTION_YAML: &str = "collection.yaml";
 pub const VARIABLES_YAML: &str = "variables.yaml";
 pub const OPENAPI_YAML: &str = "openapi.yaml";
 pub const FOLDER_YAML: &str = "_folder.yaml";
-
-/// The v1 marker, kept so a directory written by an older build is still
-/// recognised and can be converted.
-pub const COLLECTION_JSON: &str = "collection.json";
 
 const RESERVED_STEMS: &[&str] = &["collection", "variables", "openapi"];
 
@@ -139,25 +134,6 @@ pub fn slugify(input: &str) -> String {
     }
 }
 
-pub fn sanitize_file_component(input: &str) -> String {
-    let mut out = String::new();
-    for c in input.chars() {
-        let ch = c.to_ascii_lowercase();
-        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-            out.push(ch);
-        } else if !out.ends_with('-') && !out.is_empty() {
-            out.push('-');
-        }
-    }
-
-    let out = out.trim_matches('-').to_string();
-    if out.is_empty() {
-        "item".to_string()
-    } else {
-        out
-    }
-}
-
 pub fn find_available_dir(parent: &Path, base_name: &str, current_dir: Option<&Path>) -> PathBuf {
     let mut candidate = parent.join(base_name);
     if current_dir == Some(candidate.as_path()) || !candidate.exists() {
@@ -206,50 +182,10 @@ pub fn find_available_folder_dir(
     }
 }
 
-pub fn desired_endpoint_file_name(endpoint_name: &str, endpoint_id: &str) -> String {
-    format!(
-        "{}--{}.json",
-        slugify(endpoint_name),
-        sanitize_file_component(endpoint_id)
-    )
-}
-
-pub fn find_endpoint_data_file(
-    requests_dir: &Path,
-    endpoint_id: &str,
-) -> Result<Option<PathBuf>, String> {
-    let legacy_file = requests_dir.join(format!("{}.json", endpoint_id));
-    if legacy_file.exists() {
-        return Ok(Some(legacy_file));
-    }
-
-    if !requests_dir.exists() {
-        return Ok(None);
-    }
-
-    let suffix = format!("--{}.json", sanitize_file_component(endpoint_id));
-    let entries =
-        fs::read_dir(requests_dir).map_err(|e| format!("Failed to read requests dir: {}", e))?;
-
-    for entry in entries {
-        let path = entry
-            .map_err(|e| format!("Failed to read dir entry: {}", e))?
-            .path();
-
-        if path.is_file()
-            && let Some(name) = path.file_name().and_then(|value| value.to_str())
-            && name.ends_with(&suffix)
-        {
-            return Ok(Some(path));
-        }
-    }
-
-    Ok(None)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use tempfile::TempDir;
 
     #[test]
@@ -278,40 +214,6 @@ mod tests {
     fn non_ascii_characters_are_dropped() {
         assert_eq!(slugify("Ünïcödé"), "n-c-d");
         assert_eq!(slugify("日本語"), "collection");
-    }
-
-    #[test]
-    fn sanitize_keeps_dashes_and_underscores() {
-        assert_eq!(sanitize_file_component("custom_3"), "custom_3");
-        assert_eq!(sanitize_file_component("req-abc"), "req-abc");
-    }
-
-    #[test]
-    fn sanitize_falls_back_for_symbol_only_input() {
-        assert_eq!(sanitize_file_component("///"), "item");
-        assert_eq!(sanitize_file_component(""), "item");
-    }
-
-    /// Defect: distinct endpoint ids sanitize to the same file component, so
-    /// find_endpoint_data_file's suffix scan can hand one endpoint another's
-    /// data file. Pinned here as a characterization of today's behaviour; the
-    /// v2 layout drops ids from filenames entirely, which removes the hazard.
-    #[test]
-    fn distinct_ids_can_collide_after_sanitizing() {
-        let collided: Vec<String> = ["a.b", "a b", "a-b", "A-B"]
-            .iter()
-            .map(|id| sanitize_file_component(id))
-            .collect();
-
-        assert_eq!(collided, vec!["a-b", "a-b", "a-b", "a-b"]);
-    }
-
-    #[test]
-    fn endpoint_file_name_joins_the_slug_and_the_id() {
-        assert_eq!(
-            desired_endpoint_file_name("List Users", "custom_3"),
-            "list-users--custom_3.json"
-        );
     }
 
     #[test]
@@ -406,68 +308,6 @@ mod tests {
 
         assert_eq!(chosen, temp.path().join("collection-2.yaml"));
         assert_ne!(chosen, temp.path().join("collection.yaml"));
-    }
-
-    #[test]
-    fn finds_a_data_file_by_its_id_suffix() {
-        let temp = TempDir::new().unwrap();
-        let file = temp.path().join("list-users--custom_3.json");
-        fs::write(&file, "{}").unwrap();
-
-        let found = find_endpoint_data_file(temp.path(), "custom_3").unwrap();
-        assert_eq!(found, Some(file));
-    }
-
-    #[test]
-    fn finds_a_legacy_data_file_named_only_by_id() {
-        let temp = TempDir::new().unwrap();
-        let file = temp.path().join("custom_3.json");
-        fs::write(&file, "{}").unwrap();
-
-        let found = find_endpoint_data_file(temp.path(), "custom_3").unwrap();
-        assert_eq!(found, Some(file));
-    }
-
-    #[test]
-    fn prefers_the_legacy_name_when_both_exist() {
-        let temp = TempDir::new().unwrap();
-        let legacy = temp.path().join("custom_3.json");
-        fs::write(&legacy, "{}").unwrap();
-        fs::write(temp.path().join("list-users--custom_3.json"), "{}").unwrap();
-
-        let found = find_endpoint_data_file(temp.path(), "custom_3").unwrap();
-        assert_eq!(found, Some(legacy));
-    }
-
-    #[test]
-    fn reports_no_file_for_an_unknown_id() {
-        let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join("list-users--custom_3.json"), "{}").unwrap();
-
-        assert_eq!(
-            find_endpoint_data_file(temp.path(), "custom_9").unwrap(),
-            None
-        );
-    }
-
-    #[test]
-    fn a_missing_requests_dir_is_not_an_error() {
-        let temp = TempDir::new().unwrap();
-        let absent = temp.path().join("requests");
-
-        assert_eq!(find_endpoint_data_file(&absent, "custom_3").unwrap(), None);
-    }
-
-    /// Defect: the suffix match is unanchored on the left, so an id that is a
-    /// tail of another id's filename can match the wrong file.
-    #[test]
-    fn suffix_matching_is_unanchored_on_the_left() {
-        let temp = TempDir::new().unwrap();
-        let other = temp.path().join("req--a--b.json");
-        fs::write(&other, "{}").unwrap();
-
-        let found = find_endpoint_data_file(temp.path(), "b").unwrap();
-        assert_eq!(found, Some(other));
     }
 
     #[test]

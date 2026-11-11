@@ -70,3 +70,54 @@ async fn get_replays_json_and_text_bodies_when_the_stream_reconnects() {
         server.abort();
     }
 }
+
+#[tokio::test]
+async fn an_event_cut_off_by_the_end_of_stream_does_not_advance_last_event_id() {
+    let (tx, mut received) = mpsc::unbounded_channel();
+    let router = Router::new().fallback(any(move |request: Request| {
+        let tx = tx.clone();
+        async move {
+            tx.send(
+                request
+                    .headers()
+                    .get("last-event-id")
+                    .map(|v| v.to_str().unwrap().to_string()),
+            )
+            .unwrap();
+            (
+                [("content-type", "text/event-stream")],
+                "id: 1\nretry: 250\ndata: whole\n\nid: 2\ndata: part-1\n",
+            )
+        }
+    }));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let target = StreamTarget {
+        tab_id: "partial-test".into(),
+        url: format!("http://{}/events", listener.local_addr().unwrap()),
+        method: Method::GET,
+        body: None,
+        headers: HashMap::new(),
+        last_event_id: None,
+    };
+    let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let app = tauri::test::mock_app();
+    let handle = app.handle().clone();
+    let request = serde_json::from_value(json!({"tabId":"partial-test","url":target.url})).unwrap();
+    let client = build_sse_client(&request, ProxyAction::Disable).unwrap();
+    let (shutdown, mut cancelled) = oneshot::channel();
+    let stream =
+        tokio::spawn(async move { stream_loop(&handle, &client, &target, &mut cancelled).await });
+    for expected in [None, Some("1".to_string())] {
+        let last_event_id = timeout(Duration::from_secs(5), received.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(last_event_id, expected);
+    }
+    shutdown.send(()).unwrap();
+    timeout(Duration::from_secs(2), stream)
+        .await
+        .unwrap()
+        .unwrap();
+    server.abort();
+}

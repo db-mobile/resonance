@@ -41,17 +41,42 @@ describe('WorkspaceTabController.saveTab', () => {
         expect(controller.collectionRequests.showSaveToCollectionDialog).not.toHaveBeenCalled();
     });
 
-    test('an active unbound tab falls back to the current endpoint; a background one does not', async () => {
+    test('an active unbound tab falls back to the current endpoint', async () => {
         const controller = makeController();
         setCurrentEndpoint({ collectionId: 'c1', endpointId: 'e9' });
-        controller.collectionRequests.showSaveToCollectionDialog.mockResolvedValue(null);
 
         await controller.saveTab({ id: 't1', name: 'Active' });
-        expect(controller.collectionRequests.saveAllRequestModifications).toHaveBeenCalledWith('c1', 'e9');
 
-        await controller.saveTab({ id: 't2', name: 'Background' });
-        expect(controller.collectionRequests.saveAllRequestModifications).toHaveBeenCalledTimes(1);
-        expect(controller.collectionRequests.showSaveToCollectionDialog).toHaveBeenCalledTimes(1);
+        expect(controller.collectionRequests.saveAllRequestModifications).toHaveBeenCalledWith('c1', 'e9');
+    });
+
+    test('a background tab is switched to before its form is read and saved', async () => {
+        const controller = makeController();
+        const background = { id: 't2', name: 'Background', endpoint: { collectionId: 'c1', endpointId: 'e2' } };
+        const order = [];
+        controller.switchTab = jest.fn(async (tabId) => {
+            order.push(`switch:${tabId}`);
+            controller.service.getActiveTabId.mockResolvedValue(tabId);
+            controller.service.getActiveTab.mockResolvedValue(background);
+        });
+        controller.collectionRequests.saveAllRequestModifications.mockImplementation(async (c, e) => {
+            order.push(`save:${e}`);
+        });
+
+        await controller.saveTab(background);
+
+        expect(order).toEqual(['switch:t2', 'save:e2']);
+        expect(controller.markCurrentTabUnmodified).toHaveBeenCalledTimes(1);
+    });
+
+    test('a superseded switch saves nothing', async () => {
+        const controller = makeController();
+        controller.switchTab = jest.fn().mockResolvedValue(undefined);
+
+        await controller.saveTab({ id: 't2', name: 'Background', endpoint: { collectionId: 'c1', endpointId: 'e2' } });
+
+        expect(controller.collectionRequests.saveAllRequestModifications).not.toHaveBeenCalled();
+        expect(controller.collectionRequests.showSaveToCollectionDialog).not.toHaveBeenCalled();
     });
 
     test('a runner tab and a controller without a collection port are ignored', async () => {

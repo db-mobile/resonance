@@ -1,24 +1,7 @@
 use resonance_collections::{read::read_collection_dir, snapshot};
 use serde_json::json;
-use std::{collections::HashMap, fs};
+use std::fs;
 use tempfile::TempDir;
-
-#[test]
-fn an_unreadable_sidecar_directory_does_not_make_the_collection_missing() {
-    let dir = TempDir::new().unwrap();
-    fs::write(
-        dir.path().join("collection.json"),
-        json!({"id":"c", "name":"C", "endpoints":[{"id":"e"}]}).to_string(),
-    )
-    .unwrap();
-    // A file where the directory should be reproduces a sidecar read error
-    // independently of the current user's filesystem privileges.
-    fs::write(dir.path().join("requests"), "not a directory").unwrap();
-    let snapshot = snapshot::read_v1("c", dir.path(), &["e".into()], &HashMap::new()).unwrap();
-    assert!(snapshot.collection.is_some());
-    assert_eq!(snapshot.targets[0].endpoint.as_ref().unwrap()["id"], "e");
-    assert!(snapshot.targets[0].scripts.test_script.is_empty());
-}
 
 #[test]
 fn a_new_capture_revalidates_disk_while_the_previous_snapshot_stays_owned() {
@@ -41,7 +24,6 @@ fn a_new_capture_revalidates_disk_while_the_previous_snapshot_stays_owned() {
             "c",
             &read_collection_dir_cached(&cache, dir.path()).unwrap(),
             &["e".into()],
-            &HashMap::new(),
         )
     };
     let before = capture();
@@ -117,12 +99,7 @@ fn snapshot_selects_requests_with_their_folder_auth_and_live_data() {
         fs::write(dir.path().join(name), content).unwrap();
     }
     let loaded = read_collection_dir(dir.path()).unwrap();
-    let result = snapshot::from_loaded(
-        "c",
-        &loaded,
-        &["e".into(), "missing".into()],
-        &HashMap::new(),
-    );
+    let result = snapshot::from_loaded("c", &loaded, &["e".into(), "missing".into()]);
     let value = serde_json::to_value(result).unwrap();
     assert_eq!(
         value["collection"],
@@ -149,55 +126,4 @@ fn snapshot_selects_requests_with_their_folder_auth_and_live_data() {
         json!({"kind":"collection"})
     );
     assert!(value["targets"][1]["endpoint"].is_null());
-}
-
-#[test]
-fn legacy_snapshot_keeps_metadata_sidecar_precedence_and_script_fallback() {
-    let dir = TempDir::new().unwrap();
-    fs::create_dir(dir.path().join("requests")).unwrap();
-    fs::write(dir.path().join("collection.json"), json!({
-        "id":"c", "name":"C", "endpoints":[{"id":"e", "headers":{"X-Legacy":"kept"}, "security":{"type":"bearer","config":{"token":"legacy"}}}]
-    }).to_string()).unwrap();
-    fs::write(
-        dir.path().join("requests/e.json"),
-        json!({"modifiedBody":"preferred"}).to_string(),
-    )
-    .unwrap();
-    fs::write(
-        dir.path().join("requests/name--e.json"),
-        json!({"modifiedBody":"wrong"}).to_string(),
-    )
-    .unwrap();
-    let scripts = HashMap::from([(
-        "c_e".into(),
-        resonance_core::scripts::ScriptData {
-            pre_request_script: "pre()".into(),
-            test_script: "test()".into(),
-        },
-    )]);
-    let result = snapshot::read_v1("c", dir.path(), &["e".into()], &scripts).unwrap();
-    let value = serde_json::to_value(result).unwrap();
-    assert_eq!(
-        value["targets"][0]["endpoint"]["headers"]["X-Legacy"],
-        "kept"
-    );
-    assert_eq!(
-        value["targets"][0]["persisted"]["modifiedBody"],
-        "preferred"
-    );
-    assert_eq!(value["targets"][0]["scripts"]["preRequestScript"], "pre()");
-    assert!(dir.path().join("collection.json").exists());
-    assert!(!dir.path().join("collection.yaml").exists());
-
-    fs::write(
-        dir.path().join("requests/e.json"),
-        json!({"scripts":{"preRequestScript":"", "testScript":""}}).to_string(),
-    )
-    .unwrap();
-    let cleared = snapshot::read_v1("c", dir.path(), &["e".into()], &scripts).unwrap();
-    assert!(cleared.targets[0].scripts.pre_request_script.is_empty());
-
-    fs::write(dir.path().join("requests/e.json"), "invalid json").unwrap();
-    let broken = snapshot::read_v1("c", dir.path(), &["e".into()], &scripts).unwrap();
-    assert!(broken.targets[0].scripts.pre_request_script.is_empty());
 }

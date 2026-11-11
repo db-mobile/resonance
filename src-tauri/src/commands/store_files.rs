@@ -11,7 +11,7 @@
 use serde_json::{Map, Value};
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::fs_secure::restrict_file;
 
@@ -107,68 +107,9 @@ pub(crate) fn write_store(path: &Path, map: &Map<String, Value>) -> Result<(), S
     result
 }
 
-/// Moves every relocated key out of the main store and into its own file.
-///
-/// Runs on every launch and is a cheap no-op once there is nothing left to
-/// move. The new files are written before the main store is rewritten, so an
-/// interruption leaves the keys still in the main store and the next launch
-/// simply redoes the same move.
-///
-/// @param dir - The app data directory holding the store files
-/// @returns How many keys were relocated
-pub fn migrate_store_split(dir: &Path) -> Result<u32, String> {
-    let main_path = dir.join(MAIN_STORE);
-    if !main_path.exists() {
-        return Ok(0);
-    }
-
-    let mut main = read_store(&main_path);
-    let mut pending: Vec<(PathBuf, Map<String, Value>)> = Vec::new();
-    let mut moved = 0u32;
-
-    for file in ALL_STORES.iter().filter(|name| **name != MAIN_STORE) {
-        let target_path = dir.join(file);
-        let mut target = read_store(&target_path);
-        let mut changed = false;
-
-        for (key, _) in RELOCATED_KEYS.iter().filter(|(_, owner)| owner == file) {
-            if let Some(value) = main.remove(*key) {
-                target.insert((*key).to_string(), value);
-                changed = true;
-                moved += 1;
-            }
-        }
-
-        if changed {
-            pending.push((target_path, target));
-        }
-    }
-
-    if moved == 0 {
-        return Ok(0);
-    }
-
-    for (path, map) in &pending {
-        write_store(path, map)?;
-    }
-
-    write_store(&main_path, &main)?;
-
-    Ok(moved)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-
-    fn write_json(dir: &Path, name: &str, value: Value) {
-        fs::write(dir.join(name), serde_json::to_string(&value).unwrap()).unwrap();
-    }
-
-    fn read_json(dir: &Path, name: &str) -> Value {
-        serde_json::from_str(&fs::read_to_string(dir.join(name)).unwrap()).unwrap()
-    }
 
     #[test]
     fn relocated_keys_route_to_their_own_files() {
@@ -197,117 +138,5 @@ mod tests {
         ] {
             assert_eq!(store_file_for(key), MAIN_STORE, "key {} moved", key);
         }
-    }
-
-    #[test]
-    fn migration_moves_each_key_to_its_file_and_strips_it_from_main() {
-        let temp = TempDir::new().unwrap();
-        write_json(
-            temp.path(),
-            MAIN_STORE,
-            serde_json::json!({
-                "requestHistory": [{"id": "h1"}],
-                "workspace-tabs": [{"id": "t1"}],
-                "active-tab-id": "t1",
-                "cookieJar": [{"name": "sid"}],
-                "graphqlSchemaCache": {"https://api": {}},
-                "settings": {"timeout": 30000},
-                "collectionIndex": {"c1": "/tmp/c1"}
-            }),
-        );
-
-        let moved = migrate_store_split(temp.path()).unwrap();
-
-        assert_eq!(moved, 5);
-
-        let main = read_json(temp.path(), MAIN_STORE);
-        assert_eq!(main["settings"]["timeout"], 30000);
-        assert_eq!(main["collectionIndex"]["c1"], "/tmp/c1");
-        assert!(main.get("requestHistory").is_none());
-        assert!(main.get("workspace-tabs").is_none());
-        assert!(main.get("active-tab-id").is_none());
-        assert!(main.get("cookieJar").is_none());
-        assert!(main.get("graphqlSchemaCache").is_none());
-
-        assert_eq!(
-            read_json(temp.path(), HISTORY_STORE)["requestHistory"][0]["id"],
-            "h1"
-        );
-        let tabs = read_json(temp.path(), TABS_STORE);
-        assert_eq!(tabs["workspace-tabs"][0]["id"], "t1");
-        assert_eq!(tabs["active-tab-id"], "t1");
-        assert_eq!(
-            read_json(temp.path(), COOKIES_STORE)["cookieJar"][0]["name"],
-            "sid"
-        );
-        assert!(read_json(temp.path(), GRAPHQL_CACHE_STORE)["graphqlSchemaCache"].is_object());
-    }
-
-    #[test]
-    fn migration_is_idempotent() {
-        let temp = TempDir::new().unwrap();
-        write_json(
-            temp.path(),
-            MAIN_STORE,
-            serde_json::json!({ "requestHistory": [{"id": "h1"}], "settings": {} }),
-        );
-
-        assert_eq!(migrate_store_split(temp.path()).unwrap(), 1);
-        assert_eq!(migrate_store_split(temp.path()).unwrap(), 0);
-
-        assert_eq!(
-            read_json(temp.path(), HISTORY_STORE)["requestHistory"][0]["id"],
-            "h1"
-        );
-    }
-
-    #[test]
-    fn migration_leaves_an_already_split_store_untouched() {
-        let temp = TempDir::new().unwrap();
-        write_json(
-            temp.path(),
-            MAIN_STORE,
-            serde_json::json!({ "settings": {} }),
-        );
-
-        assert_eq!(migrate_store_split(temp.path()).unwrap(), 0);
-
-        assert!(!temp.path().join(HISTORY_STORE).exists());
-    }
-
-    #[test]
-    fn migration_without_a_main_store_is_a_no_op() {
-        let temp = TempDir::new().unwrap();
-
-        assert_eq!(migrate_store_split(temp.path()).unwrap(), 0);
-    }
-
-    #[test]
-    fn migration_preserves_keys_already_in_a_target_file() {
-        let temp = TempDir::new().unwrap();
-        write_json(
-            temp.path(),
-            MAIN_STORE,
-            serde_json::json!({ "active-tab-id": "t2" }),
-        );
-        write_json(
-            temp.path(),
-            TABS_STORE,
-            serde_json::json!({ "workspace-tabs": [{"id": "kept"}] }),
-        );
-
-        migrate_store_split(temp.path()).unwrap();
-
-        let tabs = read_json(temp.path(), TABS_STORE);
-        assert_eq!(tabs["workspace-tabs"][0]["id"], "kept");
-        assert_eq!(tabs["active-tab-id"], "t2");
-    }
-
-    #[test]
-    fn migration_treats_a_corrupt_main_store_as_empty() {
-        let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join(MAIN_STORE), "{not json").unwrap();
-
-        assert_eq!(migrate_store_split(temp.path()).unwrap(), 0);
     }
 }

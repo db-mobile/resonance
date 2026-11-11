@@ -2,7 +2,7 @@ use super::api_request::ClientCertConfig;
 use super::tab_sessions::{CommandAck, Session, TabSessions, require_tab_id};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use rumqttc::{AsyncClient, Event, LastWill, MqttOptions, Packet, QoS, Transport};
+use rumqttc::{AsyncClient, Event, LastWill, MqttOptions, Outgoing, Packet, QoS, Transport};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
@@ -42,9 +42,17 @@ struct MqttConnection {
     broker: String,
 }
 
+/// How long a clean disconnect may take before the event loop is aborted.
+const DISCONNECT_GRACE: Duration = Duration::from_secs(2);
+
 impl MqttConnection {
-    async fn shutdown(self) {
-        let _ = self.client.disconnect().await;
+    /// Queues DISCONNECT and lets the event loop write it before stopping the
+    /// loop. Aborting straight away dropped the socket with the packet still
+    /// queued, so the broker saw an unclean close and published the Last Will.
+    async fn shutdown(mut self) {
+        if self.client.disconnect().await.is_ok() {
+            let _ = tokio::time::timeout(DISCONNECT_GRACE, &mut self.poll_handle).await;
+        }
         self.poll_handle.abort();
     }
 }
@@ -406,7 +414,8 @@ async fn establish_connection(
                         ),
                     );
                 }
-                Ok(Event::Incoming(Packet::Disconnect)) => {
+                Ok(Event::Incoming(Packet::Disconnect))
+                | Ok(Event::Outgoing(Outgoing::Disconnect)) => {
                     break;
                 }
                 Ok(_) => {}

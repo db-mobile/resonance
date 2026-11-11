@@ -7,10 +7,9 @@ function makeContext() {
     const shared = new Map();
     const listeners = [];
     shared.set('collectionController', { onCollectionsLoaded: jest.fn((listener) => { listeners.push(listener); return () => {}; }) });
-    shared.set('collectionRepository', { marker: 'collections' });
     return {
         ctx: {
-            backendAPI: { collections: { list: jest.fn().mockResolvedValue([]), runners: {} }, store: { get: jest.fn().mockResolvedValue(null), set: jest.fn() } },
+            backendAPI: { collections: { list: jest.fn().mockResolvedValue([]), runners: {} } },
             _shared: shared,
             provide(name, value) { shared.set(name, value); return value; },
             get(name) { return shared.get(name); }
@@ -30,17 +29,15 @@ describe('runner feature', () => {
         expect(runnerFeature.globals).toEqual({ runnerBookkeeping: 'bookkeeping' });
     });
 
-    test('init invalidates the cache and runs a migration pass whenever collections load, and on focus', () => {
+    test('init invalidates the cache whenever collections load, and on focus', () => {
         const { ctx, listeners } = makeContext();
         const instances = runnerFeature.create(ctx);
         instances.repository.invalidate = jest.fn();
-        instances.bookkeeping.runMigrationPass = jest.fn().mockResolvedValue(null);
 
         runnerFeature.init(instances, ctx);
         listeners[0]([{ id: 'c1' }]);
         window.dispatchEvent(new window.Event('focus'));
 
         expect(instances.repository.invalidate).toHaveBeenCalledTimes(2);
-        expect(instances.bookkeeping.runMigrationPass).toHaveBeenCalledWith([{ id: 'c1' }], ctx.get('collectionRepository'));
     });
 });

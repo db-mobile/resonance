@@ -17,8 +17,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::layout::{
-    COLLECTION_JSON, COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML,
-    find_available_folder_dir, find_available_path, is_reserved_dir, request_stem, slugify,
+    COLLECTION_YAML, FOLDER_YAML, OPENAPI_YAML, VARIABLES_YAML, find_available_folder_dir,
+    find_available_path, is_reserved_dir, request_stem, slugify,
 };
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
 use crate::fs_secure::{restrict_dir, restrict_file};
@@ -155,6 +155,24 @@ pub fn relocate(current: &Path, desired: &Path) -> Result<(), String> {
     })
 }
 
+/// Points every descendant's `source` at the directory its folder moved to,
+/// so the recursive write sees each file where it now lives instead of
+/// treating it as a stranger that has claimed the name.
+fn rebase_sources(node: &mut FolderNode, from: &Path, to: &Path) {
+    let rebase = |source: &mut Option<PathBuf>| {
+        if let Some(rest) = source.as_deref().and_then(|p| p.strip_prefix(from).ok()) {
+            *source = Some(to.join(rest));
+        }
+    };
+    for entry in &mut node.requests {
+        rebase(&mut entry.source);
+    }
+    for child in &mut node.folders {
+        rebase(&mut child.source);
+        rebase_sources(child, from, to);
+    }
+}
+
 /// Writes one folder's requests and recurses into its subfolders.
 ///
 /// Returns every path it wrote or kept, so the caller can tell which files in
@@ -205,6 +223,7 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
             && current_path.exists()
         {
             relocate(current_path, &desired)?;
+            rebase_sources(folder, current_path, &desired);
         }
 
         folder.source = Some(desired.clone());
@@ -212,32 +231,6 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
     }
 
     Ok(claimed)
-}
-
-/// Removes the v1 files once a v2 tree is fully on disk.
-///
-/// Unconditional and idempotent, so a conversion interrupted before this point
-/// heals itself on the next save rather than leaving both formats forever.
-pub fn remove_v1_files(dir: &Path) -> Result<(), String> {
-    let collection_json = dir.join(COLLECTION_JSON);
-    if collection_json.exists() {
-        fs::remove_file(&collection_json)
-            .map_err(|e| format!("Failed to remove {}: {}", collection_json.display(), e))?;
-    }
-
-    let variables_json = dir.join("variables.json");
-    if variables_json.exists() {
-        fs::remove_file(&variables_json)
-            .map_err(|e| format!("Failed to remove {}: {}", variables_json.display(), e))?;
-    }
-
-    let requests = dir.join("requests");
-    if requests.is_dir() {
-        fs::remove_dir_all(&requests)
-            .map_err(|e| format!("Failed to remove {}: {}", requests.display(), e))?;
-    }
-
-    Ok(())
 }
 
 /// Writes a whole collection to a directory.
@@ -266,8 +259,6 @@ pub fn write_collection_dir(dir: &Path, collection: &mut LoadedCollection) -> Re
     }
 
     write_if_changed(&dir.join(COLLECTION_YAML), &to_yaml(&collection.meta)?)?;
-
-    remove_v1_files(dir)?;
 
     Ok(())
 }
@@ -351,6 +342,31 @@ mod tests {
             requests,
             folders: Vec::new(),
         }
+    }
+
+    #[test]
+    fn renaming_a_folder_moves_its_subtree_without_copies() {
+        let temp = TempDir::new().unwrap();
+        let mut written = collection(vec![]);
+        let mut pets = folder("f1", "Pets", vec![request("r1", "List")]);
+        pets.folders
+            .push(folder("f2", "Sub", vec![request("r2", "Item")]));
+        written.root.folders.push(pets);
+        write_collection_dir(temp.path(), &mut written).unwrap();
+
+        let mut read = read_collection_dir(temp.path()).unwrap();
+        read.root.folders[0].meta.as_mut().unwrap().name = "Animals".into();
+        write_collection_dir(temp.path(), &mut read).unwrap();
+
+        assert!(temp.path().join("animals/list.yaml").exists());
+        assert!(temp.path().join("animals/sub/item.yaml").exists());
+        assert!(!temp.path().join("animals/list-2.yaml").exists());
+        assert!(!temp.path().join("animals/sub-2").exists());
+        assert!(!temp.path().join("pets").exists());
+        let reread = read_collection_dir(temp.path()).unwrap();
+        assert_eq!(reread.requests().len(), 2);
+        assert_eq!(reread.root.folders.len(), 1);
+        assert_eq!(reread.root.folders[0].folders.len(), 1);
     }
 
     #[test]
@@ -855,29 +871,6 @@ mod tests {
 
         let read = read_collection_dir(temp.path()).unwrap();
         assert_eq!(read.open_api_spec.unwrap()["openapi"], "3.0.0");
-    }
-
-    #[test]
-    fn a_v2_write_removes_leftover_v1_files() {
-        let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join(COLLECTION_JSON), "{}").unwrap();
-        fs::write(temp.path().join("variables.json"), "[]").unwrap();
-        fs::create_dir(temp.path().join("requests")).unwrap();
-        fs::write(temp.path().join("requests/a--b.json"), "{}").unwrap();
-
-        let mut c = collection(vec![request("r1", "Health")]);
-        write_collection_dir(temp.path(), &mut c).unwrap();
-
-        assert!(!temp.path().join(COLLECTION_JSON).exists());
-        assert!(!temp.path().join("variables.json").exists());
-        assert!(!temp.path().join("requests").exists());
-    }
-
-    #[test]
-    fn removing_v1_files_is_safe_to_repeat() {
-        let temp = TempDir::new().unwrap();
-        remove_v1_files(temp.path()).unwrap();
-        remove_v1_files(temp.path()).unwrap();
     }
 
     #[cfg(unix)]

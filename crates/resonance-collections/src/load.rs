@@ -3,14 +3,12 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::read::{Layout, LoadedCollection, read_collection_dir};
+use crate::read::{LoadedCollection, is_collection_dir, read_collection_dir};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("{0} is not a collection directory (no collection.yaml)")]
     NotACollection(PathBuf),
-    #[error("{0} uses the legacy collection.json layout; open it in Resonance once to convert it")]
-    LegacyLayout(PathBuf),
     #[error("{0}")]
     Read(String),
     #[error("no request matches {selector}")]
@@ -30,19 +28,15 @@ pub enum LoadError {
     Environment(String),
 }
 
-/// Reads a v2 collection directory.
-///
-/// A v1 directory is refused rather than converted: conversion rewrites the
-/// user's files, which is the desktop's job, not a CI run's.
+/// Reads a collection directory.
 ///
 /// @param dir - The collection directory
 /// @returns The collection in memory
 pub fn load_collection(dir: &Path) -> Result<LoadedCollection, LoadError> {
-    match Layout::detect(dir) {
-        Some(Layout::V2) => read_collection_dir(dir).map_err(LoadError::Read),
-        Some(Layout::V1) => Err(LoadError::LegacyLayout(dir.to_path_buf())),
-        None => Err(LoadError::NotACollection(dir.to_path_buf())),
+    if !is_collection_dir(dir) {
+        return Err(LoadError::NotACollection(dir.to_path_buf()));
     }
+    read_collection_dir(dir).map_err(LoadError::Read)
 }
 
 #[cfg(test)]
@@ -71,7 +65,7 @@ mod tests {
     }
 
     #[test]
-    fn load_collection_refuses_v1_with_conversion_hint() {
+    fn load_collection_rejects_a_dir_holding_only_a_collection_json() {
         let temp = TempDir::new().unwrap();
         fs::write(
             temp.path().join("collection.json"),
@@ -80,8 +74,7 @@ mod tests {
         .unwrap();
 
         let error = load_collection(temp.path()).unwrap_err();
-        assert!(matches!(error, LoadError::LegacyLayout(_)));
-        assert!(error.to_string().contains("open it in Resonance"));
+        assert!(matches!(error, LoadError::NotACollection(_)));
     }
 
     #[test]

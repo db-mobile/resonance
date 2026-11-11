@@ -4,31 +4,37 @@
 //! The main store carries a `dataVersion` stamp. Each step lifts the data to
 //! its `to` version and the stamp is written after every step, so a crash or
 //! a failed step resumes at that step on the next launch. Every step is
-//! idempotent, which is what lets an install without a stamp (version 0) run
-//! the whole chain safely.
+//! idempotent. A fresh install has no main store yet and is stamped
+//! [`CURRENT_DATA_VERSION`] outright, since there is nothing to convert.
 //!
 //! Retiring a converter means deleting its step and raising
 //! [`MIN_SUPPORTED_DATA_VERSION`] to that step's `to`. Data stamped below the
 //! minimum is left untouched and reported, so the user can upgrade through a
-//! release that still converts it instead of losing it.
+//! release that still converts it instead of losing it. Leftovers that were
+//! converted lazily rather than by a step (v1 collection directories, store
+//! scripts, store runners) are reported the same way. Steps 1–3 were retired
+//! after 3.6.0, the last release carrying them. The cookie jar rekey shipped
+//! first in 3.6.0 and stays until 3.5.x data has had time to pass through it.
 
-use serde::Serialize;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
 
-use super::collections::{COLLECTIONS_DIR, absorb_store_scripts, convert_v1_dir};
-use super::store_files::{
-    MAIN_STORE, migrate_store_split, read_store, store_file_for, write_store,
-};
+use super::collections::{COLLECTION_INDEX_KEY, COLLECTIONS_DIR};
+use super::store_files::{MAIN_STORE, read_store, store_file_for, write_store};
 
-pub const MIN_SUPPORTED_DATA_VERSION: u32 = 0;
+/// The version a fresh install is stamped with and the last step lifts to.
+pub const CURRENT_DATA_VERSION: u32 = 4;
+pub const MIN_SUPPORTED_DATA_VERSION: u32 = 3;
+const _: () = assert!(MIN_SUPPORTED_DATA_VERSION <= CURRENT_DATA_VERSION);
 
 const DATA_VERSION_KEY: &str = "dataVersion";
-const STORE_SCRIPTS_KEY: &str = "persistedScripts";
 const GLOBAL_STORE_COLLECTIONS_KEY: &str = "collections";
+const STORE_RUNNERS_KEY: &str = "collectionRunners";
+const MIGRATED_RUNNER_COLLECTIONS_KEY: &str = "runnersMigratedCollections";
+const STORE_SCRIPTS_KEY: &str = "persistedScripts";
+const V1_MARKER: &str = "collection.json";
+const V2_MARKER: &str = "collection.yaml";
 const COOKIE_JAR_KEY: &str = "cookieJar";
 const DEFAULT_COOKIE_ENVIRONMENT: &str = "default";
 
@@ -38,67 +44,42 @@ struct Step {
     run: fn(&Path) -> Result<(), String>,
 }
 
-const STEPS: &[Step] = &[
-    Step {
-        to: 1,
-        name: "store split",
-        run: store_split,
-    },
-    Step {
-        to: 2,
-        name: "collection format v1 to v2",
-        run: convert_v1_collections,
-    },
-    Step {
-        to: 3,
-        name: "scripts from the store into request files",
-        run: move_store_scripts,
-    },
-    Step {
-        to: 4,
-        name: "cookie jar ids",
-        run: rekey_cookies,
-    },
-];
+const STEPS: &[Step] = &[Step {
+    to: 4,
+    name: "cookie jar ids",
+    run: rekey_cookies,
+}];
 
-/// Something the user has to know about after the chain ran.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+/// Something the chain could not do, logged at startup.
+#[derive(Debug, Clone, PartialEq)]
 pub enum MigrationIssue {
     /// A step failed; it is retried on the next launch.
-    #[serde(rename_all = "camelCase")]
     Failed { step: String, message: String },
     /// The data predates every step this build still carries.
-    #[serde(rename_all = "camelCase")]
     TooOld { found: u32, min: u32 },
     /// Data in a format no step converts any more, left in place.
-    #[serde(rename_all = "camelCase")]
     Unsupported { data: String },
 }
 
-/// Issues from this launch's migration run, for the frontend to show.
-#[derive(Default)]
-pub struct MigrationStatus(pub Mutex<Vec<MigrationIssue>>);
-
-#[tauri::command]
-pub async fn data_migration_status(
-    state: tauri::State<'_, MigrationStatus>,
-) -> Result<Vec<MigrationIssue>, String> {
-    Ok(state.0.lock().unwrap().clone())
-}
-
-/// Brings the data in `dir` up to the last step's version.
+/// Brings the data in `dir` up to [`CURRENT_DATA_VERSION`].
 ///
 /// @param dir - The app data directory
-/// @returns Everything the user needs to be told about
+/// @returns Everything that was left unconverted
 pub fn run(dir: &Path) -> Vec<MigrationIssue> {
-    run_steps(dir, STEPS, MIN_SUPPORTED_DATA_VERSION)
+    run_steps(dir, STEPS, MIN_SUPPORTED_DATA_VERSION, CURRENT_DATA_VERSION)
 }
 
-fn run_steps(dir: &Path, steps: &[Step], min_supported: u32) -> Vec<MigrationIssue> {
+fn run_steps(dir: &Path, steps: &[Step], min_supported: u32, current: u32) -> Vec<MigrationIssue> {
     let mut issues = Vec::new();
-    let found = stored_version(dir);
 
+    if !dir.join(MAIN_STORE).exists() {
+        if let Err(message) = stamp_version(dir, current) {
+            eprintln!("stamping a fresh install failed: {}", message);
+        }
+        return issues;
+    }
+
+    let found = stored_version(dir);
     if found < min_supported {
         issues.push(MigrationIssue::TooOld {
             found,
@@ -118,11 +99,13 @@ fn run_steps(dir: &Path, steps: &[Step], min_supported: u32) -> Vec<MigrationIss
         }
     }
 
-    if holds_global_store_collections(dir) {
-        issues.push(MigrationIssue::Unsupported {
-            data: "globalStoreCollections".to_string(),
-        });
-    }
+    issues.extend(
+        unsupported_leftovers(dir)
+            .into_iter()
+            .map(|data| MigrationIssue::Unsupported {
+                data: data.to_string(),
+            }),
+    );
 
     issues
 }
@@ -142,84 +125,101 @@ fn stamp_version(dir: &Path, version: u32) -> Result<(), String> {
     write_store(&path, &main)
 }
 
-/// Collections kept in the main store itself, from before collections had
-/// their own directories. Their converter was retired.
-fn holds_global_store_collections(dir: &Path) -> bool {
-    matches!(
-        read_store(&dir.join(MAIN_STORE)).get(GLOBAL_STORE_COLLECTIONS_KEY),
-        Some(Value::Array(collections)) if !collections.is_empty()
-    )
-}
-
-/// Collection directories the app owns. Linked collections live in the
-/// user's own checkouts and are only rewritten when the user saves them.
-fn app_collection_dirs(dir: &Path) -> Result<Vec<std::path::PathBuf>, String> {
-    let root = dir.join(COLLECTIONS_DIR);
-    if !root.is_dir() {
-        return Ok(Vec::new());
+/// Data whose converter was retired, by name.
+///
+/// @param dir - The app data directory
+/// @returns One name per kind of leftover found
+fn unsupported_leftovers(dir: &Path) -> Vec<&'static str> {
+    let main = read_store(&dir.join(MAIN_STORE));
+    let mut found = Vec::new();
+    if holds_non_empty_array(&main, GLOBAL_STORE_COLLECTIONS_KEY) {
+        found.push("globalStoreCollections");
     }
-    let mut dirs: Vec<_> = fs::read_dir(&root)
-        .map_err(|e| format!("Failed to read {}: {}", root.display(), e))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .collect();
-    dirs.sort();
-    Ok(dirs)
-}
-
-fn store_split(dir: &Path) -> Result<(), String> {
-    migrate_store_split(dir).map(|_| ())
-}
-
-fn convert_v1_collections(dir: &Path) -> Result<(), String> {
-    let failures: Vec<String> = app_collection_dirs(dir)?
-        .iter()
-        .filter_map(|path| {
-            convert_v1_dir(path)
-                .err()
-                .map(|e| format!("{}: {}", path.display(), e))
-        })
-        .collect();
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures.join("; "))
+    if holds_runners_of_registered_collections(&main) {
+        found.push("collectionRunners");
     }
+    if holds_scripts_of_registered_collections(&main) {
+        found.push("storeScripts");
+    }
+    if holds_v1_collections(dir, &main) {
+        found.push("v1Collections");
+    }
+    found
 }
 
-fn move_store_scripts(dir: &Path) -> Result<(), String> {
-    let main_path = dir.join(MAIN_STORE);
-    let mut main = read_store(&main_path);
-    let Some(Value::Object(scripts)) = main.get(STORE_SCRIPTS_KEY).cloned() else {
-        return Ok(());
+fn holds_non_empty_array(main: &Map<String, Value>, key: &str) -> bool {
+    matches!(main.get(key), Some(Value::Array(items)) if !items.is_empty())
+}
+
+/// Store runners owned (by their first request) by a collection that is still
+/// registered and was not migrated yet. Runners of deleted collections kept
+/// the old migration pending forever and are orphans, not worth a notice.
+fn holds_runners_of_registered_collections(main: &Map<String, Value>) -> bool {
+    let Some(Value::Array(runners)) = main.get(STORE_RUNNERS_KEY) else {
+        return false;
     };
+    let registered = registered_collection_ids(main);
+    let migrated: Vec<&str> = match main.get(MIGRATED_RUNNER_COLLECTIONS_KEY) {
+        Some(Value::Array(ids)) => ids.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    };
+    runners
+        .iter()
+        .filter_map(|runner| runner.pointer("/requests/0/collectionId")?.as_str())
+        .any(|owner| registered.iter().any(|id| id == owner) && !migrated.contains(&owner))
+}
 
-    let mut remaining: Map<String, Value> = scripts;
-    let before = remaining.len();
-    let mut failures = Vec::new();
-    for path in app_collection_dirs(dir)? {
-        if let Err(e) = absorb_store_scripts(&path, &mut remaining) {
-            failures.push(format!("{}: {}", path.display(), e));
-        }
-    }
+/// Store scripts keyed `{collectionId}_{requestId}` for a collection that is
+/// still registered. Entries of collections long gone are orphans and not
+/// worth a notice.
+fn holds_scripts_of_registered_collections(main: &Map<String, Value>) -> bool {
+    let Some(Value::Object(scripts)) = main.get(STORE_SCRIPTS_KEY) else {
+        return false;
+    };
+    registered_collection_ids(main)
+        .iter()
+        .any(|id| scripts.keys().any(|key| key.starts_with(&format!("{id}_"))))
+}
 
-    if remaining.len() != before {
-        main.insert(STORE_SCRIPTS_KEY.to_string(), Value::Object(remaining));
-        write_store(&main_path, &main)?;
+fn registered_collection_ids(main: &Map<String, Value>) -> Vec<String> {
+    match main.get(COLLECTION_INDEX_KEY) {
+        Some(Value::Object(index)) => index.keys().cloned().collect(),
+        _ => Vec::new(),
     }
+}
 
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures.join("; "))
+fn registered_collection_dirs(main: &Map<String, Value>) -> Vec<PathBuf> {
+    match main.get(COLLECTION_INDEX_KEY) {
+        Some(Value::Object(index)) => index
+            .values()
+            .filter_map(Value::as_str)
+            .map(PathBuf::from)
+            .collect(),
+        _ => Vec::new(),
     }
+}
+
+fn app_collection_dirs(dir: &Path) -> Vec<PathBuf> {
+    std::fs::read_dir(dir.join(COLLECTIONS_DIR))
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn holds_v1_collections(dir: &Path, main: &Map<String, Value>) -> bool {
+    app_collection_dirs(dir)
+        .into_iter()
+        .chain(registered_collection_dirs(main))
+        .any(|path| path.join(V1_MARKER).exists() && !path.join(V2_MARKER).exists())
 }
 
 /// Rekeys every cookie jar entry to `{environment}|{domain}|{path}|{name}`,
 /// the id cookies have carried since 2.12.6, and keeps only the newest entry
-/// per id. Mirrors `CookieRepository._migrateLegacyIds`, which the webview
-/// still runs lazily until this step retires it.
+/// per id.
 fn rekey_cookies(dir: &Path) -> Result<(), String> {
     let path = dir.join(store_file_for(COOKIE_JAR_KEY));
     let mut store = read_store(&path);
@@ -304,6 +304,7 @@ fn updated_at(cookie: &Map<String, Value>) -> f64 {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::fs;
     use tempfile::TempDir;
 
     fn write_main(dir: &Path, value: Value) {
@@ -314,24 +315,6 @@ mod tests {
         serde_json::from_str(&fs::read_to_string(dir.join(MAIN_STORE)).unwrap()).unwrap()
     }
 
-    fn write_v1_collection(dir: &Path) -> std::path::PathBuf {
-        let collection = dir.join(COLLECTIONS_DIR).join("pets");
-        fs::create_dir_all(collection.join("requests")).unwrap();
-        fs::write(
-            collection.join("collection.json"),
-            json!({
-                "id": "c1",
-                "name": "Pets",
-                "baseUrl": "https://api.example.com",
-                "endpoints": [{"id": "r1", "name": "List", "method": "GET", "path": "/pets"}],
-                "folders": []
-            })
-            .to_string(),
-        )
-        .unwrap();
-        collection
-    }
-
     fn failing(_: &Path) -> Result<(), String> {
         Err("boom".into())
     }
@@ -340,19 +323,48 @@ mod tests {
         Ok(())
     }
 
+    fn unsupported(data: &str) -> MigrationIssue {
+        MigrationIssue::Unsupported { data: data.into() }
+    }
+
     #[test]
-    fn a_fresh_install_runs_every_step_and_is_stamped_current() {
+    fn the_last_step_lifts_to_the_current_version() {
+        if let Some(last) = STEPS.last() {
+            assert_eq!(last.to, CURRENT_DATA_VERSION);
+        }
+    }
+
+    #[test]
+    fn a_fresh_install_is_stamped_current_without_running_a_step() {
+        let temp = TempDir::new().unwrap();
+
+        let issues = run_steps(
+            temp.path(),
+            &[Step {
+                to: 9,
+                name: "never",
+                run: failing,
+            }],
+            0,
+            9,
+        );
+
+        assert!(issues.is_empty());
+        assert_eq!(read_main(temp.path()), json!({"dataVersion": 9}));
+    }
+
+    #[test]
+    fn a_fresh_install_runs_clean_and_is_stamped_current() {
         let temp = TempDir::new().unwrap();
 
         assert!(run(temp.path()).is_empty());
 
-        assert_eq!(stored_version(temp.path()), STEPS.last().unwrap().to);
+        assert_eq!(stored_version(temp.path()), CURRENT_DATA_VERSION);
     }
 
     #[test]
     fn a_second_run_changes_nothing() {
         let temp = TempDir::new().unwrap();
-        write_v1_collection(temp.path());
         run(temp.path());
         let after_first = read_main(temp.path());
 
@@ -364,6 +376,7 @@ mod tests {
     #[test]
     fn a_failed_step_keeps_the_previous_stamp_and_stops_the_chain() {
         let temp = TempDir::new().unwrap();
+        write_main(temp.path(), json!({}));
         let steps = [
             Step {
                 to: 1,
@@ -382,7 +395,7 @@ mod tests {
             },
         ];
 
-        let issues = run_steps(temp.path(), &steps, 0);
+        let issues = run_steps(temp.path(), &steps, 0, 3);
 
         assert_eq!(
             issues,
@@ -397,6 +410,7 @@ mod tests {
     #[test]
     fn a_failed_step_is_retried_on_the_next_launch() {
         let temp = TempDir::new().unwrap();
+        write_main(temp.path(), json!({}));
         run_steps(
             temp.path(),
             &[Step {
@@ -405,6 +419,7 @@ mod tests {
                 run: failing,
             }],
             0,
+            1,
         );
 
         let issues = run_steps(
@@ -415,6 +430,7 @@ mod tests {
                 run: succeeding,
             }],
             0,
+            1,
         );
 
         assert!(issues.is_empty());
@@ -437,6 +453,7 @@ mod tests {
                 run: failing,
             }],
             2,
+            5,
         );
 
         assert_eq!(issues, vec![MigrationIssue::TooOld { found: 1, min: 2 }]);
@@ -447,56 +464,154 @@ mod tests {
     }
 
     #[test]
-    fn the_chain_converts_v1_collections_and_moves_store_scripts() {
+    fn an_unstamped_store_is_too_old_for_the_retired_chain() {
         let temp = TempDir::new().unwrap();
-        let collection = write_v1_collection(temp.path());
         write_main(
             temp.path(),
-            json!({
-                "requestHistory": [],
-                "persistedScripts": {
-                    "c1_r1": {"preRequestScript": "", "testScript": "check();"},
-                    "elsewhere_r9": {"testScript": "linked();"}
-                }
-            }),
+            json!({"requestHistory": [], "persistedScripts": {"c1_r1": {"testScript": "check();"}}}),
         );
+        let before = read_main(temp.path());
 
-        assert!(run(temp.path()).is_empty());
+        let issues = run(temp.path());
 
-        assert!(collection.join("collection.yaml").exists());
-        assert!(!collection.join("collection.json").exists());
-        assert!(!collection.join("runners").exists());
-        let request = fs::read_to_string(collection.join("list.yaml")).unwrap();
-        assert!(request.contains("check();"), "{}", request);
-        let main = read_main(temp.path());
         assert_eq!(
-            main["persistedScripts"],
-            json!({"elsewhere_r9": {"testScript": "linked();"}})
+            issues,
+            vec![MigrationIssue::TooOld {
+                found: 0,
+                min: MIN_SUPPORTED_DATA_VERSION
+            }]
         );
-        assert!(
-            main.get("requestHistory").is_none(),
-            "store split did not run"
-        );
-        assert!(temp.path().join("resonance-history.json").exists());
+        assert_eq!(read_main(temp.path()), before);
     }
 
     #[test]
-    fn the_chain_rekeys_cookies_after_the_store_split_moved_them() {
+    fn data_stamped_by_the_last_converting_release_is_accepted() {
+        let temp = TempDir::new().unwrap();
+        write_main(temp.path(), json!({"dataVersion": 4, "theme": "dark"}));
+
+        assert!(run(temp.path()).is_empty());
+
+        assert_eq!(
+            read_main(temp.path()),
+            json!({"dataVersion": 4, "theme": "dark"})
+        );
+    }
+
+    #[test]
+    fn global_store_collections_are_reported_and_kept() {
         let temp = TempDir::new().unwrap();
         write_main(
             temp.path(),
+            json!({"dataVersion": 4, "collections": [{"id": "old"}]}),
+        );
+
+        let issues = run(temp.path());
+
+        assert_eq!(issues, vec![unsupported("globalStoreCollections")]);
+        assert_eq!(
+            read_main(temp.path())["collections"],
+            json!([{"id": "old"}])
+        );
+    }
+
+    #[test]
+    fn leftover_store_runners_are_reported_only_for_an_unmigrated_registered_collection() {
+        let temp = TempDir::new().unwrap();
+        let runner = json!([{"id": "runner_1", "requests": [{"collectionId": "c1"}]}]);
+        write_main(
+            temp.path(),
+            json!({"dataVersion": 4, "collectionIndex": {"c1": "/somewhere/c1"}, "collectionRunners": runner}),
+        );
+        assert_eq!(run(temp.path()), vec![unsupported("collectionRunners")]);
+
+        write_main(
+            temp.path(),
+            json!({"dataVersion": 4, "collectionIndex": {"c2": "/somewhere/c2"}, "collectionRunners": runner}),
+        );
+        assert!(run(temp.path()).is_empty());
+
+        write_main(
+            temp.path(),
+            json!({
+                "dataVersion": 4,
+                "collectionIndex": {"c1": "/somewhere/c1"},
+                "collectionRunners": runner,
+                "runnersMigratedCollections": ["c1"]
+            }),
+        );
+        assert!(run(temp.path()).is_empty());
+
+        write_main(
+            temp.path(),
+            json!({"dataVersion": 4, "collectionRunners": null, "collectionRunnersLegacyBackup": {"runners": [1]}}),
+        );
+        assert!(run(temp.path()).is_empty());
+    }
+
+    #[test]
+    fn store_scripts_are_reported_only_for_a_registered_collection() {
+        let temp = TempDir::new().unwrap();
+        write_main(
+            temp.path(),
+            json!({
+                "dataVersion": 4,
+                "collectionIndex": {"c1": "/somewhere/c1"},
+                "persistedScripts": {"gone_r1": {"testScript": "orphan();"}}
+            }),
+        );
+        assert!(run(temp.path()).is_empty());
+
+        write_main(
+            temp.path(),
+            json!({
+                "dataVersion": 4,
+                "collectionIndex": {"c1": "/somewhere/c1"},
+                "persistedScripts": {"c1_r1": {"testScript": "mine();"}}
+            }),
+        );
+        assert_eq!(run(temp.path()), vec![unsupported("storeScripts")]);
+    }
+
+    #[test]
+    fn a_v1_collection_directory_is_reported_whether_app_owned_or_linked() {
+        let temp = TempDir::new().unwrap();
+        let owned = temp.path().join(COLLECTIONS_DIR).join("pets");
+        fs::create_dir_all(&owned).unwrap();
+        fs::write(owned.join("collection.json"), "{}").unwrap();
+        write_main(temp.path(), json!({"dataVersion": 4}));
+        assert_eq!(run(temp.path()), vec![unsupported("v1Collections")]);
+
+        fs::write(owned.join("collection.yaml"), "resonanceFormat: 2\n").unwrap();
+        assert!(run(temp.path()).is_empty());
+
+        let linked = TempDir::new().unwrap();
+        fs::write(linked.path().join("collection.json"), "{}").unwrap();
+        write_main(
+            temp.path(),
+            json!({"dataVersion": 4, "collectionIndex": {"c9": linked.path().to_string_lossy()}}),
+        );
+        assert_eq!(run(temp.path()), vec![unsupported("v1Collections")]);
+    }
+
+    #[test]
+    fn data_stamped_by_3_5_has_its_cookies_rekeyed() {
+        let temp = TempDir::new().unwrap();
+        write_main(temp.path(), json!({"dataVersion": 3}));
+        fs::write(
+            temp.path().join(store_file_for("cookieJar")),
             json!({
                 "cookieJar": [
                     {"id": "old-1", "domain": "a.test", "path": "/", "name": "s", "value": "stale", "updatedAt": 1},
                     {"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s", "value": "fresh", "updatedAt": 2},
                     {"id": "env1|b.test|/|t", "environmentId": "env1", "domain": "b.test", "path": "/", "name": "t", "value": "kept"}
                 ]
-            }),
-        );
+            })
+            .to_string(),
+        )
+        .unwrap();
 
         assert!(run(temp.path()).is_empty());
 
-        assert!(read_main(temp.path()).get("cookieJar").is_none());
         let cookies = read_store(&temp.path().join(store_file_for("cookieJar")));
         assert_eq!(
             cookies["cookieJar"],
@@ -516,56 +631,5 @@ mod tests {
         ];
 
         assert_eq!(rekeyed_cookies(&cookies), None);
-    }
-
-    #[test]
-    fn a_rekeyed_entry_keeps_its_position_and_the_older_duplicate_loses() {
-        let cookies = vec![
-            json!({"id": "x", "environmentId": null, "domain": "a.test", "path": "/", "name": "s", "value": "newer", "updatedAt": 5}),
-            json!({"id": "y", "domain": "c.test", "path": "/", "name": "u"}),
-            json!({"id": "default|a.test|/|s", "environmentId": "default", "domain": "a.test", "path": "/", "name": "s", "value": "older", "updatedAt": 3}),
-        ];
-
-        let rekeyed = rekeyed_cookies(&cookies).unwrap();
-
-        assert_eq!(rekeyed.len(), 2);
-        assert_eq!(rekeyed[0]["id"], "default|a.test|/|s");
-        assert_eq!(rekeyed[0]["value"], "newer");
-        assert_eq!(rekeyed[1]["id"], "default|c.test|/|u");
-        assert_eq!(rekeyed[1]["environmentId"], "default");
-    }
-
-    #[test]
-    fn a_missing_jar_is_a_no_op() {
-        let temp = TempDir::new().unwrap();
-
-        assert_eq!(rekey_cookies(temp.path()), Ok(()));
-
-        assert!(!temp.path().join(store_file_for("cookieJar")).exists());
-    }
-
-    #[test]
-    fn global_store_collections_are_reported_and_kept() {
-        let temp = TempDir::new().unwrap();
-        write_main(temp.path(), json!({"collections": [{"id": "old"}]}));
-
-        let issues = run(temp.path());
-
-        assert_eq!(
-            issues,
-            vec![MigrationIssue::Unsupported {
-                data: "globalStoreCollections".into()
-            }]
-        );
-        assert_eq!(
-            read_main(temp.path())["collections"],
-            json!([{"id": "old"}])
-        );
-    }
-
-    #[test]
-    fn an_issue_serializes_with_a_kind_tag() {
-        let value = serde_json::to_value(MigrationIssue::TooOld { found: 0, min: 2 }).unwrap();
-        assert_eq!(value, json!({"kind": "tooOld", "found": 0, "min": 2}));
     }
 }

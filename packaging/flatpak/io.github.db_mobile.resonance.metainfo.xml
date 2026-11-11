@@ -117,6 +117,20 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.1" date="2026-11-10">
+      <description>
+        <p>Feature stabilization release</p>
+        <ul>
+          <li>Renaming a folder no longer duplicates its requests and subfolders</li>
+          <li>Store authentication secrets of open tabs in the system keyring instead of plain text</li>
+          <li>Saving an inactive tab from the tab bar saves that tab instead of the active one</li>
+          <li>Remove a collection's variables file when all its variables are cleared</li>
+          <li>Disconnect from MQTT brokers cleanly so the Last Will message is not published</li>
+          <li>Fix gRPC message skeletons for recursive message types, cURL imports with -u credentials and script test results when a script throws</li>
+          <li>Data from before Resonance 3.3.1 is no longer converted; install 3.6.0 once first to upgrade it</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.6.0" date="2026-11-08">
       <description>
         <p>New features introduced</p>
