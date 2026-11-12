@@ -51,7 +51,7 @@ fn build_context(
         secret_keys.extend(file.secret_keys);
         layers.push(file.variables);
     }
-    layers.push(vars::prefixed_env(std::env::vars()));
+    layers.push(vars::prefixed_env(vars::utf8_env(std::env::vars_os())));
     let mut flags = Variables::new();
     for assignment in &args.vars {
         let (key, value) = vars::parse_assignment(assignment)?;
@@ -134,6 +134,14 @@ pub async fn run(args: RunArgs, out: &mut dyn Write, err: &mut dyn Write) -> Res
         let _ = writeln!(
             err,
             "warning: runner id {old:?} is duplicated; using {fresh} for this run"
+        );
+    }
+    let unreadable = vars::unreadable_prefixed_env(std::env::vars_os());
+    if !unreadable.is_empty() {
+        let _ = writeln!(
+            err,
+            "warning: ignoring environment variables that are not valid UTF-8: {}",
+            unreadable.join(", ")
         );
     }
     let prepared = prepare(&args, &loaded)?;

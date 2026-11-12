@@ -19,6 +19,12 @@ const API_KEY_VARIABLE: &str = "apiKey";
 /// schemas; this is a safety net for pathologically deep (but acyclic) specs.
 const MAX_REF_DEPTH: usize = 64;
 
+/// Hard cap on how many `$ref`s one schema may inline. Cycle detection and the
+/// depth cap leave acyclic fan-out unbounded: a schema whose properties all
+/// share one nested schema is inlined once per path, so ten properties over
+/// ten levels would be ten billion nodes.
+const MAX_REF_EXPANSIONS: usize = 2_000;
+
 /// Hard cap on example-generation recursion depth.
 const MAX_EXAMPLE_DEPTH: usize = 128;
 
@@ -378,7 +384,8 @@ fn extract_openapi_responses(
 /// Resolve $ref in OpenAPI schema recursively
 fn resolve_schema_ref(schema: &Value, spec: &Value) -> Value {
     let mut active = HashSet::new();
-    resolve_schema_ref_recursive(schema, spec, 0, &mut active)
+    let mut budget = MAX_REF_EXPANSIONS;
+    resolve_schema_ref_recursive(schema, spec, 0, &mut active, &mut budget)
 }
 
 /// Recursively resolve all `$ref` in an OpenAPI schema.
@@ -389,12 +396,14 @@ fn resolve_schema_ref(schema: &Value, spec: &Value) -> Value {
 /// the entry is removed on the way back up so the same schema reused in a
 /// sibling (non-cyclic) position still resolves normally. Unresolvable refs and
 /// anything past `MAX_REF_DEPTH` also stub out, so the returned value never
-/// contains an unresolved `$ref`.
+/// contains an unresolved `$ref`. `budget` counts the `$ref`s still allowed to
+/// inline; once spent, further refs stub out the same way.
 fn resolve_schema_ref_recursive(
     schema: &Value,
     spec: &Value,
     depth: usize,
     active: &mut HashSet<String>,
+    budget: &mut usize,
 ) -> Value {
     if depth > MAX_REF_DEPTH {
         return empty_schema_stub();
@@ -403,13 +412,14 @@ fn resolve_schema_ref_recursive(
     // Handle direct $ref
     if let Some(ref_path) = schema.get("$ref").and_then(|r| r.as_str()) {
         if ref_path.starts_with("#/") {
-            if active.contains(ref_path) {
+            if active.contains(ref_path) || *budget == 0 {
                 return empty_schema_stub();
             }
             let json_pointer = format!("/{}", ref_path.trim_start_matches("#/"));
             if let Some(resolved) = spec.pointer(&json_pointer) {
+                *budget -= 1;
                 active.insert(ref_path.to_string());
-                let out = resolve_schema_ref_recursive(resolved, spec, depth + 1, active);
+                let out = resolve_schema_ref_recursive(resolved, spec, depth + 1, active, budget);
                 active.remove(ref_path);
                 return out;
             }
@@ -428,7 +438,13 @@ fn resolve_schema_ref_recursive(
                     for (prop_key, prop_value) in props {
                         new_props.insert(
                             prop_key.clone(),
-                            resolve_schema_ref_recursive(prop_value, spec, depth + 1, active),
+                            resolve_schema_ref_recursive(
+                                prop_value,
+                                spec,
+                                depth + 1,
+                                active,
+                                budget,
+                            ),
                         );
                     }
                     new_obj.insert(key.clone(), Value::Object(new_props));
@@ -439,14 +455,16 @@ fn resolve_schema_ref_recursive(
                 // Handle array items
                 new_obj.insert(
                     key.clone(),
-                    resolve_schema_ref_recursive(value, spec, depth + 1, active),
+                    resolve_schema_ref_recursive(value, spec, depth + 1, active, budget),
                 );
             } else if key == "allOf" || key == "oneOf" || key == "anyOf" {
                 // Handle composition keywords
                 if let Some(arr) = value.as_array() {
                     let resolved_arr: Vec<Value> = arr
                         .iter()
-                        .map(|item| resolve_schema_ref_recursive(item, spec, depth + 1, active))
+                        .map(|item| {
+                            resolve_schema_ref_recursive(item, spec, depth + 1, active, budget)
+                        })
                         .collect();
                     new_obj.insert(key.clone(), Value::Array(resolved_arr));
                 } else {
@@ -890,6 +908,59 @@ mod tests {
 
         assert_eq!(variables.len(), 1);
         assert_eq!(variables[0].key, "baseUrl");
+    }
+
+    fn diamond_spec(levels: usize, fan_out: usize) -> Value {
+        let mut schemas = serde_json::Map::new();
+        for level in 0..levels {
+            let properties: serde_json::Map<String, Value> = (0..fan_out)
+                .map(|i| {
+                    let child = if level + 1 < levels {
+                        json!({ "$ref": format!("#/components/schemas/L{}", level + 1) })
+                    } else {
+                        json!({ "type": "string" })
+                    };
+                    (format!("p{i}"), child)
+                })
+                .collect();
+            schemas.insert(
+                format!("L{level}"),
+                json!({ "type": "object", "properties": properties }),
+            );
+        }
+        json!({
+            "openapi": "3.0.0",
+            "info": { "title": "Diamond", "version": "1" },
+            "paths": {
+                "/d": { "post": {
+                    "requestBody": { "content": { "application/json": {
+                        "schema": { "$ref": "#/components/schemas/L0" } } } },
+                    "responses": { "200": { "description": "ok", "content": { "application/json": {
+                        "schema": { "$ref": "#/components/schemas/L0" } } } } }
+                } }
+            },
+            "components": { "schemas": schemas }
+        })
+    }
+
+    fn contains_ref(value: &Value) -> bool {
+        match value {
+            Value::Object(map) => map.contains_key("$ref") || map.values().any(contains_ref),
+            Value::Array(items) => items.iter().any(contains_ref),
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn shared_nested_refs_are_bounded_instead_of_exploding() {
+        let spec = diamond_spec(12, 10);
+        let started = std::time::Instant::now();
+
+        let resolved = resolve_schema_ref(&json!({ "$ref": "#/components/schemas/L0" }), &spec);
+
+        assert!(!contains_ref(&resolved));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        assert!(parse_openapi_spec(spec).is_ok());
     }
 
     #[test]

@@ -222,7 +222,7 @@ pub async fn grpc_select_proto_file(app: AppHandle) -> Result<Option<String>, St
 
 /// Compiles `.proto` files in-process with protox, so no `protoc` binary is
 /// needed. Google's well-known types (`google/protobuf/*.proto`) are bundled.
-mod protox_parse {
+pub(crate) mod protox_parse {
     use prost_reflect::DescriptorPool;
     use std::path::PathBuf;
 
