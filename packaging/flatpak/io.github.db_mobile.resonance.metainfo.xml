@@ -117,6 +117,18 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.2" date="2026-11-12">
+      <description>
+        <p>Stability fixes</p>
+        <ul>
+          <li>Stop the window jumping when clicking into an editor</li>
+          <li>Send and cancel gRPC streams before the server sends its first response</li>
+          <li>Import malformed Insomnia exports without crashing</li>
+          <li>Import OpenAPI specs with deeply shared schemas without hanging</li>
+          <li>Run the command-line tool in environments with non-UTF-8 variables</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.6.1" date="2026-11-10">
       <description>
         <p>Feature stabilization release</p>
