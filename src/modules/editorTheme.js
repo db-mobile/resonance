@@ -11,7 +11,7 @@ import { tags } from '@lezer/highlight';
 const THEME_CHANGED_EVENT = 'resonance:theme-changed';
 
 export const baseEditorTheme = EditorView.theme({
-    '&': {
+    '&.cm-editor': {
         height: '100%'
     },
     '.cm-scroller': {

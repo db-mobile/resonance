@@ -3,6 +3,7 @@
 use resonance_collections::variables::environment_from_export;
 use resonance_core::model::Variables;
 use serde_json::Value;
+use std::ffi::OsString;
 use std::path::Path;
 
 use crate::error::CliError;
@@ -28,6 +29,26 @@ pub fn prefixed_env(env: impl Iterator<Item = (String, String)>) -> Variables {
             .filter(|key| !key.is_empty())
             .map(|key| (key.to_string(), Value::String(value)))
     })
+    .collect()
+}
+
+/// The process environment as strings, skipping any entry whose name or value
+/// is not UTF-8. `std::env::vars` panics on those, and a CI runner can carry
+/// one that has nothing to do with Resonance.
+pub fn utf8_env(
+    env: impl Iterator<Item = (OsString, OsString)>,
+) -> impl Iterator<Item = (String, String)> {
+    env.filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+}
+
+/// Names of `RESONANCE_VAR_` entries that [`utf8_env`] has to skip, so the run
+/// can say why a variable the user passed is missing.
+pub fn unreadable_prefixed_env(env: impl Iterator<Item = (OsString, OsString)>) -> Vec<String> {
+    env.filter(|(name, value)| {
+        name.to_string_lossy().starts_with(ENV_PREFIX)
+            && (name.to_str().is_none() || value.to_str().is_none())
+    })
+    .map(|(name, _)| name.to_string_lossy().into_owned())
     .collect()
 }
 
@@ -113,6 +134,35 @@ mod tests {
         );
         assert_eq!(vars.len(), 1);
         assert_eq!(vars["baseUrl"], "https://x");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_entries_are_skipped_and_named_when_they_were_meant_for_us() {
+        use std::os::unix::ffi::OsStringExt;
+        let env = || {
+            vec![
+                (
+                    OsString::from("LANG_JUNK"),
+                    OsString::from_vec(b"\xff".to_vec()),
+                ),
+                (
+                    OsString::from("RESONANCE_VAR_bad"),
+                    OsString::from_vec(b"\xfe".to_vec()),
+                ),
+                (OsString::from("RESONANCE_VAR_good"), OsString::from("ok")),
+            ]
+            .into_iter()
+        };
+
+        let vars = prefixed_env(utf8_env(env()));
+
+        assert_eq!(vars.len(), 1);
+        assert_eq!(vars["good"], "ok");
+        assert_eq!(
+            unreadable_prefixed_env(env()),
+            vec!["RESONANCE_VAR_bad".to_string()]
+        );
     }
 
     #[test]

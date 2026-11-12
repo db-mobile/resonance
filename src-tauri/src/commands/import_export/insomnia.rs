@@ -130,28 +130,18 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
 
     let mut builder = CollectionBuilder::default();
     let mut skipped_requests = 0usize;
+    let mut walk = V4Walk {
+        children: &children,
+        visited: HashSet::new(),
+    };
 
-    collect_v4_items(
-        root_id,
-        &children,
-        &[],
-        None,
-        &mut builder,
-        &mut skipped_requests,
-    );
+    walk.collect(root_id, &[], None, &mut builder, &mut skipped_requests);
     // Resources whose parent is missing from the export (partial exports)
     // bucket under "" — surface them at the collection root rather than
     // dropping them. The workspace itself sits there too but is not a
     // request/request_group, so nothing is visited twice.
     if !root_id.is_empty() {
-        collect_v4_items(
-            "",
-            &children,
-            &[],
-            None,
-            &mut builder,
-            &mut skipped_requests,
-        );
+        walk.collect("", &[], None, &mut builder, &mut skipped_requests);
     }
 
     let (endpoints, folders) = builder.finish();
@@ -212,45 +202,52 @@ fn parse_v4(doc: &Value) -> Result<InsomniaImport, String> {
 /// nested groups flatten to composite-named folders ("Parent / Child"), the
 /// nearest group auth wins, and endpoints land in both the folder and the flat
 /// list.
-fn collect_v4_items(
-    parent_id: &str,
-    children: &HashMap<&str, Vec<&Value>>,
-    name_chain: &[String],
-    folder_auth: Option<&Value>,
-    builder: &mut CollectionBuilder,
-    skipped_requests: &mut usize,
-) {
-    for resource in children.get(parent_id).cloned().unwrap_or_default() {
-        match resource.get("_type").and_then(|t| t.as_str()) {
-            Some("request_group") => {
-                let folder_name = resource
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("Folder")
-                    .to_string();
-                let mut chain = name_chain.to_vec();
-                chain.push(folder_name);
+/// Walks the v4 parent/child buckets. `visited` holds every folder already
+/// entered: a folder without an id, one that is its own parent, or one whose
+/// id is duplicated would otherwise lead back into a bucket that contains it
+/// and recurse until the stack overflows.
+struct V4Walk<'a> {
+    children: &'a HashMap<&'a str, Vec<&'a Value>>,
+    visited: HashSet<String>,
+}
 
-                let own_auth = convert_auth(resource.get("authentication"));
-                let child_auth = own_auth.as_ref().or(folder_auth);
+impl V4Walk<'_> {
+    fn collect(
+        &mut self,
+        parent_id: &str,
+        name_chain: &[String],
+        folder_auth: Option<&Value>,
+        builder: &mut CollectionBuilder,
+        skipped_requests: &mut usize,
+    ) {
+        for resource in self.children.get(parent_id).cloned().unwrap_or_default() {
+            match resource.get("_type").and_then(|t| t.as_str()) {
+                Some("request_group") => {
+                    let group_id = resource.get("_id").and_then(|id| id.as_str()).unwrap_or("");
+                    if group_id.is_empty() || !self.visited.insert(group_id.to_string()) {
+                        continue;
+                    }
+                    let folder_name = resource
+                        .get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("Folder")
+                        .to_string();
+                    let mut chain = name_chain.to_vec();
+                    chain.push(folder_name);
 
-                let group_id = resource.get("_id").and_then(|id| id.as_str()).unwrap_or("");
-                collect_v4_items(
-                    group_id,
-                    children,
-                    &chain,
-                    child_auth,
-                    builder,
-                    skipped_requests,
-                );
+                    let own_auth = convert_auth(resource.get("authentication"));
+                    let child_auth = own_auth.as_ref().or(folder_auth);
+
+                    self.collect(group_id, &chain, child_auth, builder, skipped_requests);
+                }
+                Some("request") => {
+                    builder.place(convert_request(resource), name_chain, folder_auth);
+                }
+                Some("websocket_request") | Some("grpc_request") => {
+                    *skipped_requests += 1;
+                }
+                _ => {}
             }
-            Some("request") => {
-                builder.place(convert_request(resource), name_chain, folder_auth);
-            }
-            Some("websocket_request") | Some("grpc_request") => {
-                *skipped_requests += 1;
-            }
-            _ => {}
         }
     }
 }
@@ -906,6 +903,44 @@ mod tests {
                 .iter()
                 .any(|e| e.name == "Orphan")
         );
+    }
+
+    fn v4_export(resources: Value) -> Value {
+        json!({"_type": "export", "__export_format": 4, "resources": resources})
+    }
+
+    #[test]
+    fn malformed_folder_graphs_import_without_recursing_forever() {
+        let request = |id: &str, parent: &str| json!({"_id": id, "_type": "request", "parentId": parent, "name": id, "method": "GET", "url": "https://x.test"});
+        let cases = vec![
+            vec![
+                json!({"_id": "wrk", "_type": "workspace", "name": "W"}),
+                json!({"_type": "request_group", "name": "No id"}),
+                request("r1", "missing"),
+            ],
+            vec![
+                json!({"_id": "wrk", "_type": "workspace", "name": "W"}),
+                json!({"_id": "g", "_type": "request_group", "parentId": "g", "name": "Self"}),
+                json!({"_id": "h", "_type": "request_group", "parentId": "wrk", "name": "Ok"}),
+                request("r1", "h"),
+            ],
+            vec![
+                json!({"_id": "wrk", "_type": "workspace", "name": "W"}),
+                json!({"_id": "g", "_type": "request_group", "parentId": "wrk", "name": "First"}),
+                json!({"_id": "g", "_type": "request_group", "parentId": "g", "name": "Duplicate"}),
+                request("r1", "g"),
+            ],
+            vec![
+                json!({"_id": "wrk", "_type": "workspace", "name": "W"}),
+                json!({"_id": "a", "_type": "request_group", "parentId": "b", "name": "A"}),
+                json!({"_id": "b", "_type": "request_group", "parentId": "a", "name": "B"}),
+                request("r1", "wrk"),
+            ],
+        ];
+        for resources in cases {
+            let import = parse_insomnia_export(v4_export(Value::Array(resources))).unwrap();
+            assert_eq!(import.collection.endpoints.len(), 1);
+        }
     }
 
     #[test]
