@@ -99,6 +99,15 @@ describe('VariableRepository secret handling', () => {
         expect(await secretStore.get('collvar:c1', 'apiKey')).toBe('super-secret');
     });
 
+    test('deleteAllVariablesForCollection clears the secret scope even after the collection is gone', async () => {
+        await repository.setVariablesForCollection('c1', { apiKey: 'super-secret' }, ['apiKey']);
+        mockBackendAPI.collections.saveVariables.mockRejectedValueOnce(new Error('Collection c1 not found'));
+
+        await repository.deleteAllVariablesForCollection('c1');
+
+        expect(await secretStore.has('collvar:c1', 'apiKey')).toBe(false);
+    });
+
     test('deleteAllVariablesForCollection clears the secret scope', async () => {
         await repository.setVariablesForCollection('c1', { apiKey: 'super-secret' }, ['apiKey']);
         await repository.deleteAllVariablesForCollection('c1');

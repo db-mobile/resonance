@@ -10,6 +10,7 @@ import { getAuthType, getAuthTypeLabel, DEFAULT_REDIRECT_URI } from './auth/auth
 import { buildTokenRequest, applyTokenResult } from './auth/oauthRefresh.js';
 import { resolveAuthConfigVariables } from './auth/authVariables.js';
 import { toast } from './ui/Toast.js';
+import { getCurrentEndpoint } from './state/currentEndpoint.js';
 
 /** @type {((collectionId: (string|undefined)) => Promise<{variables: Object, processor: Object}>)|null} */
 let oauthVariableResolver = null;
@@ -363,6 +364,7 @@ export class AuthManager {
      */
     async _handleGetToken(errorGroup, errorMessage) {
         const grantType = this.currentAuthConfig.config.grantType || 'client_credentials';
+        const origin = this._tokenOrigin();
 
         if (errorGroup) {errorGroup.classList.add('u-hidden');}
 
@@ -377,7 +379,7 @@ export class AuthManager {
             } else {
                 const config = await this._resolvedOAuthConfig();
                 const result = await api.oauth2.getToken(buildTokenRequest(config, grantType));
-                this._handleTokenResponse(result, errorGroup, errorMessage);
+                this._handleTokenResponse(result, errorGroup, errorMessage, origin);
             }
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to get token');
@@ -456,6 +458,7 @@ export class AuthManager {
      */
     async _exchangeAuthorizationCode(code) {
         const raw = this.currentAuthConfig.config;
+        const origin = this._tokenOrigin();
         const errorGroup = this._el('oauth2-error-group');
         const errorMessage = this._el('oauth2-error-message');
 
@@ -467,7 +470,7 @@ export class AuthManager {
             }
 
             const result = await api.oauth2.getToken(buildTokenRequest(config, 'authorization_code', { authorizationCode: code, codeVerifier }));
-            this._handleTokenResponse(result, errorGroup, errorMessage);
+            this._handleTokenResponse(result, errorGroup, errorMessage, origin);
 
             delete raw._pendingState;
         } catch (error) {
@@ -486,10 +489,11 @@ export class AuthManager {
             return;
         }
 
+        const origin = this._tokenOrigin();
         try {
             const config = await this._resolvedOAuthConfig();
             const result = await api.oauth2.getToken(buildTokenRequest(config, 'refresh_token'));
-            this._handleTokenResponse(result, errorGroup, errorMessage);
+            this._handleTokenResponse(result, errorGroup, errorMessage, origin);
         } catch (error) {
             this._showError(errorGroup, errorMessage, error.message || 'Failed to refresh token');
         }
@@ -505,13 +509,40 @@ export class AuthManager {
         }
     }
 
+    /** @returns {{config: Object, endpoint: Object|null}} */
+    _tokenOrigin() {
+        return { config: this.currentAuthConfig, endpoint: getCurrentEndpoint() };
+    }
+
+    /**
+     * @param {{config: Object, endpoint: Object|null}} [origin]
+     * @returns {boolean}
+     */
+    _isStillShowing(origin) {
+        if (!origin) {
+            return true;
+        }
+        const current = getCurrentEndpoint();
+        if (origin.endpoint || current) {
+            return origin.endpoint?.collectionId === current?.collectionId
+                && origin.endpoint?.endpointId === current?.endpointId
+                && this.currentAuthConfig?.type === 'oauth2';
+        }
+        return origin.config === this.currentAuthConfig;
+    }
+
     /**
      * @param {Object} result
      * @param {HTMLElement} errorGroup
      * @param {HTMLElement} errorMessage
+     * @param {{config: Object, endpoint: Object|null}} [origin]
      * @returns {void}
      */
-    _handleTokenResponse(result, errorGroup, errorMessage) {
+    _handleTokenResponse(result, errorGroup, errorMessage, origin) {
+        if (!this._isStillShowing(origin)) {
+            toast.warning('The token arrived after you switched requests, so it was not applied. Get the token again on that request.');
+            return;
+        }
         if (result.success && result.accessToken) {
             const { config } = this.currentAuthConfig;
             const next = applyTokenResult(config, result);

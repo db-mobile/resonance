@@ -248,10 +248,13 @@ export class VariableRepository {
     async deleteAllVariablesForCollection(collectionId) {
         try {
             await this.backendAPI.collections.saveVariables(collectionId, []);
-            if (this.secretStore) {
-                await this.secretStore.deleteScope(this.secretScope(collectionId));
-            }
         } catch {
+        }
+        if (this.secretStore) {
+            try {
+                await this.secretStore.deleteScope(this.secretScope(collectionId));
+            } catch {
+            }
         }
         this._cache.delete(collectionId);
     }

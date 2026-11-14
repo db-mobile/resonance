@@ -604,18 +604,24 @@ fn extract_postman_url(url: Option<&Value>) -> String {
         _ => "/".to_string(),
     };
 
-    // Convert Postman :param format to {{param}} format
-    // e.g., /posts/:id -> /posts/{{id}}
-    PATH_PARAM_PATTERN
-        .replace_all(&raw_url, "{{$1}}")
-        .to_string()
+    // Convert Postman :param segments to {{param}}, e.g. /posts/:id ->
+    // /posts/{{id}}. Only a segment that starts with `:` is a placeholder, as
+    // in Postman: `models/gemini:generateContent`, `user:pass@` and query
+    // values keep their colons.
+    let split = raw_url.find(['?', '#']).unwrap_or(raw_url.len());
+    let (path, rest) = raw_url.split_at(split);
+    format!(
+        "{}{}",
+        PATH_PARAM_PATTERN.replace_all(path, "${1}{{${2}}}"),
+        rest
+    )
 }
 
-/// Postman's `:name` path placeholders. Compiled once: this runs per endpoint,
-/// and a large collection re-parsing the pattern thousands of times during an
-/// import is pure waste.
+/// Postman's `:name` path placeholders, matched only at the start of a path
+/// segment. Compiled once: this runs per endpoint, and a large collection
+/// re-parsing the pattern thousands of times during an import is pure waste.
 static PATH_PARAM_PATTERN: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r":([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"));
+    LazyLock::new(|| regex::Regex::new(r"(^|/):([a-zA-Z_][a-zA-Z0-9_]*)").expect("valid regex"));
 
 /// Extract parameters from Postman URL object and request headers
 fn extract_postman_parameters(url: Option<&Value>, request: &Value) -> Option<Value> {
@@ -979,6 +985,33 @@ mod tests {
         assert_eq!(config["scope"], "read write");
         assert_eq!(config["clientAuthMethod"], "header");
         assert!(config.get("clientSecret").is_none());
+    }
+
+    #[test]
+    fn only_colon_prefixed_path_segments_become_variables() {
+        let cases = [
+            (
+                "{{baseUrl}}/posts/:id/comments/:commentId",
+                "{{baseUrl}}/posts/{{id}}/comments/{{commentId}}",
+            ),
+            (
+                "{{baseUrl}}/v1/models/gemini:generateContent",
+                "{{baseUrl}}/v1/models/gemini:generateContent",
+            ),
+            (
+                "https://user:pass@api.example.com/items/:id",
+                "https://user:pass@api.example.com/items/{{id}}",
+            ),
+            (
+                "https://api.example.com/x?t=a:b&u=/:c",
+                "https://api.example.com/x?t=a:b&u=/:c",
+            ),
+            (":id", "{{id}}"),
+        ];
+        for (raw, expected) in cases {
+            let url = serde_json::json!({ "raw": raw });
+            assert_eq!(extract_postman_url(Some(&url)), expected, "{raw}");
+        }
     }
 
     #[test]

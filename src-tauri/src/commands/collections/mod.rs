@@ -2247,6 +2247,60 @@ mod delete_folder {
     }
 
     #[test]
+    fn deleting_one_of_two_same_named_folders_removes_only_that_one() {
+        let temp = TempDir::new().unwrap();
+        let incoming = ipc(vec![], vec![]);
+        write_v2_collection(temp.path(), &incoming).unwrap();
+        for (dir, id) in [("v1/users", "a"), ("v2/users", "b")] {
+            std::fs::create_dir_all(temp.path().join(dir)).unwrap();
+            std::fs::write(
+                temp.path().join(dir).join(format!("{id}.yaml")),
+                format!("resonanceFormat: 2\nid: {id}\nname: {id}\n"),
+            )
+            .unwrap();
+        }
+
+        let mut loaded = read_collection_dir(temp.path()).unwrap();
+        let folder = take_folder_from_tree(&mut loaded.root, "folder_users_2").unwrap();
+        write::write_collection_dir(temp.path(), &mut loaded).unwrap();
+        remove_folder_files(&folder);
+
+        assert!(temp.path().join("v1/users/a.yaml").exists());
+        assert!(!temp.path().join("v2/users").exists());
+        assert!(temp.path().join("v2").exists());
+    }
+
+    #[test]
+    fn a_structural_save_keeps_same_named_folders_in_their_own_directories() {
+        let temp = TempDir::new().unwrap();
+        write_v2_collection(temp.path(), &ipc(vec![], vec![])).unwrap();
+        for (dir, id) in [("v1/users", "a"), ("v2/users", "b")] {
+            std::fs::create_dir_all(temp.path().join(dir)).unwrap();
+            std::fs::write(
+                temp.path().join(dir).join(format!("{id}.yaml")),
+                format!("resonanceFormat: 2\nid: {id}\nname: {id}\n"),
+            )
+            .unwrap();
+        }
+        let request = |id: &str| json!({"id": id, "name": id, "method": "GET", "path": "/"});
+        let incoming = ipc(
+            vec![request("a"), request("b")],
+            vec![
+                json!({"id": "folder_v1", "name": "v1", "endpoints": [],
+                    "folders": [{"id": "folder_users", "name": "users", "endpoints": [request("a")]}]}),
+                json!({"id": "folder_v2", "name": "v2", "endpoints": [],
+                    "folders": [{"id": "folder_users_2", "name": "users", "endpoints": [request("b")]}]}),
+            ],
+        );
+
+        write_v2_collection(temp.path(), &incoming).unwrap();
+
+        assert!(temp.path().join("v1/users/a.yaml").exists());
+        assert!(temp.path().join("v2/users/b.yaml").exists());
+        assert!(!temp.path().join("v1/users-2").exists());
+    }
+
+    #[test]
     fn a_stray_user_file_keeps_its_directory() {
         let temp = TempDir::new().unwrap();
         let req = json!({"id": "r", "name": "R", "method": "GET", "path": "/r"});

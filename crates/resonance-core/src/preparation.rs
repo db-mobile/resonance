@@ -235,20 +235,32 @@ pub fn query_string(rows: &[(String, String)]) -> String {
         .collect::<Vec<_>>()
         .join("&")
 }
+/// Percent-encodes a query key or value like `encodeURIComponent`, keeping
+/// any `%XX` escape already in it. A value that was pre-encoded (`a%20b`, a
+/// token) goes out unchanged, while a literal `%` (`100% done`) becomes `%25`
+/// and `&` or `=` can no longer split the parameter.
 fn encode(text: &str) -> String {
-    if text.contains('%') {
-        return text.into();
+    let bytes = text.as_bytes();
+    let mut out = String::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'%'
+            && bytes.get(i + 1).is_some_and(u8::is_ascii_hexdigit)
+            && bytes.get(i + 2).is_some_and(u8::is_ascii_hexdigit)
+        {
+            out.push_str(&text[i..i + 3]);
+            i += 3;
+            continue;
+        }
+        if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+        i += 1;
     }
-    text.as_bytes()
-        .iter()
-        .map(|b| {
-            if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(b) {
-                (*b as char).to_string()
-            } else {
-                format!("%{b:02X}")
-            }
-        })
-        .collect()
+    out
 }
 pub fn mock_path(template: &str, paths: &Map<String, Value>) -> String {
     let mut path = template.trim().to_string();

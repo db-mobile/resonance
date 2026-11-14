@@ -85,6 +85,7 @@ pub async fn oauth2_get_token(
             disable_pooling: false,
             single_connection: false,
             timing_recorder: None,
+            cookie_store: None,
         },
         proxy_action,
     )

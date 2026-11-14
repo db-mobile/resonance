@@ -303,14 +303,14 @@ export class PreviewRenderer {
      * @returns {string}
      */
     _injectCSP(content, cspMeta) {
-        const headMatch = content.match(/<head[^>]*>/i);
-        if (headMatch) {
-            return content.replace(headMatch[0], `${headMatch[0]}\n${cspMeta}`);
+        const headTag = /<head(?=[\s>/])[^>]*>/i;
+        if (headTag.test(content)) {
+            return content.replace(headTag, (tag) => `${tag}\n${cspMeta}`);
         }
 
-        const htmlMatch = content.match(/<html[^>]*>/i);
-        if (htmlMatch) {
-            return content.replace(htmlMatch[0], `${htmlMatch[0]}\n<head>${cspMeta}</head>`);
+        const htmlTag = /<html(?=[\s>/])[^>]*>/i;
+        if (htmlTag.test(content)) {
+            return content.replace(htmlTag, (tag) => `${tag}\n<head>${cspMeta}</head>`);
         }
 
         return `<!DOCTYPE html><html><head>${cspMeta}</head><body>${content}</body></html>`;

@@ -14,6 +14,7 @@ use crate::{
 };
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::watch;
 
 #[derive(Clone, Debug)]
@@ -402,8 +403,24 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
         }
         result["requestConfig"] = prepared.request.clone();
         result["historySensitive"] = json!({"headerNames":prepared.auth_headers.keys().collect::<Vec<_>>(),"queryNames":prepared.auth_query.keys().collect::<Vec<_>>()});
-        let options: RequestOptions = serde_json::from_value(prepared.request.clone())
+        let mut options: RequestOptions = serde_json::from_value(prepared.request.clone())
             .map_err(|e| ExecutionError::new("invalidRequest", e.to_string()))?;
+        let jar_enabled = self.context.settings.cookie_jar_enabled != Some(false);
+        let hops = jar_enabled.then(|| cookies::HopRecorder::new(self.context.cookies.clone()));
+        if let Some(hops) = &hops {
+            // `finalize` put the jar's cookies on the request so scripts and
+            // history see them. On the wire the hop recorder supplies them per
+            // hop instead; reqwest only asks it when no Cookie header is set,
+            // so one the user typed still wins.
+            let jar_header = cookies::header(&self.context.cookies, &options.url);
+            if let Some(headers) = options.headers.as_mut()
+                && jar_header.is_some()
+                && headers.get("Cookie") == jar_header.as_ref()
+            {
+                headers.remove("Cookie");
+            }
+            options.cookie_store = Some(Arc::clone(hops));
+        }
         self.sent = true;
         self.event("request-sent", Value::Null);
         let response =
@@ -415,13 +432,16 @@ impl<F: FnMut(ExecutionEvent)> Session<F> {
         result["apiResponse"] = response_value.clone();
         result["statusCode"] = json!(response.status);
         result["httpSuccess"] = response.success.into();
-        let changes = cookies::response_changes(
-            &response.set_cookies,
-            prepared.request["url"].as_str().unwrap_or(""),
-        );
+        let changes = match &hops {
+            Some(hops) => hops.changes(),
+            None => cookies::response_changes(
+                &response.set_cookies,
+                prepared.request["url"].as_str().unwrap_or(""),
+            ),
+        };
         let response_cookies: Vec<_> = changes.iter().map(|c| c["cookie"].clone()).collect();
         result["cookies"] = json!(response_cookies);
-        if self.context.settings.cookie_jar_enabled != Some(false) && !changes.is_empty() {
+        if jar_enabled && !changes.is_empty() {
             cookies::apply(&mut self.context.cookies, &changes);
             self.effect(json!({"kind":"cookies","environmentId":self.context.environment_id,"cookies":changes}));
         }

@@ -11,6 +11,7 @@ export class EnvironmentSelector {
         this.dropdown = null;
         this.isOpen = false;
         this.releaseEscape = null;
+        this._openToken = 0;
     }
 
     initialize(containerId) {
@@ -68,9 +69,13 @@ export class EnvironmentSelector {
     }
 
     async openDropdown() {
+        const token = ++this._openToken;
         try {
             const environments = await this.service.getAllEnvironments();
             const activeEnvId = await this.service.getActiveEnvironmentId();
+            if (token !== this._openToken) {
+                return;
+            }
 
             this.dropdown.innerHTML = '';
 
@@ -112,13 +117,16 @@ export class EnvironmentSelector {
 
             this.dropdown.classList.remove('is-hidden');
             this.isOpen = true;
-            this.releaseEscape = pushEscapeHandler(() => this.closeDropdown());
+            if (!this.releaseEscape) {
+                this.releaseEscape = pushEscapeHandler(() => this.closeDropdown());
+            }
 
             this.positionDropdown();
         } catch {}
     }
 
     closeDropdown() {
+        this._openToken++;
         if (this.releaseEscape) {
             this.releaseEscape();
             this.releaseEscape = null;

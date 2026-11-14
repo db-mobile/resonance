@@ -237,3 +237,108 @@ async fn runner_scripts_read_the_request_tags() {
     );
     assert_eq!(effects[1]["environment"]["plain"], json!("[]"));
 }
+
+async fn cookie_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+    use axum::{extract::Request, http::StatusCode, response::IntoResponse, routing::any};
+    async fn route(request: Request) -> axum::response::Response {
+        let cookie = request
+            .headers()
+            .get("cookie")
+            .map(|v| v.to_str().unwrap().to_string())
+            .unwrap_or_default();
+        let host = request.headers()["host"].to_str().unwrap().to_string();
+        match request.uri().path() {
+            "/login" => (
+                StatusCode::FOUND,
+                [("location", "/home"), ("set-cookie", "sid=1; Path=/")],
+            )
+                .into_response(),
+            "/to-localhost" => {
+                let port = host.rsplit(':').next().unwrap();
+                (
+                    StatusCode::FOUND,
+                    [("location", format!("http://localhost:{port}/landing"))],
+                )
+                    .into_response()
+            }
+            "/landing" => ([("set-cookie", "landed=1")], cookie).into_response(),
+            _ => cookie.into_response(),
+        }
+    }
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        axum::serve(listener, axum::Router::new().fallback(any(route)))
+            .await
+            .unwrap()
+    });
+    (addr, server)
+}
+
+#[tokio::test]
+async fn a_cookie_set_by_a_redirect_is_sent_on_the_next_hop_and_stored() {
+    let (addr, server) = cookie_server().await;
+    let input = serde_json::from_value(json!({"executionId":"login","context":{},
+        "request":{"method":"POST","url":format!("http://{addr}/login")}}))
+    .unwrap();
+    let mut effects = vec![];
+    let result = execute_request(input, Cancellation::default(), |event| {
+        if event.kind == "effect" {
+            effects.push(event.data);
+        }
+    })
+    .await;
+
+    let response = result.api_response.as_ref().unwrap();
+    assert_eq!(response.data, Some(json!("sid=1")), "{result:?}");
+    let stored: Vec<_> = effects
+        .iter()
+        .filter(|e| e["kind"] == "cookies")
+        .flat_map(|e| e["cookies"].as_array().unwrap().clone())
+        .collect();
+    assert_eq!(stored.len(), 1, "{effects:?}");
+    assert_eq!(stored[0]["cookie"]["name"], "sid");
+    assert_eq!(stored[0]["cookie"]["domain"], "127.0.0.1");
+    server.abort();
+}
+
+#[tokio::test]
+async fn a_cookie_set_after_a_cross_host_redirect_belongs_to_the_final_host() {
+    let (addr, server) = cookie_server().await;
+    let port = addr.port();
+    let input: RunInput = serde_json::from_value(json!({"executionId":"hosts","runnerName":"Run",
+    "runnerId":null,"dataFile":null,"context":{},"requests":[
+        {"endpointId":"a","url":format!("http://127.0.0.1:{port}/to-localhost")},
+        {"endpointId":"b","url":format!("http://localhost:{port}/echo")},
+        {"endpointId":"c","url":format!("http://127.0.0.1:{port}/echo")}
+    ]}))
+    .unwrap();
+    let result =
+        serde_json::to_value(execute_run(input, Cancellation::default(), |_| {}).await).unwrap();
+
+    assert_eq!(
+        result["requests"][1]["apiResponse"]["data"], "landed=1",
+        "{result}"
+    );
+    assert_eq!(result["requests"][2]["apiResponse"]["data"], "", "{result}");
+    server.abort();
+}
+
+#[tokio::test]
+async fn a_cookie_header_the_user_set_is_sent_unchanged() {
+    let (addr, server) = cookie_server().await;
+    let input: RunInput = serde_json::from_value(json!({"executionId":"manual","runnerName":"Run",
+    "runnerId":null,"dataFile":null,"context":{},"requests":[
+        {"endpointId":"a","method":"POST","url":format!("http://{addr}/login")},
+        {"endpointId":"b","url":format!("http://{addr}/echo"),"headers":{"Cookie":"manual=1"}}
+    ]}))
+    .unwrap();
+    let result =
+        serde_json::to_value(execute_run(input, Cancellation::default(), |_| {}).await).unwrap();
+
+    assert_eq!(
+        result["requests"][1]["apiResponse"]["data"], "manual=1",
+        "{result}"
+    );
+    server.abort();
+}

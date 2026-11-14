@@ -202,7 +202,7 @@ In GitHub Actions, the repository doubles as a setup action that installs the
 CLI on Linux, macOS and Windows runners:
 
 ```yaml
-- uses: db-mobile/resonance@v3.6.2   # installs that version; add `with: version:` to pick another
+- uses: db-mobile/resonance@v3.6.3   # installs that version; add `with: version:` to pick another
 - run: resonance run collections/petstore --runner smoke --junit reports/junit.xml
 ```
 

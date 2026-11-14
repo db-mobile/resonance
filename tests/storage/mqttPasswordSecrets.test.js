@@ -116,6 +116,23 @@ describe('copying and deleting request data', () => {
         expect(await secrets.get('mqtt:c1:dst', 'password')).toBe('pw');
     });
 
+    test('deleteFolder drops the auth secrets of nested subfolders too', async () => {
+        const api = makeBackend();
+        api.collections.get = jest.fn().mockResolvedValue({
+            id: 'c1', name: 'C', endpoints: [],
+            folders: [{ id: 'f1', name: 'Parent', endpoints: [], folders: [{ id: 'f2', name: 'Child', endpoints: [] }] }]
+        });
+        api.collections.deleteFolder = jest.fn().mockResolvedValue([]);
+        const repo = new CollectionRepository(api, new SecretStore(api));
+        await repo.secretStore.set('auth:c1:__folder__:f1', 'token', 'p');
+        await repo.secretStore.set('auth:c1:__folder__:f2', 'token', 'c');
+
+        await repo.deleteFolder('c1', 'f1');
+
+        expect(await repo.secretStore.get('auth:c1:__folder__:f1', 'token')).toBeUndefined();
+        expect(await repo.secretStore.get('auth:c1:__folder__:f2', 'token')).toBeUndefined();
+    });
+
     test('deleteFolder drops the secrets of every removed request and of the folder', async () => {
         const api = makeBackend();
         api.collections.deleteFolder = jest.fn().mockResolvedValue(['r1']);

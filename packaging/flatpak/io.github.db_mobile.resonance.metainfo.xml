@@ -117,6 +117,21 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.3" date="2026-11-14">
+      <description>
+        <p>Bug fixes</p>
+        <ul>
+          <li>Keep same-named folders apart, so deleting or renaming one no longer affects the other</li>
+          <li>Keep script edits, recent body edits and OAuth tokens with the request they belong to</li>
+          <li>Store secrets from bulk environment imports in the keychain and remove secrets left behind by deleted collections and folders</li>
+          <li>Send and store cookies set during redirects</li>
+          <li>Encode literal percent signs and ampersands in query values</li>
+          <li>Import OpenAPI operations marked as public without authentication, and keep colons in Postman URLs</li>
+          <li>Keep the Escape key working after using the environment menu or runner history</li>
+          <li>Block remote images in the HTML preview for every page layout</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.6.2" date="2026-11-12">
       <description>
         <p>Stability fixes</p>

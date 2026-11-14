@@ -27,6 +27,26 @@ fn raw_templates_preserve_duplicate_queries_auth_and_graphql() {
     assert_eq!(prepared.request["body"]["variables"]["id"], 7);
 }
 #[test]
+fn a_literal_percent_sign_and_separators_in_a_query_value_are_encoded() {
+    let request: RequestTemplate = serde_json::from_value(json!({
+        "method":"GET", "url":"https://api.test/x",
+        "queryRows":[{"key":"q","value":"100% done & more"},{"key":"pre","value":"a%2Fb"}]
+    }))
+    .unwrap();
+    let prepared = prepare(
+        &request,
+        &ExecutionContext::default(),
+        &Default::default(),
+        &mut VariableProcessor::default(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        prepared.request["url"],
+        "https://api.test/x?q=100%25%20done%20%26%20more&pre=a%2Fb"
+    );
+}
+#[test]
 fn empty_and_invalid_json_bodies_are_distinct() {
     let mut request: RequestTemplate =
         serde_json::from_value(json!({"method":"POST","url":"api.test"})).unwrap();

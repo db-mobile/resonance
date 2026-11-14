@@ -4,7 +4,7 @@
  */
 
 import { splitAuthSecrets, mergeAuthSecrets, authSecretScope, collectionAuthSecretScope, folderAuthSecretScope } from '../auth/authSecrets.js';
-import { findFolder, folderChainForRequest, updateFolder, endpointKey } from '../collections/collectionTree.js';
+import { findFolder, folderChainForRequest, updateFolder, endpointKey, walkFolders } from '../collections/collectionTree.js';
 import { fromWire, toWire, listFromWire } from './collectionMapper.js';
 
 const METADATA_FIELDS = Object.freeze([
@@ -860,11 +860,24 @@ export class CollectionRepository {
      * @param {string} folderId
      * @returns {Promise<Array<string>>}
      */
+    async _folderIdsUnder(collectionId, folderId) {
+        const folder = findFolder(await this.getById(collectionId), folderId);
+        return folder ? [...walkFolders({ folders: [folder] })].map((entry) => entry.id) : [folderId];
+    }
+
+    /**
+     * @param {string} collectionId
+     * @param {string} folderId
+     * @returns {Promise<Array<string>>}
+     */
     async deleteFolder(collectionId, folderId) {
+        const folderIds = await this._folderIdsUnder(collectionId, folderId);
         const removed = await this.backendAPI.collections.deleteFolder(collectionId, folderId);
         this._byIdCache.delete(collectionId);
         if (this.secretStore) {
-            await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, folderId));
+            for (const id of folderIds) {
+                await this.secretStore.deleteScope(folderAuthSecretScope(collectionId, id));
+            }
             for (const endpointId of removed ?? []) {
                 await this._deleteEndpointSecrets(collectionId, endpointId);
             }

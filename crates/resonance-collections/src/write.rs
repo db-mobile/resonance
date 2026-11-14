@@ -325,6 +325,7 @@ mod tests {
             open_api_spec: None,
             variables: Vec::new(),
             root: FolderNode {
+                derived_id: None,
                 meta: None,
                 source: None,
                 requests,
@@ -337,6 +338,7 @@ mod tests {
 
     fn folder(id: &str, name: &str, requests: Vec<RequestEntry>) -> FolderNode {
         FolderNode {
+            derived_id: None,
             meta: Some(folder_meta(id, name)),
             source: None,
             requests,
@@ -473,6 +475,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let mut c = collection(vec![]);
         c.root.folders.push(FolderNode {
+            derived_id: None,
             meta: Some(folder_meta("f1", "pets")),
             source: None,
             requests: vec![request("r1", "List Pets")],
@@ -491,10 +494,12 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let mut c = collection(vec![]);
         c.root.folders.push(FolderNode {
+            derived_id: None,
             meta: Some(folder_meta("outer", "outer")),
             source: None,
             requests: Vec::new(),
             folders: vec![FolderNode {
+                derived_id: None,
                 meta: Some(folder_meta("inner", "inner")),
                 source: None,
                 requests: vec![request("r1", "Deep")],

@@ -16,12 +16,18 @@ function ensureScheme(url) {
     return url && !URL_SCHEME.test(url) ? `https://${url}` : url;
 }
 
+/** @type {RegExp} */
+const PERCENT_ESCAPE = /(%[0-9A-Fa-f]{2})/;
+
 /**
  * @param {string} text
  * @returns {string}
  */
-function encodeUnlessEncoded(text) {
-    return text.includes('%') ? text : encodeURIComponent(text);
+function encodeQueryComponent(text) {
+    return text
+        .split(PERCENT_ESCAPE)
+        .map((part) => (PERCENT_ESCAPE.test(part) ? part : encodeURIComponent(part)))
+        .join('');
 }
 
 export class RequestBuilderService {
@@ -114,7 +120,7 @@ export class RequestBuilderService {
                 continue;
             }
             const value = processor.processTemplate(row.value || '', variables);
-            queryPairs.push(`${encodeUnlessEncoded(key)}=${encodeUnlessEncoded(value)}`);
+            queryPairs.push(`${encodeQueryComponent(key)}=${encodeQueryComponent(value)}`);
         }
         return queryPairs.join('&');
     }
@@ -149,7 +155,7 @@ export class RequestBuilderService {
                 continue;
             }
             const stringValue = value === null || value === undefined ? '' : String(value);
-            queryPairs.push(`${encodeUnlessEncoded(key)}=${encodeUnlessEncoded(stringValue)}`);
+            queryPairs.push(`${encodeQueryComponent(key)}=${encodeQueryComponent(stringValue)}`);
         }
         return queryPairs.join('&');
     }
