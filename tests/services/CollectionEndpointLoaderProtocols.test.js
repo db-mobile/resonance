@@ -1,5 +1,6 @@
 import { CollectionEndpointLoaderService } from '../../src/modules/services/CollectionEndpointLoaderService.js';
 import { app } from '../../src/modules/appContext.js';
+import { registerPendingSave } from '../../src/modules/state/pendingSaves.js';
 
 describe('CollectionEndpointLoaderService protocol handling', () => {
     let repository;
@@ -209,5 +210,33 @@ describe('CollectionEndpointLoaderService OpenAPI spec resolution', () => {
         await loader.loadEndpointIntoWorkspaceTab({ id: 'c1' }, { id: 'e1', name: 'Get' });
 
         expect(schemaProcessor.setOpenApiSpec).toHaveBeenCalledWith({ openapi: '3.0.0' });
+    });
+});
+
+describe('CollectionEndpointLoaderService reads stored data only after pending saves land', () => {
+    test('a debounced body save is flushed before the request is read back', async () => {
+        const flush = jest.fn().mockResolvedValue(undefined);
+        const unregister = registerPendingSave({ flush, cancel: jest.fn() });
+        const repository = {
+            getAllPersistedEndpointData: jest.fn().mockResolvedValue({}),
+            getById: jest.fn().mockResolvedValue(null)
+        };
+        const loader = new CollectionEndpointLoaderService({
+            repository,
+            collectionService: { generateRequestBody: jest.fn(() => '') },
+            schemaProcessor: { setOpenApiSpec: jest.fn() },
+            setActiveEndpoint: jest.fn()
+        });
+        app.workspaceTabController = { loadEndpoint: jest.fn().mockResolvedValue(undefined) };
+
+        try {
+            await loader.loadEndpointIntoWorkspaceTab({ id: 'c1', baseUrl: '' }, { id: 'e1', name: 'E', protocol: 'http' });
+        } finally {
+            unregister();
+        }
+
+        expect(flush).toHaveBeenCalled();
+        expect(flush.mock.invocationCallOrder[0])
+            .toBeLessThan(repository.getAllPersistedEndpointData.mock.invocationCallOrder[0]);
     });
 });

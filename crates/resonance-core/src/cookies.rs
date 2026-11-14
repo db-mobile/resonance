@@ -1,6 +1,64 @@
 use crate::context::{Cookie, CookieExpiry};
+use reqwest::header::HeaderValue;
 use serde_json::{Value, json};
+use std::sync::{Arc, Mutex};
 use url::Url;
+
+/// The cookie jar as one request sees it while reqwest follows redirects.
+///
+/// reqwest asks for cookies before every hop and reports every hop's
+/// `Set-Cookie`, each with that hop's own URL. Without this, cookies set by a
+/// `302` were lost (login flows) and the final response's cookies were filed
+/// under the URL the request started at.
+#[derive(Debug)]
+pub struct HopRecorder {
+    state: Mutex<HopState>,
+}
+
+#[derive(Debug)]
+struct HopState {
+    jar: Vec<Cookie>,
+    changes: Vec<Value>,
+}
+
+impl HopRecorder {
+    /// @param jar - The jar as it stood when the request was prepared
+    pub fn new(jar: Vec<Cookie>) -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::new(HopState {
+                jar,
+                changes: Vec::new(),
+            }),
+        })
+    }
+
+    /// Every cookie change the redirect chain made, in the order the hops made
+    /// them, in the shape [`apply`] takes.
+    pub fn changes(&self) -> Vec<Value> {
+        self.state
+            .lock()
+            .map(|state| state.changes.clone())
+            .unwrap_or_default()
+    }
+}
+
+impl reqwest::cookie::CookieStore for HopRecorder {
+    fn set_cookies(&self, cookie_headers: &mut dyn Iterator<Item = &HeaderValue>, url: &Url) {
+        let headers: Vec<String> = cookie_headers
+            .filter_map(|value| value.to_str().ok().map(str::to_string))
+            .collect();
+        let hop = response_changes(&headers, url.as_str());
+        if let Ok(mut state) = self.state.lock() {
+            apply(&mut state.jar, &hop);
+            state.changes.extend(hop);
+        }
+    }
+
+    fn cookies(&self, url: &Url) -> Option<HeaderValue> {
+        let state = self.state.lock().ok()?;
+        header(&state.jar, url.as_str()).and_then(|value| HeaderValue::from_str(&value).ok())
+    }
+}
 
 fn text<'a>(cookie: &'a Value, key: &str, default: &'a str) -> &'a str {
     cookie[key].as_str().unwrap_or(default)

@@ -674,6 +674,16 @@ fn parse_parameters(params: Option<&Value>, spec: &Value) -> Option<Value> {
 fn extract_openapi_security(security: Option<&Value>, spec: &Value) -> Option<Value> {
     let security_arr = security?.as_array()?;
 
+    // `security: []`, or an empty first requirement, marks the operation as
+    // public. Leaving it unset would make the request inherit the global
+    // scheme and send credentials to an endpoint that must not get them.
+    if security_arr
+        .first()
+        .is_none_or(|req| req.as_object().is_some_and(|req| req.is_empty()))
+    {
+        return Some(serde_json::json!({"type": "none", "config": {}}));
+    }
+
     // Get the first security requirement
     let first_req = security_arr.first()?.as_object()?;
     let (scheme_name, _scopes) = first_req.iter().next()?;
@@ -851,6 +861,69 @@ mod tests {
             .find(|e| e.path == "/access-tokens")
             .unwrap();
         assert!(open.security.is_none());
+    }
+
+    #[test]
+    fn an_explicitly_public_operation_does_not_inherit_the_global_scheme() {
+        let mut spec = operation_security_spec();
+        spec["security"] = json!([{ "BearerAuth": [] }]);
+        spec["paths"]["/access-tokens"]["post"]["security"] = json!([]);
+        spec["paths"]["/health"] = json!({ "get": {
+            "security": [{}],
+            "responses": { "200": { "description": "ok" } }
+        } });
+
+        let collection = parse_openapi_spec(spec).unwrap();
+        let find = |path: &str| {
+            collection
+                .endpoints
+                .iter()
+                .find(|e| e.path == path)
+                .unwrap()
+        };
+
+        let none = Some(json!({ "type": "none", "config": {} }));
+        assert_eq!(find("/access-tokens").security, none);
+        assert_eq!(find("/health").security, none);
+        assert_eq!(
+            find("/company-users").security.as_ref().unwrap()["type"],
+            "bearer"
+        );
+        assert_eq!(collection.auth_config.as_ref().unwrap()["type"], "bearer");
+    }
+
+    #[test]
+    fn a_swagger2_public_operation_is_imported_without_auth() {
+        let spec = json!({
+            "swagger": "2.0",
+            "info": { "title": "Old", "version": "1" },
+            "host": "api.example.com",
+            "securityDefinitions": { "Bearer": { "type": "apiKey", "name": "Authorization", "in": "header" } },
+            "security": [{ "Bearer": [] }],
+            "paths": {
+                "/login": { "post": { "security": [], "responses": { "200": { "description": "ok" } } } },
+                "/me": { "get": { "responses": { "200": { "description": "ok" } } } }
+            }
+        });
+
+        let collection = parse_openapi_spec(spec).unwrap();
+        let login = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/login")
+            .unwrap();
+        let me = collection
+            .endpoints
+            .iter()
+            .find(|e| e.path == "/me")
+            .unwrap();
+
+        assert_eq!(
+            login.security,
+            Some(json!({ "type": "none", "config": {} }))
+        );
+        assert!(me.security.is_none());
+        assert!(collection.auth_config.is_some());
     }
 
     #[test]

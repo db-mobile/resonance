@@ -48,6 +48,9 @@ pub struct FolderNode {
     pub meta: Option<FolderDoc>,
     /// Where this folder was read from; `None` for one not yet written.
     pub source: Option<PathBuf>,
+    /// The id the reader settled on when the folder's own one was missing or
+    /// already taken; see [`dedupe_folder_ids`].
+    pub derived_id: Option<String>,
     pub requests: Vec<RequestEntry>,
     pub folders: Vec<FolderNode>,
 }
@@ -333,6 +336,55 @@ fn dedupe_ids(node: &mut FolderNode, seen: &mut HashSet<String>) -> Vec<(String,
     reassigned
 }
 
+/// Gives every folder an id no other folder in the collection shares.
+///
+/// A directory without `_folder.yaml` is named after itself, so `v1/users`
+/// and `v2/users` would both be `folder_users`, and a copied `_folder.yaml`
+/// repeats its id. Delete, git status and the frontend all look folders up by
+/// id, so a shared one sends an action to the wrong folder. A folder whose own
+/// id is free keeps it; any other gets the first free `base`, `base_2`, ...
+/// Walking in read order keeps the choice the same on every read, and the
+/// next structural save writes it into `_folder.yaml`.
+///
+/// @param node - Folder whose subfolders to walk
+/// @param seen - Ids already claimed
+fn dedupe_folder_ids(node: &mut FolderNode, seen: &mut HashSet<String>) {
+    for folder in &mut node.folders {
+        let own = folder
+            .meta
+            .as_ref()
+            .map(|meta| meta.id.clone())
+            .filter(|id| !id.is_empty());
+        folder.derived_id = None;
+        match own {
+            Some(id) if seen.insert(id.clone()) => {}
+            own => {
+                let base = own.unwrap_or_else(|| name_based_folder_id(folder));
+                let mut candidate = base.clone();
+                let mut counter = 2;
+                while !seen.insert(candidate.clone()) {
+                    candidate = format!("{base}_{counter}");
+                    counter += 1;
+                }
+                folder.derived_id = Some(candidate);
+            }
+        }
+        dedupe_folder_ids(folder, seen);
+    }
+}
+
+/// The id a folder without metadata is known by: `folder_` and its name with
+/// every character outside ASCII letters and digits replaced by `_`.
+pub fn name_based_folder_id(folder: &FolderNode) -> String {
+    format!(
+        "folder_{}",
+        folder_display_name(folder)
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect::<String>()
+    )
+}
+
 /// Mints a request id that no counter could reproduce on another branch.
 pub fn new_request_id() -> String {
     format!("req_{}", uuid::Uuid::new_v4().simple())
@@ -378,6 +430,8 @@ pub fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String> {
     };
 
     let mut root = read_folder(dir, true)?;
+
+    dedupe_folder_ids(&mut root, &mut HashSet::new());
 
     let mut seen = HashSet::new();
     let reassigned = dedupe_ids(&mut root, &mut seen);
@@ -429,6 +483,46 @@ mod tests {
 
     fn request_yaml(id: &str, name: &str) -> String {
         format!("resonanceFormat: 2\nid: {}\nname: {}\n", id, name)
+    }
+
+    fn all_folder_ids(node: &FolderNode, out: &mut Vec<String>) {
+        for folder in &node.folders {
+            out.push(crate::ipc::folder_id(folder));
+            all_folder_ids(folder, out);
+        }
+    }
+
+    #[test]
+    fn folders_that_would_share_an_id_get_distinct_stable_ones() {
+        let temp = TempDir::new().unwrap();
+        minimal_collection(temp.path());
+        write(temp.path(), "v1/users/a.yaml", &request_yaml("a", "A"));
+        write(temp.path(), "v2/users/b.yaml", &request_yaml("b", "B"));
+        write(
+            temp.path(),
+            "x/_folder.yaml",
+            "resonanceFormat: 2\nid: dup\nname: X\n",
+        );
+        write(
+            temp.path(),
+            "y/_folder.yaml",
+            "resonanceFormat: 2\nid: dup\nname: Y\n",
+        );
+
+        let mut ids = Vec::new();
+        all_folder_ids(&read_collection_dir(temp.path()).unwrap().root, &mut ids);
+        let mut again = Vec::new();
+        all_folder_ids(&read_collection_dir(temp.path()).unwrap().root, &mut again);
+
+        let unique: HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len(), "{ids:?}");
+        for expected in ["folder_users", "folder_users_2", "dup", "dup_2"] {
+            assert!(
+                ids.iter().any(|id| id == expected),
+                "{expected} missing from {ids:?}"
+            );
+        }
+        assert_eq!(ids, again);
     }
 
     #[test]

@@ -52,6 +52,8 @@ export class RunnerPanel {
         this.onExport = null;
         this.dataFile = null;
         this._closeHistoryMenu = null;
+        this._historyMenuLoading = false;
+        this._destroyed = false;
 
         this.onRunnerSave = null;
         this.onRun = null;
@@ -180,6 +182,9 @@ export class RunnerPanel {
 
         this.dom.historyButton?.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (this._historyMenuLoading) {
+                return;
+            }
             if (this._closeHistoryMenu) {
                 this._closeHistoryMenu();
             } else {
@@ -418,7 +423,16 @@ export class RunnerPanel {
     async _openHistoryMenu() {
         if (!this.dom.historyDropdown || !this.dom.historyList) {return;}
 
-        const runs = this.currentRunnerId ? await this.onLoadHistory?.() || [] : null;
+        this._historyMenuLoading = true;
+        let runs;
+        try {
+            runs = this.currentRunnerId ? await this.onLoadHistory?.() || [] : null;
+        } finally {
+            this._historyMenuLoading = false;
+        }
+        if (this._destroyed || this._closeHistoryMenu) {
+            return;
+        }
         this._renderHistory(runs);
 
         this.dom.historyDropdown.classList.remove('is-hidden');
@@ -526,6 +540,7 @@ export class RunnerPanel {
 
     /** @returns {void} */
     destroy() {
+        this._destroyed = true;
         this._closeHistoryMenu?.();
         this.menu.destroy();
         this.resultsView.hide();

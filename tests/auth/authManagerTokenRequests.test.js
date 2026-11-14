@@ -100,3 +100,48 @@ describe('AuthManager token requests', () => {
         expect(manager.getAuthConfig().config.token).toBe('old');
     });
 });
+
+describe('AuthManager applies a token only to the request that asked for it', () => {
+    async function inFlight(startEndpoint) {
+        const { manager, getToken } = await loadManager({
+            grantType: 'client_credentials', tokenUrl: 'https://auth.test/token', clientId: 'id', clientSecret: 's'
+        });
+        const { setCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
+        const { toast } = await import('../../src/modules/ui/Toast.js');
+        const warning = jest.spyOn(toast, 'warning').mockImplementation(() => {});
+        setCurrentEndpoint(startEndpoint);
+        let resolve;
+        getToken.mockImplementation(() => new Promise((done) => { resolve = done; }));
+        const original = manager.currentAuthConfig;
+        const pending = manager._handleGetToken(null, null);
+        await new Promise((tick) => setTimeout(tick, 0));
+        return { manager, original, pending, setCurrentEndpoint, warning, finish: () => resolve({ success: true, accessToken: 'late' }) };
+    }
+
+    test('switching to another request while the token is requested discards it', async () => {
+        const { manager, original, pending, setCurrentEndpoint, warning, finish } = await inFlight({ collectionId: 'c1', endpointId: 'a' });
+        const other = { type: 'oauth2', config: { grantType: 'client_credentials', token: 'other' } };
+        setCurrentEndpoint({ collectionId: 'c1', endpointId: 'b' });
+        manager.loadAuthConfig(other);
+
+        finish();
+        await pending;
+
+        expect(manager.currentAuthConfig.config.token).toBe('other');
+        expect(original.config.token).toBeUndefined();
+        expect(warning).toHaveBeenCalledTimes(1);
+        setCurrentEndpoint(null);
+    });
+
+    test('the same request restored while the token is requested still receives it', async () => {
+        const { manager, pending, setCurrentEndpoint, warning, finish } = await inFlight({ collectionId: 'c1', endpointId: 'a' });
+        manager.loadAuthConfig({ type: 'oauth2', config: { grantType: 'client_credentials' } });
+
+        finish();
+        await pending;
+
+        expect(manager.currentAuthConfig.config.token).toBe('late');
+        expect(warning).not.toHaveBeenCalled();
+        setCurrentEndpoint(null);
+    });
+});

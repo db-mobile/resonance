@@ -87,6 +87,61 @@ describe('migrated dialogs share one Escape stack', () => {
         });
     });
 
+    describe('EnvironmentSelector reopened while open', () => {
+        let selector;
+
+        beforeEach(() => {
+            templateLoader.cache.set(
+                SELECTOR_TEMPLATE,
+                new DOMParser().parseFromString(
+                    fs.readFileSync(path.join(process.cwd(), 'src/templates/environment/environmentSelector.html'), 'utf8'),
+                    'text/html'
+                )
+            );
+            document.body.innerHTML = '<div id="env-container"></div><button id="env-selector-btn"></button>';
+            selector = new EnvironmentSelector(
+                {
+                    getAllEnvironments: jest.fn().mockResolvedValue([{ id: 'e1', name: 'Dev' }]),
+                    getActiveEnvironmentId: jest.fn().mockResolvedValue('e1'),
+                    getActiveEnvironment: jest.fn().mockResolvedValue(null)
+                },
+                jest.fn(),
+                jest.fn()
+            );
+            selector.dropdown = document.createElement('div');
+            document.body.appendChild(selector.dropdown);
+        });
+
+        test('refreshing an open dropdown keeps one Escape registration', async () => {
+            await selector.openDropdown();
+            await selector.refresh();
+            expect(escapeHandlerCount()).toBe(1);
+
+            pressEscape();
+
+            expect(selector.isOpen).toBe(false);
+            expect(escapeHandlerCount()).toBe(0);
+        });
+
+        test('two opens racing each other register once', async () => {
+            await Promise.all([selector.openDropdown(), selector.openDropdown()]);
+            expect(escapeHandlerCount()).toBe(1);
+
+            pressEscape();
+
+            expect(escapeHandlerCount()).toBe(0);
+        });
+
+        test('closing while the open is still loading leaves it closed', async () => {
+            const opening = selector.openDropdown();
+            selector.closeDropdown();
+            await opening;
+
+            expect(selector.isOpen).toBe(false);
+            expect(escapeHandlerCount()).toBe(0);
+        });
+    });
+
     describe('a dropdown opened over a dialog', () => {
         test('Escape closes the dropdown first, then the dialog', () => {
             const closeDialog = jest.fn();

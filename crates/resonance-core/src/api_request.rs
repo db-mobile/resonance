@@ -480,6 +480,10 @@ pub struct RequestOptions {
     /// request cannot be cancelled.
     #[serde(default)]
     pub request_id: Option<String>,
+    /// The executor's view of the cookie jar for this one request, consulted
+    /// and updated on every redirect hop. Never part of the wire format.
+    #[serde(skip)]
+    pub cookie_store: Option<Arc<crate::cookies::HopRecorder>>,
 }
 
 /// One row of a "formdata" or "urlencoded" body sent as a JSON array.
@@ -891,6 +895,7 @@ pub async fn send_api_request(
         disable_pooling: false,
         single_connection: request_options.ntlm.is_some(),
         timing_recorder: Some(Arc::clone(&recorder)),
+        cookie_store: request_options.cookie_store.clone(),
     };
 
     let client = match build_http_client(client_options, proxy_action) {

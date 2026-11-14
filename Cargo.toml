@@ -35,7 +35,7 @@ resonance-collections = { path = "crates/resonance-collections" }
 # statically link the aws-lc-rs crypto provider; ring is installed as the
 # process default by the core. Root verification uses the OS trust store via
 # rustls-platform-verifier.
-reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "form", "rustls-no-provider", "http2", "gzip", "brotli", "socks", "cookies"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
 tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"

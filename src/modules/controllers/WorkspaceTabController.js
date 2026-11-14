@@ -442,10 +442,6 @@ export class WorkspaceTabController {
 
             this.tabBar.setActiveTab(tabId);
             await this._activateTab(tab);
-
-            if (tab.type !== 'runner') {
-                await this._syncScriptsForTab(tab);
-            }
         } catch {}
     }
 
@@ -556,6 +552,7 @@ export class WorkspaceTabController {
         } else {
             this.responseContainerManager.showContainer(tab.id);
             await this._restoreTabStateSafely(tab);
+            await this._syncScriptsForTab(tab);
         }
     }
 
@@ -837,6 +834,7 @@ export class WorkspaceTabController {
             }
 
             setCurrentEndpoint({ collectionId: saved.collectionId, endpointId: saved.endpointId });
+            await this._syncScriptsForTab({ endpoint: { collectionId: saved.collectionId, endpointId: saved.endpointId } });
             await this.service.updateTab(tab.id, {
                 name: saved.name,
                 endpoint: {

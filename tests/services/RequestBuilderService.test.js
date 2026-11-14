@@ -24,6 +24,14 @@ describe('RequestBuilderService', () => {
             expect(service.buildQueryString({ a: 'x%20y' })).toBe('a=x%20y');
         });
 
+        it('encodes a literal percent sign and separators in a value', () => {
+            expect(service.buildQueryString({ q: '50% off & more' })).toBe('q=50%25%20off%20%26%20more');
+        });
+
+        it('encodes around escapes that are already present', () => {
+            expect(service.buildQueryString({ q: '100%25 done=%' })).toBe('q=100%25%20done%3D%25');
+        });
+
         it('coerces non-string values instead of throwing', () => {
             expect(service.buildQueryString({ n: 5, b: true })).toBe('n=5&b=true');
         });

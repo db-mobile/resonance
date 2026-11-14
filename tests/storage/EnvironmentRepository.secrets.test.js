@@ -127,3 +127,46 @@ describe('EnvironmentRepository secret handling', () => {
         expect(copy.variables.apiKey).toBe('');
     });
 });
+
+describe('EnvironmentRepository bulk import keeps secrets out of the store', () => {
+    let repository;
+    let secretStore;
+    let backing;
+
+    beforeEach(() => {
+        backing = {};
+        const api = {
+            store: {
+                get: jest.fn(async (key) => backing[key] ?? null),
+                set: jest.fn(async (key, value) => { backing[key] = value; })
+            }
+        };
+        secretStore = new SecretStore(api);
+        repository = new EnvironmentRepository(api, secretStore);
+    });
+
+    const imported = {
+        items: [{ name: 'Prod', variables: { host: 'api.test', apiKey: 'k-1' }, secretKeys: ['apiKey'] }]
+    };
+
+    test.each([false, true])('merge=%s stores the secret value in the keychain only', async (merge) => {
+        await repository.importEnvironments(imported, merge);
+
+        const env = backing.environments.items.find(item => item.name === 'Prod');
+        expect(env.variables).toEqual({ host: 'api.test', apiKey: '' });
+        expect(env.secretKeys).toEqual(['apiKey']);
+        expect(await secretStore.get(`env:${env.id}`, 'apiKey')).toBe('k-1');
+    });
+
+    test('replacing all environments removes the secret scopes of the replaced ones', async () => {
+        backing.environments = {
+            items: [{ id: 'old', name: 'Old', variables: { token: '' }, secretKeys: ['token'] }],
+            activeEnvironmentId: 'old'
+        };
+        await secretStore.set('env:old', 'token', 't-0');
+
+        await repository.importEnvironments(imported, false);
+
+        expect(await secretStore.has('env:old', 'token')).toBe(false);
+    });
+});

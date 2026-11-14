@@ -483,6 +483,24 @@ export class EnvironmentRepository {
     }
 
     /**
+     * @param {Object} environment
+     * @returns {Promise<Object>}
+     */
+    async _withImportedSecretsStored(environment) {
+        if (environment.secretKeys.length === 0) {
+            return environment;
+        }
+        const variables = { ...environment.variables };
+        for (const name of environment.secretKeys) {
+            if (this.secretStore) {
+                await this.secretStore.set(this.secretScope(environment.id), name, variables[name] ?? '');
+            }
+            variables[name] = '';
+        }
+        return { ...environment, variables };
+    }
+
+    /**
      * @param {Object} environmentsData
      * @param {Array<Object>} environmentsData.items
      * @param {boolean} [merge=false]
@@ -497,23 +515,29 @@ export class EnvironmentRepository {
             let data;
             if (merge) {
                 data = await this.getAllEnvironments();
-                environmentsData.items.forEach(importedEnv => {
+                for (const importedEnv of environmentsData.items) {
                     const exists = data.items.some(env => env.name === importedEnv.name);
                     if (!exists) {
-                        data.items.push(this._normalizeEnvironment({
+                        data.items.push(await this._withImportedSecretsStored(this._normalizeEnvironment({
                             ...importedEnv,
                             id: this._generateId()
-                        }));
+                        })));
                     }
-                });
+                }
             } else {
-                data = {
-                    items: environmentsData.items.map(env => this._normalizeEnvironment({
+                if (this.secretStore) {
+                    const replaced = await this.getAllEnvironments();
+                    for (const env of replaced.items) {
+                        await this.secretStore.deleteScope(this.secretScope(env.id));
+                    }
+                }
+                data = { items: [], activeEnvironmentId: null };
+                for (const env of environmentsData.items) {
+                    data.items.push(await this._withImportedSecretsStored(this._normalizeEnvironment({
                         ...env,
                         id: this._generateId()
-                    })),
-                    activeEnvironmentId: null
-                };
+                    })));
+                }
                 if (data.items.length > 0) {
                     data.activeEnvironmentId = data.items[0].id;
                 }

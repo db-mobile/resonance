@@ -757,6 +757,7 @@ fn perform_send_request(
                 disable_pooling: false,
                 single_connection: false,
                 timing_recorder: None,
+                cookie_store: None,
             },
             proxy_action,
         )

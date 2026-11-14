@@ -4,6 +4,7 @@
  */
 
 import { app } from '../appContext.js';
+import { flushPendingSaves } from '../state/pendingSaves.js';
 import {
     getProtocol,
     projectPersistedData,
@@ -49,6 +50,7 @@ export class CollectionEndpointLoaderService {
     }
 
     async loadEndpointIntoWorkspaceTab(collection, endpoint) {
+        await flushPendingSaves();
         this.schemaProcessor.setOpenApiSpec(await this.resolveOpenApiSpec(collection));
 
         let requestBodyString = '';

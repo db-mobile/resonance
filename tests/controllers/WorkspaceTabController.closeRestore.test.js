@@ -106,3 +106,51 @@ describe('WorkspaceTabController close paths do not revert the active tab', () =
         );
     });
 });
+
+describe('WorkspaceTabController binds the scripts editor to every tab it activates', () => {
+    let controller;
+    let service;
+    let scriptController;
+    const graphqlTab = { id: 'tab-G', type: 'graphql', endpoint: { collectionId: 'c1', endpointId: 'gql', protocol: 'graphql' } };
+
+    beforeEach(async () => {
+        jest.clearAllMocks();
+        const { app } = await import('../../src/modules/appContext.js');
+        scriptController = {
+            isShowingScriptsFor: jest.fn().mockReturnValue(false),
+            loadScriptsForEndpoint: jest.fn().mockResolvedValue(undefined),
+            clearScripts: jest.fn().mockResolvedValue(undefined)
+        };
+        app.scriptController = scriptController;
+        service = {
+            initialize: jest.fn().mockResolvedValue({ tabs: [graphqlTab], activeTabId: 'tab-G' }),
+            getActiveTabId: jest.fn().mockResolvedValue('tab-A'),
+            getAllTabs: jest.fn().mockResolvedValue([{ id: 'tab-A', type: 'http' }, graphqlTab]),
+            closeTab: jest.fn().mockResolvedValue({ newActiveTabId: 'tab-G' }),
+            updateTab: jest.fn().mockResolvedValue(undefined)
+        };
+        controller = new WorkspaceTabController(
+            service,
+            { render: jest.fn(), setActiveTab: jest.fn(), updateTab: jest.fn() },
+            { captureCurrentState: jest.fn().mockResolvedValue({ endpoint: null }), restoreTabState: jest.fn() },
+            { showContainer: jest.fn(), removeContainer: jest.fn() }
+        );
+    });
+
+    afterEach(async () => {
+        const { app } = await import('../../src/modules/appContext.js');
+        delete app.scriptController;
+    });
+
+    test('closing a tab loads the scripts of the GraphQL tab that becomes active', async () => {
+        await controller.closeTab('tab-A');
+
+        expect(scriptController.loadScriptsForEndpoint).toHaveBeenCalledWith('c1', 'gql');
+    });
+
+    test('initializing with a GraphQL tab active loads its scripts', async () => {
+        await controller.initialize();
+
+        expect(scriptController.loadScriptsForEndpoint).toHaveBeenCalledWith('c1', 'gql');
+    });
+});

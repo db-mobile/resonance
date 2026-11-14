@@ -539,6 +539,7 @@ fn build_sse_client(
             disable_pooling: true,
             single_connection: false,
             timing_recorder: None,
+            cookie_store: None,
         },
         proxy_action,
     )

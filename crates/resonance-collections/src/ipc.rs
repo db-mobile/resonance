@@ -11,7 +11,9 @@ use serde_json::{Map, Value, json};
 use std::collections::{HashMap, HashSet};
 
 use super::model::{Body, BodyKind, ExampleDoc, FORMAT_VERSION, FolderDoc, RequestDoc, Scripts};
-use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
+use super::read::{
+    FolderNode, LoadedCollection, RequestEntry, folder_display_name, name_based_folder_id,
+};
 
 /// Collection metadata stored in collection.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,7 +323,13 @@ pub fn body_from_endpoint_data(data: &EndpointData) -> Option<Body> {
         }));
     }
 
-    None
+    // A body this build cannot edit left as `formBodyData` and comes back
+    // unchanged whenever another field of the request is saved; dropping it
+    // here would erase it. The editor sends `null` when the user replaces it.
+    data.form_body_data
+        .as_ref()
+        .filter(|form| !form.is_null())
+        .map(|form| Body::Other(form.clone()))
 }
 
 /// Converts the scripts object, which uses the longer frontend field names.
@@ -414,21 +422,19 @@ fn folder_to_ipc(node: &FolderNode, path: &mut Vec<String>, flat: &mut Vec<Value
     Value::Object(entry)
 }
 
-/// A folder's id: its own metadata when present, else derived from its name so
+/// A folder's id: the one the reader made unique when the folder's own id was
+/// missing or taken, else its own metadata id, else derived from its name so
 /// expansion state and auth scopes stay stable for a hand-made directory.
 pub fn folder_id(folder: &FolderNode) -> String {
+    if let Some(id) = &folder.derived_id {
+        return id.clone();
+    }
     if let Some(meta) = &folder.meta
         && !meta.id.is_empty()
     {
         return meta.id.clone();
     }
-    format!(
-        "folder_{}",
-        folder_display_name(folder)
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-            .collect::<String>()
-    )
+    name_based_folder_id(folder)
 }
 
 /// Projects a loaded v2 collection into the IPC shape.
@@ -623,6 +629,7 @@ pub fn tree_from_ipc_guarded(
     collect_foldered_ids(&incoming.folders, &mut foldered_ids);
 
     let mut root = FolderNode {
+        derived_id: None,
         source: existing.and_then(|l| l.root.source.clone()),
         ..Default::default()
     };
@@ -725,6 +732,7 @@ fn folder_from_ipc(
     let previous = existing_folders.get(&folder_id);
 
     let mut node = FolderNode {
+        derived_id: None,
         meta: Some(FolderDoc {
             format: FORMAT_VERSION,
             id: folder_id.clone(),
@@ -814,6 +822,7 @@ mod tests {
 
     fn folder(id: &str, name: &str, requests: Vec<RequestEntry>) -> FolderNode {
         FolderNode {
+            derived_id: None,
             meta: Some(FolderDoc {
                 format: FORMAT_VERSION,
                 id: id.into(),
@@ -852,6 +861,7 @@ mod tests {
     #[test]
     fn root_requests_appear_in_the_flat_list() {
         let collection = loaded(FolderNode {
+            derived_id: None,
             requests: vec![request("r1", "Health")],
             ..Default::default()
         });
@@ -869,6 +879,7 @@ mod tests {
     #[test]
     fn a_foldered_request_appears_in_both_views() {
         let collection = loaded(FolderNode {
+            derived_id: None,
             folders: vec![folder("f1", "pets", vec![request("r1", "List")])],
             ..Default::default()
         });
@@ -892,6 +903,7 @@ mod tests {
 
         let ipc = to_ipc_collection(
             &loaded(FolderNode {
+                derived_id: None,
                 folders: vec![outer],
                 ..Default::default()
             }),
@@ -920,6 +932,7 @@ mod tests {
 
         let ipc = to_ipc_collection(
             &loaded(FolderNode {
+                derived_id: None,
                 folders: vec![outer],
                 ..Default::default()
             }),
@@ -940,6 +953,7 @@ mod tests {
     fn a_folder_with_no_children_omits_the_nested_key() {
         let ipc = to_ipc_collection(
             &loaded(FolderNode {
+                derived_id: None,
                 folders: vec![folder("f1", "pets", vec![request("r1", "X")])],
                 ..Default::default()
             }),
@@ -959,6 +973,7 @@ mod tests {
 
         let ipc = to_ipc_collection(
             &loaded(FolderNode {
+                derived_id: None,
                 folders: vec![outer],
                 ..Default::default()
             }),
@@ -980,6 +995,7 @@ mod tests {
             .push(folder("inner", "inner", vec![request("r2", "Deep")]));
 
         let original = loaded(FolderNode {
+            derived_id: None,
             folders: vec![outer],
             ..Default::default()
         });
@@ -1000,6 +1016,7 @@ mod tests {
     #[test]
     fn a_folder_without_metadata_gets_a_stable_derived_id() {
         let node = FolderNode {
+            derived_id: None,
             meta: None,
             source: Some(std::path::PathBuf::from("/tmp/c/pets")),
             requests: vec![request("r1", "X")],
@@ -1008,6 +1025,7 @@ mod tests {
 
         let ipc = to_ipc_collection(
             &loaded(FolderNode {
+                derived_id: None,
                 folders: vec![node],
                 ..Default::default()
             }),
@@ -1181,6 +1199,7 @@ mod save_path {
             open_api_spec: None,
             variables: Vec::new(),
             root: FolderNode {
+                derived_id: None,
                 requests: vec![RequestEntry::new(doc)],
                 ..Default::default()
             },
@@ -1451,6 +1470,7 @@ mod save_path {
     fn moving_a_request_out_of_a_folder_keeps_its_state() {
         let mut existing = existing_with_state();
         existing.root.folders.push(FolderNode {
+            derived_id: None,
             meta: Some(crate::model::FolderDoc {
                 format: FORMAT_VERSION,
                 id: "f1".into(),
@@ -1478,6 +1498,7 @@ mod save_path {
     fn folder_auth_and_directory_survive_a_rename() {
         let mut existing = existing_with_state();
         existing.root.folders.push(FolderNode {
+            derived_id: None,
             meta: Some(crate::model::FolderDoc {
                 format: FORMAT_VERSION,
                 id: "f1".into(),
@@ -1511,6 +1532,7 @@ mod save_path {
     fn a_folder_without_metadata_keeps_its_directory() {
         let mut existing = existing_with_state();
         existing.root.folders.push(FolderNode {
+            derived_id: None,
             meta: None,
             source: Some(std::path::PathBuf::from("/c/pets")),
             requests: Vec::new(),
@@ -1536,6 +1558,7 @@ mod save_path {
         let mut extra = Map::new();
         extra.insert("color".into(), json!("red"));
         existing.root.folders.push(FolderNode {
+            derived_id: None,
             meta: Some(crate::model::FolderDoc {
                 format: FORMAT_VERSION,
                 id: "f1".into(),
@@ -1648,6 +1671,7 @@ mod save_path {
             let mut existing = existing_three();
             let moved = existing.root.requests.split_off(1);
             existing.root.folders.push(FolderNode {
+                derived_id: None,
                 meta: Some(crate::model::FolderDoc {
                     format: FORMAT_VERSION,
                     id: "f1".into(),
@@ -1712,6 +1736,35 @@ mod save_path {
         assert_eq!(projected.auth_config, data.auth_config);
         assert_eq!(projected.scripts.unwrap()["testScript"], "test();");
         assert_eq!(projected.websocket_data, data.websocket_data);
+    }
+
+    #[test]
+    fn a_body_in_an_unknown_mode_survives_saving_another_field() {
+        let mut doc = RequestDoc::new("r1".into(), "X".into());
+        let body = json!({"mode": "protobuf", "schema": "pets.proto", "message": {"id": 1}});
+        doc.body = Some(Body::Other(body.clone()));
+
+        let mut data = request_to_endpoint_data(&doc);
+        data.headers = vec![json!({"key": "Accept", "value": "*/*"})];
+        apply_endpoint_data(&mut doc, &data);
+
+        assert!(matches!(&doc.body, Some(Body::Other(value)) if value == &body));
+        assert_eq!(doc.params.headers.len(), 1);
+    }
+
+    #[test]
+    fn replacing_an_unknown_body_from_the_editor_takes_effect() {
+        let mut doc = RequestDoc::new("r1".into(), "X".into());
+        doc.body = Some(Body::Other(json!({"mode": "protobuf"})));
+
+        let mut data = request_to_endpoint_data(&doc);
+        data.form_body_data = None;
+        data.modified_body = Some("{}".into());
+        apply_endpoint_data(&mut doc, &data);
+
+        assert!(
+            matches!(&doc.body, Some(Body::Known(BodyKind::Json { content })) if content == "{}")
+        );
     }
 
     #[test]

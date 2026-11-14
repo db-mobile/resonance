@@ -50,6 +50,10 @@ pub struct HttpClientOptions {
     /// Only the request path reports these; the other callers pass `None` and
     /// pay nothing for the instrumentation.
     pub timing_recorder: Option<Arc<TimingRecorder>>,
+    /// Supplies cookies to every hop of a redirect chain and hears every
+    /// hop's `Set-Cookie`. Only the request path sets one; see
+    /// [`crate::cookies::HopRecorder`].
+    pub cookie_store: Option<Arc<crate::cookies::HopRecorder>>,
 }
 
 /// Build a client from `opts`, applying the caller's already-resolved proxy
@@ -109,6 +113,10 @@ pub fn build_http_client(
 
     if !opts.follow_redirects {
         builder = builder.redirect(reqwest::redirect::Policy::none());
+    }
+
+    if let Some(store) = opts.cookie_store {
+        builder = builder.cookie_provider(store);
     }
 
     // `Disable` must call `no_proxy()` explicitly — otherwise reqwest would
@@ -186,6 +194,7 @@ mod tests {
             disable_pooling: false,
             single_connection: false,
             timing_recorder: None,
+            cookie_store: None,
         }
     }
 
@@ -205,6 +214,7 @@ mod tests {
     fn builds_a_client_with_timing_instrumentation() {
         let opts = HttpClientOptions {
             timing_recorder: Some(TimingRecorder::new()),
+            cookie_store: None,
             ..base_options()
         };
         assert!(build_http_client(opts, ProxyAction::Disable).is_ok());
