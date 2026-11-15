@@ -294,3 +294,17 @@ test('captures proxy settings from the desktop IPC namespace and pins an immutab
     expect(backend.proxySettings.get).toHaveBeenCalledTimes(1);
     expect(pipeline.environmentRepository.getVariablesForEnvironment).toHaveBeenCalledWith('original');
 });
+
+ test.each([
+    [{ queryParams: [] }, [], []],
+    [{}, [{ key: 'q', value: 'disabled', enabled: false }], []],
+    [{}, [], [{ key: 'q', value: 'spec' }]],
+    [{ queryParams: [{ key: 'q', value: '', enabled: true }] }, [], [{ key: 'q', value: '', enabled: true }]]
+])('runner respects explicitly configured query rows: %j', (overrides, queryParams, expected) => {
+    const captured = captureRunnerEntry({ overrides }, {
+        ...target,
+        endpoint: { ...target.endpoint, parameters: { query: { q: { example: 'spec' } } } },
+        persisted: { ...target.persisted, queryParams }
+    });
+    expect(captured.queryRows).toEqual(expected);
+});

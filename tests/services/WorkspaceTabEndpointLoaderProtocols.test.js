@@ -26,6 +26,13 @@ describe('WorkspaceTabEndpointLoaderService protocol dispatch', () => {
         });
     });
 
+    test('replacing a request clears its response and inspection state', () => {
+        const update = loader.createTabUpdate({ id: 'new', collectionId: 'c', path: '/new' });
+        expect(update.response).toBeNull();
+        expect(update.responseInspection).toBeNull();
+        expect(loader.createHistoryTabUpdate({ request: { url: 'https://example.test' } }).response).toBeNull();
+    });
+
     describe('SSE', () => {
         const sseEndpoint = {
             id: 'e1',

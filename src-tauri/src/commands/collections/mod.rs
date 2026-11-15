@@ -226,17 +226,28 @@ fn find_request_entry_mut<'a>(
 /// @param request_id - Request to update
 /// @param data - The data the frontend sent
 /// @returns Ok once the change is on disk
+#[cfg(test)]
 fn save_endpoint_data_v2(
     dir: &Path,
     loaded: &mut read::LoadedCollection,
     request_id: &str,
     data: &EndpointData,
 ) -> Result<(), String> {
+    save_endpoint_data_v2_with_policy(dir, loaded, request_id, data, write::WritePolicy::Private)
+}
+
+fn save_endpoint_data_v2_with_policy(
+    dir: &Path,
+    loaded: &mut read::LoadedCollection,
+    request_id: &str,
+    data: &EndpointData,
+    policy: write::WritePolicy,
+) -> Result<(), String> {
     let entry = find_request_entry_mut(&mut loaded.root, request_id)
         .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
     ipc::apply_endpoint_data(&mut entry.doc, data);
-    if !write::write_request_in_place(entry)? {
-        write::write_collection_dir(dir, loaded)?;
+    if !write::write_request_in_place_with_policy(entry, policy)? {
+        write::write_collection_dir_with_policy(dir, loaded, policy)?;
     }
     Ok(())
 }
@@ -299,17 +310,34 @@ fn validate_examples(examples: &[ExampleDoc]) -> Result<(), String> {
 /// @param request_id - Request to update
 /// @param examples - The full new list
 /// @returns Ok once the change is on disk
+#[cfg(test)]
 fn save_examples_v2(
     dir: &Path,
     loaded: &mut read::LoadedCollection,
     request_id: &str,
     examples: Vec<ExampleDoc>,
 ) -> Result<(), String> {
+    save_examples_v2_with_policy(
+        dir,
+        loaded,
+        request_id,
+        examples,
+        write::WritePolicy::Private,
+    )
+}
+
+fn save_examples_v2_with_policy(
+    dir: &Path,
+    loaded: &mut read::LoadedCollection,
+    request_id: &str,
+    examples: Vec<ExampleDoc>,
+    policy: write::WritePolicy,
+) -> Result<(), String> {
     let entry = find_request_entry_mut(&mut loaded.root, request_id)
         .ok_or_else(|| format!("Endpoint {} not found in collection", request_id))?;
     entry.doc.examples = examples;
-    if !write::write_request_in_place(entry)? {
-        write::write_collection_dir(dir, loaded)?;
+    if !write::write_request_in_place_with_policy(entry, policy)? {
+        write::write_collection_dir_with_policy(dir, loaded, policy)?;
     }
     Ok(())
 }
@@ -459,7 +487,15 @@ fn write_v2_collection_seeded(
             .unwrap_or_default(),
     };
 
-    write::write_collection_dir(dir, &mut loaded)?;
+    write::write_collection_dir_with_policy(
+        dir,
+        &mut loaded,
+        if incoming.linked {
+            write::WritePolicy::Linked
+        } else {
+            write::WritePolicy::Private
+        },
+    )?;
     collection_cache().refresh(dir, &loaded);
     Ok(skipped)
 }
@@ -617,6 +653,14 @@ fn save_linked_collections(
 }
 
 /// Reports whether a collection was opened in place.
+fn write_policy(app: &AppHandle, id: &str) -> Result<write::WritePolicy, String> {
+    Ok(if is_linked_collection(app, id)? {
+        write::WritePolicy::Linked
+    } else {
+        write::WritePolicy::Private
+    })
+}
+
 fn is_linked_collection(app: &AppHandle, collection_id: &str) -> Result<bool, String> {
     Ok(link::is_linked(
         collection_id,
@@ -1227,7 +1271,13 @@ pub async fn collection_save_endpoint_data(
 
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
     let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-    save_endpoint_data_v2(&paths.dir, &mut loaded, &endpoint_id, &data)?;
+    save_endpoint_data_v2_with_policy(
+        &paths.dir,
+        &mut loaded,
+        &endpoint_id,
+        &data,
+        write_policy(&app, &collection_id)?,
+    )?;
     collection_cache().refresh(&paths.dir, &loaded);
     Ok(())
 }
@@ -1257,7 +1307,13 @@ pub async fn collection_save_examples(
     validate_examples(&examples)?;
     let paths = CollectionPaths::resolve(&app, &collection_id)?;
     let mut loaded = read_collection_dir_cached(collection_cache(), &paths.dir)?;
-    save_examples_v2(&paths.dir, &mut loaded, &endpoint_id, examples)?;
+    save_examples_v2_with_policy(
+        &paths.dir,
+        &mut loaded,
+        &endpoint_id,
+        examples,
+        write_policy(&app, &collection_id)?,
+    )?;
     collection_cache().refresh(&paths.dir, &loaded);
     Ok(())
 }
@@ -1278,7 +1334,11 @@ pub async fn collection_delete_endpoint_data(
         .and_then(|entry| entry.source.clone());
 
     if remove_request_from_tree(&mut loaded.root, &endpoint_id) {
-        write::write_collection_dir(&paths.dir, &mut loaded)?;
+        write::write_collection_dir_with_policy(
+            &paths.dir,
+            &mut loaded,
+            write_policy(&app, &collection_id)?,
+        )?;
         if let Some(file) = request_file {
             let _ = fs::remove_file(file);
         }
@@ -1301,7 +1361,11 @@ pub async fn collection_delete_folder(
     let folder = take_folder_from_tree(&mut loaded.root, &folder_id)
         .ok_or_else(|| format!("Folder {} not found in collection", folder_id))?;
 
-    write::write_collection_dir(&paths.dir, &mut loaded)?;
+    write::write_collection_dir_with_policy(
+        &paths.dir,
+        &mut loaded,
+        write_policy(&app, &collection_id)?,
+    )?;
     remove_folder_files(&folder);
     collection_cache().refresh(&paths.dir, &loaded);
 
@@ -1338,16 +1402,25 @@ pub async fn collection_save_variables(
         }
     }
 
-    save_variables_in(&paths.dir, variables)
+    save_variables_in_with_policy(&paths.dir, variables, write_policy(&app, &collection_id)?)
 }
 
 /// Replaces a collection's variables on disk. The directory writer skips an
 /// empty list, so clearing the last variable removes the file here; otherwise
 /// the old values would come back on the next uncached read.
+#[cfg(test)]
 fn save_variables_in(dir: &Path, variables: Vec<Value>) -> Result<(), String> {
+    save_variables_in_with_policy(dir, variables, write::WritePolicy::Private)
+}
+
+fn save_variables_in_with_policy(
+    dir: &Path,
+    variables: Vec<Value>,
+    policy: write::WritePolicy,
+) -> Result<(), String> {
     let mut loaded = read_collection_dir_cached(collection_cache(), dir)?;
     loaded.variables = variables;
-    write::write_collection_dir(dir, &mut loaded)?;
+    write::write_collection_dir_with_policy(dir, &mut loaded, policy)?;
     if loaded.variables.is_empty() {
         let file = dir.join(layout::VARIABLES_YAML);
         if file.exists() {

@@ -13,7 +13,7 @@ fn template_capture_fixtures_match_the_js_port() {
         "../../../tests/fixtures/execution/template-capture.json"
     ))
     .unwrap();
-    assert_eq!(fixtures.len(), 20);
+    assert_eq!(fixtures.len(), 21);
 
     for fixture in fixtures {
         let name = fixture["name"].as_str().unwrap();

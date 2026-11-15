@@ -68,6 +68,26 @@ afterEach(() => {
 });
 
 describe('HTTP responses of every status are treated as responses', () => {
+    test('a response arriving after request replacement cannot overwrite the new tab', async () => {
+        const { handleSendRequest, updateTab, app } = await loadApiHandler({});
+        let resolveResponse;
+        let signalStarted;
+        const started = new Promise(resolve => { signalStarted = resolve; });
+        window.backendAPI.sendApiRequest.mockImplementation(() => {
+            signalStarted();
+            return new Promise(resolve => { resolveResponse = resolve; });
+        });
+        const sending = handleSendRequest();
+        await started;
+        const { invalidateInFlight } = await import('../../src/modules/state/inFlightRequests.js');
+        invalidateInFlight('tab-1');
+        resolveResponse({ status: 200, success: true, data: 'old response', headers: {} });
+        await sending;
+        expect(updateTab).not.toHaveBeenCalled();
+        delete app.workspaceTabController;
+        delete app.cookieController;
+    });
+
     test('retains the complete live inspection source across tab restores when storage caps its body', async () => {
         const data = { value: 'x'.repeat(500100) };
         const { handleSendRequest, app, updateTab } = await loadApiHandler({

@@ -633,6 +633,7 @@ async function invokeGrpcUnary({ target, fullMethod, requestJson, metadata, prot
             ? await window.backendAPI.grpc.protoInvokeUnary(protoPath, unaryRequest)
             : await window.backendAPI.grpc.invokeUnary(unaryRequest);
 
+        if (inFlightRequestFor(requestTabId) !== requestId) {return;}
         if (result.cancelled) {
             displayResponseWithLineNumbersForTab('Request was cancelled', null, requestTabId);
             await showStatus('Request cancelled');
@@ -656,8 +657,10 @@ async function invokeGrpcUnary({ target, fullMethod, requestJson, metadata, prot
 
         await showStatus(result.success ? 'gRPC OK' : `gRPC error: ${result.statusMessage || 'unknown'}`);
 
+        if (inFlightRequestFor(requestTabId) !== requestId) {return;}
         await persistGrpcResult(requestTabId, result, grpcPanes, Date.now() - startedAt, historyContext, containerElements);
     } catch (error) {
+        if (inFlightRequestFor(requestTabId) !== requestId) {return;}
         const msg = error.message || String(error);
         toast.error(`gRPC send error: ${msg}`);
         await showStatus(`gRPC send error: ${msg}`);

@@ -183,13 +183,15 @@ pub async fn mock_server_status() -> Result<Value, String> {
         Ok(serde_json::json!({
             "running": true,
             "port": server.port,
-            "requestCount": log_count
+            "requestCount": log_count,
+            "loadedCollectionIds": server.state.endpoints.read().unwrap().iter().map(|endpoint| endpoint.collection_id.clone()).collect::<std::collections::BTreeSet<_>>()
         }))
     } else {
         Ok(serde_json::json!({
             "running": false,
             "port": null,
-            "requestCount": 0
+            "requestCount": 0,
+            "loadedCollectionIds": []
         }))
     }
 }
@@ -221,11 +223,19 @@ pub async fn mock_server_clear_logs() -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub async fn mock_server_reload_settings(settings: MockServerSettings) -> Result<Value, String> {
+pub async fn mock_server_reload_settings(
+    settings: MockServerSettings,
+    collections: Option<Vec<Value>>,
+) -> Result<Value, String> {
     let handle = get_server_handle().read().unwrap();
 
     if let Some(server) = handle.as_ref() {
-        apply_settings(&server.state, settings, server.port);
+        if let Some(collections) = collections {
+            let endpoints = build_routing_table(&collections);
+            apply_routes(&server.state, settings, endpoints, server.port);
+        } else {
+            apply_settings(&server.state, settings, server.port);
+        }
         Ok(serde_json::json!({
             "success": true,
             "message": "Settings reloaded successfully"
@@ -233,6 +243,20 @@ pub async fn mock_server_reload_settings(settings: MockServerSettings) -> Result
     } else {
         Ok(serde_json::json!({ "success": false, "message": "Server is not running" }))
     }
+}
+
+/// Replace routes and settings while excluding request readers from both.
+fn apply_routes(
+    state: &MockServerState,
+    settings: MockServerSettings,
+    endpoints: Vec<MockEndpoint>,
+    port: u16,
+) {
+    // Match the handler's endpoints -> settings lock order.
+    let mut routes = state.endpoints.write().unwrap();
+    let mut current = state.settings.write().unwrap();
+    *routes = endpoints;
+    *current = MockServerSettings { port, ..settings };
 }
 
 /// Swaps in new per-endpoint settings; the bound port can't change while running.
@@ -1126,6 +1150,23 @@ mod tests {
 
     fn endpoint(id: &str, method: &str, path: &str) -> Value {
         serde_json::json!({ "id": id, "name": id, "method": method, "path": path })
+    }
+
+    #[tokio::test]
+    async fn route_reload_replaces_routes_and_can_disable_the_last_collection() {
+        let state = state_with(vec![endpoint("old", "GET", "/old")]);
+        let settings = state.settings.read().unwrap().clone();
+        apply_routes(
+            &state,
+            settings.clone(),
+            build_routing_table(&[collection(vec![endpoint("new", "GET", "/new")])]),
+            3000,
+        );
+        assert_eq!(call(&state, "GET", "/old").await.0, StatusCode::NOT_FOUND);
+        assert_eq!(call(&state, "GET", "/new").await.0, StatusCode::OK);
+        apply_routes(&state, settings, Vec::new(), 3000);
+        assert_eq!(call(&state, "GET", "/new").await.0, StatusCode::NOT_FOUND);
+        assert_eq!(state.settings.read().unwrap().port, 3000);
     }
 
     fn state_with(endpoints: Vec<Value>) -> MockServerState {

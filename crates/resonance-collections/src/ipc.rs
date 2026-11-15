@@ -696,7 +696,41 @@ fn renumber_if_reordered(requests: &mut [RequestEntry], existing: Option<&Folder
         .collect();
 
     if previous_surviving == incoming_known {
-        return;
+        // Allocate inserted/moved requests between their destination siblings.
+        // A moved request's old seq belongs to its source folder.
+        let mut candidate: Vec<i64> = requests.iter().map(|entry| entry.doc.seq).collect();
+        let mut last = 0_i64;
+        let mut fits = true;
+        for index in 0..requests.len() {
+            if previous.contains(&requests[index].doc.id.as_str()) {
+                if candidate[index] <= last {
+                    fits = false;
+                    break;
+                }
+            } else {
+                let next = requests[index + 1..]
+                    .iter()
+                    .find(|entry| previous.contains(&entry.doc.id.as_str()))
+                    .map(|entry| entry.doc.seq);
+                let step = if next.is_some() { 1 } else { 10 };
+                let Some(seq) = last.checked_add(step) else {
+                    fits = false;
+                    break;
+                };
+                if next.is_some_and(|next| seq >= next) {
+                    fits = false;
+                    break;
+                }
+                candidate[index] = seq;
+            }
+            last = candidate[index];
+        }
+        if fits {
+            for (entry, seq) in requests.iter_mut().zip(candidate) {
+                entry.doc.seq = seq;
+            }
+            return;
+        }
     }
 
     for (index, entry) in requests.iter_mut().enumerate() {
@@ -1586,6 +1620,105 @@ mod save_path {
 
     mod reordering {
         use super::*;
+
+        #[test]
+        fn moved_requests_keep_the_requested_order_in_cache_and_on_disk() {
+            use crate::cache::{CollectionCache, read_collection_dir_cached};
+            use crate::read::read_collection_dir;
+            use crate::write::write_collection_dir;
+
+            for (source, destination) in [
+                ("root", "destination"),
+                ("source", "root"),
+                ("source", "destination"),
+            ] {
+                for position in 0..=2 {
+                    let temp = tempfile::TempDir::new().unwrap();
+                    let mut existing = existing_three();
+                    let entries = |ids: &[&str]| -> Vec<RequestEntry> {
+                        ids.iter()
+                            .enumerate()
+                            .map(|(index, id)| {
+                                let mut doc = RequestDoc::new((*id).into(), id.to_uppercase());
+                                doc.seq = (index as i64 + 1) * 10;
+                                RequestEntry::new(doc)
+                            })
+                            .collect()
+                    };
+                    existing.root.requests = entries(if source == "root" {
+                        &["z"]
+                    } else if destination == "root" {
+                        &["a", "c"]
+                    } else {
+                        &["untouched"]
+                    });
+                    existing.root.folders.clear();
+                    for (id, ids) in [(source, vec!["z"]), (destination, vec!["a", "c"])] {
+                        if id == "root" {
+                            continue;
+                        }
+                        existing.root.folders.push(FolderNode {
+                            meta: Some(crate::model::FolderDoc {
+                                format: FORMAT_VERSION,
+                                id: id.into(),
+                                name: id.into(),
+                                seq: 10,
+                                auth: None,
+                                extra: Map::new(),
+                            }),
+                            requests: entries(&ids),
+                            ..Default::default()
+                        });
+                    }
+                    write_collection_dir(temp.path(), &mut existing).unwrap();
+                    let existing = read_collection_dir(temp.path()).unwrap();
+                    let mut desired = vec!["a", "c"];
+                    desired.insert(position, "z");
+                    let mut folders = Vec::new();
+                    if source != "root" {
+                        folders.push(json!({"id": source, "name": source, "endpoints": []}));
+                    }
+                    if destination != "root" {
+                        folders.push(json!({"id": destination, "name": destination,
+                            "endpoints": desired.iter().map(|id| endpoint(id)).collect::<Vec<_>>() }));
+                    }
+                    let mut flat = desired.iter().map(|id| endpoint(id)).collect::<Vec<_>>();
+                    if source != "root" && destination != "root" {
+                        flat.push(endpoint("untouched"));
+                    }
+                    let incoming = ipc_collection(flat, folders);
+                    let mut updated = existing.clone();
+                    updated.root = tree_from_ipc(&incoming, Some(&existing));
+                    write_collection_dir(temp.path(), &mut updated).unwrap();
+                    let cache = CollectionCache::default();
+                    cache.refresh(temp.path(), &updated);
+                    for collection in [
+                        read_collection_dir_cached(&cache, temp.path()).unwrap(),
+                        read_collection_dir(temp.path()).unwrap(),
+                    ] {
+                        let node = if destination == "root" {
+                            &collection.root
+                        } else {
+                            collection
+                                .root
+                                .folders
+                                .iter()
+                                .find(|folder| folder.meta.as_ref().unwrap().id == destination)
+                                .unwrap()
+                        };
+                        let actual: Vec<_> = node
+                            .requests
+                            .iter()
+                            .map(|entry| entry.doc.id.as_str())
+                            .collect();
+                        assert_eq!(
+                            actual, desired,
+                            "move {source} -> {destination}, insertion {position}"
+                        );
+                    }
+                }
+            }
+        }
 
         fn existing_three() -> LoadedCollection {
             let mut c = existing_with_state();

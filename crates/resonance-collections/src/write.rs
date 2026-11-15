@@ -21,7 +21,13 @@ use super::layout::{
     find_available_path, is_reserved_dir, request_stem, slugify,
 };
 use super::read::{FolderNode, LoadedCollection, RequestEntry, folder_display_name};
-use crate::fs_secure::{restrict_dir, restrict_file};
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WritePolicy {
+    /// App-owned storage: owner-only files and directories.
+    Private,
+    /// User-owned checkout: preserve existing modes; normal defaults for new entries.
+    Linked,
+}
 
 /// Gap left between consecutive `seq` values, so a request can be inserted
 /// between two others without renumbering either.
@@ -42,6 +48,14 @@ pub fn to_yaml<T: Serialize>(value: &T) -> Result<String, String> {
 /// @param contents - Bytes to write
 /// @returns Ok once the file is durably in place
 pub fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+    write_atomic_with_policy(path, contents, WritePolicy::Private)
+}
+
+pub fn write_atomic_with_policy(
+    path: &Path,
+    contents: &str,
+    policy: WritePolicy,
+) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
@@ -58,15 +72,39 @@ pub fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
     ));
 
     let result = (|| -> Result<(), String> {
-        let mut file = fs::File::create(&temp)
+        let existing_permissions = if policy == WritePolicy::Linked {
+            match fs::metadata(path) {
+                Ok(meta) => Some(meta.permissions()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => return Err(format!("Failed to read permissions: {e}")),
+            }
+        } else {
+            None
+        };
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        if policy == WritePolicy::Private {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        #[cfg(unix)]
+        if let Some(permissions) = &existing_permissions {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            options.mode(permissions.mode() & 0o777);
+        }
+        let mut file = options
+            .open(&temp)
             .map_err(|e| format!("Failed to create {}: {}", temp.display(), e))?;
+        if let Some(permissions) = existing_permissions {
+            file.set_permissions(permissions)
+                .map_err(|e| format!("Failed to preserve permissions: {e}"))?;
+        }
         file.write_all(contents.as_bytes())
             .map_err(|e| format!("Failed to write {}: {}", temp.display(), e))?;
         file.sync_all()
             .map_err(|e| format!("Failed to flush {}: {}", temp.display(), e))?;
         drop(file);
-
-        restrict_file(&temp);
 
         fs::rename(&temp, path).map_err(|e| format!("Failed to place {}: {}", path.display(), e))
     })();
@@ -83,22 +121,47 @@ pub fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
 /// @param contents - Bytes the file should hold
 /// @returns True when the file was written
 pub fn write_if_changed(path: &Path, contents: &str) -> Result<bool, String> {
+    write_if_changed_with_policy(path, contents, WritePolicy::Private)
+}
+
+pub fn write_if_changed_with_policy(
+    path: &Path,
+    contents: &str,
+    policy: WritePolicy,
+) -> Result<bool, String> {
     if let Ok(existing) = fs::read_to_string(path)
         && existing == contents
     {
         return Ok(false);
     }
-    write_atomic(path, contents)?;
+    write_atomic_with_policy(path, contents, policy)?;
     Ok(true)
 }
 
 /// Creates a directory if missing and tightens its permissions either way.
 pub fn ensure_dir(dir: &Path) -> Result<(), String> {
+    ensure_dir_with_policy(dir, WritePolicy::Private)
+}
+
+pub fn ensure_dir_with_policy(dir: &Path, policy: WritePolicy) -> Result<(), String> {
     if !dir.exists() {
-        fs::create_dir_all(dir)
+        let mut builder = fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        if policy == WritePolicy::Private {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder
+            .create(dir)
             .map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
     }
-    restrict_dir(dir);
+    #[cfg(unix)]
+    if policy == WritePolicy::Private {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+            .map_err(|e| format!("Failed to restrict {}: {e}", dir.display()))?;
+    }
     Ok(())
 }
 
@@ -179,14 +242,19 @@ fn rebase_sources(node: &mut FolderNode, from: &Path, to: &Path) {
 /// the directory belong to the tree. At the collection root a subfolder whose
 /// slug is a reserved directory name is suffixed, so it can never claim the
 /// directory the layout owns.
-fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<PathBuf>, String> {
-    ensure_dir(dir)?;
+fn write_folder(
+    dir: &Path,
+    node: &mut FolderNode,
+    at_root: bool,
+    policy: WritePolicy,
+) -> Result<Vec<PathBuf>, String> {
+    ensure_dir_with_policy(dir, policy)?;
 
     let mut claimed: Vec<PathBuf> = Vec::new();
 
     if let Some(meta) = &node.meta {
         let path = dir.join(FOLDER_YAML);
-        write_if_changed(&path, &to_yaml(meta)?)?;
+        write_if_changed_with_policy(&path, &to_yaml(meta)?, policy)?;
         claimed.push(path);
     }
 
@@ -200,7 +268,7 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
             relocate(current_path, &desired)?;
         }
 
-        write_if_changed(&desired, &to_yaml(&node.requests[index].doc)?)?;
+        write_if_changed_with_policy(&desired, &to_yaml(&node.requests[index].doc)?, policy)?;
         node.requests[index].source = Some(desired.clone());
         claimed.push(desired);
     }
@@ -227,7 +295,7 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
         }
 
         folder.source = Some(desired.clone());
-        claimed.extend(write_folder(&desired, folder, false)?);
+        claimed.extend(write_folder(&desired, folder, false, policy)?);
     }
 
     Ok(claimed)
@@ -244,21 +312,37 @@ fn write_folder(dir: &Path, node: &mut FolderNode, at_root: bool) -> Result<Vec<
 /// @param collection - The collection to persist
 /// @returns Ok once every file is in place
 pub fn write_collection_dir(dir: &Path, collection: &mut LoadedCollection) -> Result<(), String> {
-    ensure_dir(dir)?;
+    write_collection_dir_with_policy(dir, collection, WritePolicy::Private)
+}
+
+pub fn write_collection_dir_with_policy(
+    dir: &Path,
+    collection: &mut LoadedCollection,
+    policy: WritePolicy,
+) -> Result<(), String> {
+    ensure_dir_with_policy(dir, policy)?;
 
     assign_missing_seq(&mut collection.root);
-    write_folder(dir, &mut collection.root, true)?;
+    write_folder(dir, &mut collection.root, true, policy)?;
 
     if !collection.variables.is_empty() {
-        write_if_changed(&dir.join(VARIABLES_YAML), &to_yaml(&collection.variables)?)?;
+        write_if_changed_with_policy(
+            &dir.join(VARIABLES_YAML),
+            &to_yaml(&collection.variables)?,
+            policy,
+        )?;
     }
 
     if let Some(spec) = &collection.open_api_spec {
-        write_if_changed(&dir.join(OPENAPI_YAML), &to_yaml(spec)?)?;
+        write_if_changed_with_policy(&dir.join(OPENAPI_YAML), &to_yaml(spec)?, policy)?;
         collection.meta.open_api_spec = Some(OPENAPI_YAML.to_string());
     }
 
-    write_if_changed(&dir.join(COLLECTION_YAML), &to_yaml(&collection.meta)?)?;
+    write_if_changed_with_policy(
+        &dir.join(COLLECTION_YAML),
+        &to_yaml(&collection.meta)?,
+        policy,
+    )?;
 
     Ok(())
 }
@@ -272,13 +356,20 @@ pub fn write_collection_dir(dir: &Path, collection: &mut LoadedCollection) -> Re
 /// @returns False when the request has no file or no `seq` yet, in which case
 /// the caller must fall back to a whole-tree write that assigns both
 pub fn write_request_in_place(entry: &RequestEntry) -> Result<bool, String> {
+    write_request_in_place_with_policy(entry, WritePolicy::Private)
+}
+
+pub fn write_request_in_place_with_policy(
+    entry: &RequestEntry,
+    policy: WritePolicy,
+) -> Result<bool, String> {
     let Some(path) = entry.source.as_deref() else {
         return Ok(false);
     };
     if entry.doc.seq == 0 || !path.exists() {
         return Ok(false);
     }
-    write_if_changed(path, &to_yaml(&entry.doc)?)?;
+    write_if_changed_with_policy(path, &to_yaml(&entry.doc)?, policy)?;
     Ok(true)
 }
 
@@ -304,6 +395,74 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn linked_collection_saves_preserve_shared_directory_and_file_modes() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = TempDir::new().unwrap();
+        let mut c = collection(vec![request("r1", "Health")]);
+        write_collection_dir_with_policy(temp.path(), &mut c, WritePolicy::Linked).unwrap();
+        fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o2770)).unwrap();
+        for name in [COLLECTION_YAML, "health.yaml"] {
+            fs::set_permissions(temp.path().join(name), fs::Permissions::from_mode(0o660)).unwrap();
+        }
+        c.meta.name = "Updated collection".into();
+        c.root.requests[0].doc.description = Some("Changed request".into());
+        write_collection_dir_with_policy(temp.path(), &mut c, WritePolicy::Linked).unwrap();
+
+        assert_eq!(
+            fs::metadata(temp.path()).unwrap().permissions().mode() & 0o7777,
+            0o2770
+        );
+        for name in [COLLECTION_YAML, "health.yaml"] {
+            assert_eq!(
+                fs::metadata(temp.path().join(name))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o660,
+                "{name}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linked_targeted_saves_and_renames_preserve_existing_file_modes() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = TempDir::new().unwrap();
+        let mut c = collection(vec![request("r1", "Health")]);
+        write_collection_dir_with_policy(temp.path(), &mut c, WritePolicy::Linked).unwrap();
+        fs::set_permissions(
+            temp.path().join("health.yaml"),
+            fs::Permissions::from_mode(0o640),
+        )
+        .unwrap();
+        c.root.requests[0].doc.description = Some("Updated in place".into());
+        assert!(
+            write_request_in_place_with_policy(&c.root.requests[0], WritePolicy::Linked).unwrap()
+        );
+        assert_eq!(
+            fs::metadata(temp.path().join("health.yaml"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+        c.root.requests[0].doc.name = "Renamed".into();
+        write_collection_dir_with_policy(temp.path(), &mut c, WritePolicy::Linked).unwrap();
+        assert_eq!(
+            fs::metadata(temp.path().join("renamed.yaml"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+    }
+
     fn folder_meta(id: &str, name: &str) -> FolderDoc {
         FolderDoc {
             format: FORMAT_VERSION,
@@ -313,6 +472,30 @@ mod tests {
             auth: None,
             extra: Map::new(),
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linked_new_entries_use_the_same_modes_as_normal_filesystem_creation() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = TempDir::new().unwrap();
+        let baseline_file = temp.path().join("baseline-file");
+        let baseline_dir = temp.path().join("baseline-dir");
+        fs::write(&baseline_file, "baseline").unwrap();
+        fs::create_dir(&baseline_dir).unwrap();
+        let mut c = collection(vec![request("r1", "Health")]);
+        c.root
+            .folders
+            .push(folder("f1", "Pets", vec![request("r2", "List")]));
+        write_collection_dir_with_policy(temp.path(), &mut c, WritePolicy::Linked).unwrap();
+
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&temp.path().join("health.yaml")), mode(&baseline_file));
+        assert_eq!(mode(&temp.path().join("pets")), mode(&baseline_dir));
+        assert_eq!(
+            mode(&temp.path().join("pets/list.yaml")),
+            mode(&baseline_file)
+        );
     }
 
     fn request(id: &str, name: &str) -> RequestEntry {

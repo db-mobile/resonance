@@ -147,7 +147,7 @@ if (isTauri) {
             status: () => invoke('mock_server_status'),
             logs: (limit) => invoke('mock_server_logs', { limit }),
             clearLogs: () => invoke('mock_server_clear_logs'),
-            reloadSettings: (settings) => invoke('mock_server_reload_settings', { settings })
+            reloadSettings: (settings, collections = null) => invoke('mock_server_reload_settings', { settings, collections })
         },
         schema: {
             check: (schema) => invoke('schema_check', { schema }),

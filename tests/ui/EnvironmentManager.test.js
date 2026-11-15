@@ -66,6 +66,22 @@ describe('EnvironmentManager', () => {
         expect(escapeHandlerCount()).toBe(0);
     });
 
+    test('a rename finishing after selection changes stays in the original environment', async () => {
+        const { manager } = await openManager(service);
+        let release;
+        service.deleteVariable.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+        const input = document.querySelector('.var-name-input');
+        input.value = 'renamed';
+        input.dispatchEvent(new window.Event('blur'));
+        await flush();
+        manager.selectEnvironment('prod');
+        release();
+        await flush();
+        manager.close();
+        expect(service.setVariable).toHaveBeenCalledWith('dev', 'renamed', 'dev.example', false);
+        expect(service.setVariable.mock.calls.some(call => call[0] === 'prod')).toBe(false);
+    });
+
     test('renders the environment list with the active badge and selects the active one', async () => {
         const { manager } = await openManager(service);
 

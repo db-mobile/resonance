@@ -307,6 +307,13 @@ export class WorkspaceTabRepository {
         return newTab;
     }
 
+    /** Clear bindings to a deleted collection while preserving tab contents. */
+    async detachCollection(collectionId) {
+        const tabs = await this.getTabs();
+        await this.saveTabs(tabs.map(tab => tab.endpoint?.collectionId === collectionId
+            ? { ...tab, endpoint: null } : tab));
+    }
+
     /**
      * @param {string} tabId
      * @param {Object} updates
@@ -357,7 +364,7 @@ export class WorkspaceTabRepository {
 
         const mergedEndpoint = (updates.endpoint && existingTab.endpoint) ?
             { ...existingTab.endpoint, ...updates.endpoint } :
-            (updates.endpoint || existingTab.endpoint);
+            (updates.endpoint !== undefined ? updates.endpoint : existingTab.endpoint);
 
         const { request: _r, response: _res, endpoint: _e, ...restUpdates } = updates;
 

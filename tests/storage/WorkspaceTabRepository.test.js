@@ -15,6 +15,24 @@ describe('WorkspaceTabRepository', () => {
         repository = new WorkspaceTabRepository(mockBackendAPI);
     });
 
+    test('explicit null detaches an endpoint while omitted fields preserve it', async () => {
+        mockBackendAPI.store.get.mockResolvedValue([{ id: 't', endpoint: { collectionId: 'c', endpointId: 'e' } }]);
+        expect((await repository.updateTab('t', { name: 'renamed' })).endpoint.endpointId).toBe('e');
+        expect((await repository.updateTab('t', { endpoint: null })).endpoint).toBeNull();
+    });
+
+    test('detaching a collection preserves request contents and other bindings', async () => {
+        mockBackendAPI.store.get.mockResolvedValue([
+            { id: 'a', request: { url: 'https://a' }, endpoint: { collectionId: 'c', endpointId: 'e' } },
+            { id: 'b', endpoint: { collectionId: 'other', endpointId: 'e' } }
+        ]);
+        await repository.detachCollection('c');
+        const tabs = await repository.getTabs();
+        expect(tabs[0].endpoint).toBeNull();
+        expect(tabs[0].request.url).toBe('https://a');
+        expect(tabs[1].endpoint.collectionId).toBe('other');
+    });
+
     describe('getTabs', () => {
         test('should return tabs from storage', async () => {
             const tabs = [

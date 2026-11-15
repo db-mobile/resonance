@@ -400,14 +400,13 @@ export function captureRunnerEntry(entry, { collection, endpoint, persisted, inh
             headers[row.key] = row.value ?? '';
         }
     }
-    let queryRows = (
-        (Array.isArray(overrides.queryParams) ? overrides.queryParams : persisted.queryParams) || []
-    ).filter((row) => row.enabled !== false && row.key);
-    if (!queryRows.length) {
-        queryRows = Object.entries(endpoint.parameters?.query || {})
+    const hasQueryOverride = Array.isArray(overrides.queryParams);
+    const configuredQueryRows = hasQueryOverride ? overrides.queryParams : persisted.queryParams || [];
+    const queryRows = hasQueryOverride || configuredQueryRows.length
+        ? configuredQueryRows.filter(row => row.enabled !== false && row.key)
+        : Object.entries(endpoint.parameters?.query || {})
             .filter(([, param]) => param.example)
             .map(([key, param]) => ({ key, value: String(param.example) }));
-    }
     const form = persisted.formBodyData || {};
     const hasOverride = typeof overrides.body === 'string';
     const nonemptyOverride = hasOverride && overrides.body.trim() !== '';

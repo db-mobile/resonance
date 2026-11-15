@@ -158,6 +158,11 @@ export class WorkspaceTabService {
         });
     }
 
+    /** Clear bindings to a deleted collection while preserving tab contents. */
+    async detachCollection(collectionId) {
+        return this.repository.detachCollection(collectionId);
+    }
+
     /**
      * @param {string} tabId
      * @param {Object} updates

@@ -449,7 +449,8 @@ async function sendHttpRequest() {
     previous?.cancel().catch(() => {});
     const execution = core.createExecution();
     manualExecutions.set(requestTabId, execution);
-    const isCurrent = () => manualExecutions.get(requestTabId) === execution && !execution.cancelled;
+    const isCurrent = () => manualExecutions.get(requestTabId) === execution && !execution.cancelled &&
+        inFlightRequestFor(requestTabId) === execution.executionId;
     const untrack = trackInFlight(requestTabId, execution.executionId);
     setRequestInProgress(true);
     const { schemaController } = app;
@@ -575,6 +576,7 @@ async function handleReceivedResponse(result, { requestConfig, requestTabId, url
     }
 
     const cookies = responseCookies(result);
+    if (!isCurrentResponse()) { return; }
 
     if (app.workspaceTabController && requestTabId) {
         app.workspaceTabController.service.updateTab(requestTabId, {

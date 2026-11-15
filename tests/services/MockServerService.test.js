@@ -90,7 +90,7 @@ describe('MockServerService', () => {
         test('shouldUseMockServer only when running and enabled', async () => {
             expect(await service.shouldUseMockServer('c1')).toEqual({ shouldUseMock: false, mockBaseUrl: null });
 
-            mockServerApi.status.mockResolvedValue({ running: true, port: 3005 });
+            mockServerApi.status.mockResolvedValue({ running: true, port: 3005, loadedCollectionIds: ['c1'] });
             expect(await service.shouldUseMockServer('c1')).toEqual({ shouldUseMock: true, mockBaseUrl: 'http://localhost:3005' });
             expect(await service.shouldUseMockServer('c9')).toEqual({ shouldUseMock: false, mockBaseUrl: null });
         });
@@ -196,6 +196,156 @@ describe('MockServerService', () => {
             mockServerApi.reloadSettings.mockRejectedValue(new Error('x'));
 
             await expect(service.setCustomResponse('c1', 'e1', null)).resolves.toEqual({ ok: 'response' });
+        });
+    });
+
+    describe('live collection toggles', () => {
+        let saved;
+        let loaded;
+        let collections;
+        let reload;
+
+        const clone = value => JSON.parse(JSON.stringify(value));
+        const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        beforeEach(() => {
+            saved = { port: 3000, enabledCollections: ['c1'] };
+            loaded = ['c1'];
+            collections = [
+                { id: 'c1', endpoints: [{ id: 'e1', path: '/one' }] },
+                { id: 'c2', endpoints: [{ id: 'e2', path: '/two' }] }
+            ];
+            repository.getSettings.mockImplementation(async () => clone(saved));
+            repository.saveSettings = jest.fn(async settings => {
+                saved = clone(settings);
+                return clone(saved);
+            });
+            repository.toggleCollectionEnabled.mockImplementation(async id => {
+                const ids = saved.enabledCollections;
+                saved = { ...saved, enabledCollections: ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id] };
+                return clone(saved);
+            });
+            mockServerApi.status.mockImplementation(async () => ({
+                running: true, port: 3000, loadedCollectionIds: [...loaded]
+            }));
+            reload = async (settings, snapshots) => {
+                loaded = snapshots.map(collection => collection.id);
+                return { success: true };
+            };
+            mockServerApi.reloadSettings.mockImplementation((...args) => reload(...args));
+            service = new MockServerService(repository, statusDisplay, async () => collections);
+        });
+
+        test('enabling an unloaded collection loads its routes before reporting success', async () => {
+            expect(await service.toggleCollectionEnabled('c2')).toBe(true);
+
+            expect(loaded).toEqual(['c1', 'c2']);
+            expect(mockServerApi.reloadSettings).toHaveBeenCalledWith(saved, collections);
+            expect(await service.shouldUseMockServer('c2')).toEqual({ shouldUseMock: true, mockBaseUrl: 'http://localhost:3000' });
+        });
+
+        test('a toggle waits for an in-progress start before replacing routes', async () => {
+            let running = false;
+            mockServerApi.status.mockImplementation(async () => ({ running, port: 3000, loadedCollectionIds: [...loaded] }));
+            loaded = [];
+            let releaseStart;
+            let signalStarted;
+            const started = new Promise(resolve => { signalStarted = resolve; });
+            window.backendAPI.mockServer.start.mockImplementation(async (_settings, snapshots) => {
+                signalStarted();
+                await new Promise(resolve => { releaseStart = resolve; });
+                running = true;
+                loaded = snapshots.map(collection => collection.id);
+                return { success: true, port: 3000 };
+            });
+            const start = service.startServer(collections);
+            await started;
+            const toggle = service.toggleCollectionEnabled('c2');
+            releaseStart();
+            await Promise.all([start, toggle]);
+            expect(loaded).toEqual(['c1', 'c2']);
+            expect(saved.enabledCollections).toEqual(['c1', 'c2']);
+        });
+
+        test('routing follows acknowledged runtime membership during a reload', async () => {
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            reload = async (_settings, snapshots) => {
+                await gate;
+                loaded = snapshots.map(collection => collection.id);
+                return { success: true };
+            };
+            const toggle = service.toggleCollectionEnabled('c2');
+            await tick();
+            const beforeReload = await service.shouldUseMockServer('c2');
+            release();
+            await toggle;
+
+            expect(beforeReload).toEqual({ shouldUseMock: false, mockBaseUrl: null });
+            expect(await service.shouldUseMockServer('c2')).toEqual({ shouldUseMock: true, mockBaseUrl: 'http://localhost:3000' });
+        });
+
+        test('a saved toggle cannot redirect to a collection absent from the runtime', async () => {
+            saved.enabledCollections.push('c2');
+            expect(await service.shouldUseMockServer('c2')).toEqual({ shouldUseMock: false, mockBaseUrl: null });
+
+            saved.enabledCollections = [];
+            expect(await service.shouldUseMockServer('c1')).toEqual({ shouldUseMock: true, mockBaseUrl: 'http://localhost:3000' });
+        });
+
+        test('disabling the last collection removes routes without stopping the server', async () => {
+            expect(await service.toggleCollectionEnabled('c1')).toBe(false);
+
+            expect(saved.enabledCollections).toEqual([]);
+            expect(loaded).toEqual([]);
+            expect(mockServerApi.stop).not.toHaveBeenCalled();
+            expect(await service.shouldUseMockServer('c1')).toEqual({ shouldUseMock: false, mockBaseUrl: null });
+        });
+
+        test('rapid toggles wait for the preceding reload and preserve the final intent', async () => {
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            let reloadCount = 0;
+            reload = async (_settings, snapshots) => {
+                if (++reloadCount === 1) { await gate; }
+                loaded = snapshots.map(collection => collection.id);
+                return { success: true };
+            };
+            const enable = service.toggleCollectionEnabled('c2');
+            await tick();
+            const disable = service.toggleCollectionEnabled('c2');
+            await tick();
+            const pendingSaved = clone(saved);
+            release();
+            await expect(Promise.all([enable, disable])).resolves.toEqual([true, false]);
+
+            expect(pendingSaved.enabledCollections).toEqual(['c1', 'c2']);
+            expect(saved.enabledCollections).toEqual(['c1']);
+            expect(loaded).toEqual(['c1']);
+            expect(reloadCount).toBe(2);
+        });
+
+        test.each(['transport', 'rejected', 'stopped'])('a %s reload failure restores saved settings and keeps old routing', async kind => {
+            reload = async () => {
+                if (kind === 'transport') { throw new Error('reload failed'); }
+                return { success: false, message: kind === 'stopped' ? 'Server is not running' : 'reload failed' };
+            };
+
+            await expect(service.toggleCollectionEnabled('c2')).rejects.toThrow();
+
+            expect(saved.enabledCollections).toEqual(['c1']);
+            expect(loaded).toEqual(['c1']);
+            expect(await service.shouldUseMockServer('c2')).toEqual({ shouldUseMock: false, mockBaseUrl: null });
+            expect(statusDisplay.update).toHaveBeenCalledWith(expect.stringContaining('Error toggling collection:'), null);
+        });
+
+        test('a failed reload does not prevent a subsequent toggle', async () => {
+            mockServerApi.reloadSettings.mockRejectedValueOnce(new Error('temporary failure'));
+            await expect(service.toggleCollectionEnabled('c2')).rejects.toThrow('temporary failure');
+
+            await expect(service.toggleCollectionEnabled('c2')).resolves.toBe(true);
+            expect(saved.enabledCollections).toEqual(['c1', 'c2']);
+            expect(loaded).toEqual(['c1', 'c2']);
         });
     });
 

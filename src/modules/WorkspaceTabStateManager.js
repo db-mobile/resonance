@@ -699,6 +699,7 @@ export class WorkspaceTabStateManager {
 
     _clearResponse(tabId) {
         clearResponseDisplayForTab(tabId);
+        setResponseMeta(tabId, { isBinary: false, base64: null, suggestedName: 'response' });
 
         updateStatusDisplay('Ready', null);
 
