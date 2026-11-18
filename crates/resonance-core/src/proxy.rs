@@ -1,6 +1,7 @@
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::net::IpAddr;
 use std::sync::RwLock;
 
 /// Every field defaults, so a stored payload written by an older version (or a
@@ -134,6 +135,10 @@ impl ProxySettings {
             };
         }
 
+        if self.host.trim().is_empty() {
+            return WsProxyAction::Direct;
+        }
+
         let scheme = match self.proxy_type.to_ascii_lowercase().as_str() {
             "http" => ProxyScheme::Http,
             "https" => ProxyScheme::Https,
@@ -172,7 +177,11 @@ impl ProxySettings {
         }
 
         if self.use_system_proxy {
-            return ProxyAction::UseSystem;
+            return if no_proxy_bypasses(env_var("NO_PROXY").as_deref(), url) {
+                ProxyAction::Disable
+            } else {
+                ProxyAction::UseSystem
+            };
         }
 
         if self.host.trim().is_empty() {
@@ -194,34 +203,76 @@ impl ProxySettings {
     }
 
     /// Shared by both resolvers so the bypass rules cannot drift apart.
+    ///
+    /// Accepts every spelling conventional tooling does: `host` and `.host`
+    /// (the host and its subdomains), `*.host`, a lone `*`, an IP address with
+    /// or without IPv6 brackets, and a CIDR block.
     fn should_bypass(url: &str, bypass_list: &[String]) -> bool {
-        if let Ok(parsed) = url::Url::parse(url)
-            && let Some(host) = parsed.host_str()
-        {
-            for pattern in bypass_list {
-                let pattern = pattern.trim().to_ascii_lowercase();
-                let pattern = pattern.as_str();
-                if pattern.is_empty() {
-                    continue;
-                }
-
-                if pattern == host {
-                    return true;
-                }
-
-                if let Some(domain) = pattern.strip_prefix("*.")
-                    && (host == domain || host.ends_with(&format!(".{domain}")))
-                {
-                    return true;
-                }
-
-                if pattern.starts_with('.') && host.ends_with(pattern) {
-                    return true;
-                }
-            }
-        }
-        false
+        let Ok(parsed) = url::Url::parse(url) else {
+            return false;
+        };
+        let Some(host) = parsed.host_str() else {
+            return false;
+        };
+        let host = host.trim_matches(['[', ']']);
+        let address = host.parse::<IpAddr>().ok();
+        bypass_list
+            .iter()
+            .any(|rule| rule_matches(&rule.trim().to_ascii_lowercase(), host, address))
     }
+}
+
+fn rule_matches(rule: &str, host: &str, address: Option<IpAddr>) -> bool {
+    if rule.is_empty() {
+        return false;
+    }
+    if rule == "*" {
+        return true;
+    }
+    if let Some(address) = address {
+        return address_rule_matches(rule, address);
+    }
+    let domain = rule
+        .strip_prefix("*.")
+        .or_else(|| rule.strip_prefix('.'))
+        .unwrap_or(rule);
+    !domain.is_empty() && (host == domain || host.ends_with(&format!(".{domain}")))
+}
+
+fn address_rule_matches(rule: &str, address: IpAddr) -> bool {
+    let (network, prefix) = match rule.split_once('/') {
+        Some((network, prefix)) => match prefix.parse::<u32>() {
+            Ok(prefix) => (network, Some(prefix)),
+            Err(_) => return false,
+        },
+        None => (rule, None),
+    };
+    let Ok(network) = network.trim_matches(['[', ']']).parse::<IpAddr>() else {
+        return false;
+    };
+    match (network, address) {
+        (IpAddr::V4(network), IpAddr::V4(address)) => same_prefix(
+            u32::from(network).into(),
+            u32::from(address).into(),
+            prefix.unwrap_or(32),
+            32,
+        ),
+        (IpAddr::V6(network), IpAddr::V6(address)) => {
+            same_prefix(network.into(), address.into(), prefix.unwrap_or(128), 128)
+        }
+        _ => false,
+    }
+}
+
+fn same_prefix(left: u128, right: u128, prefix: u32, width: u32) -> bool {
+    if prefix > width {
+        return false;
+    }
+    if prefix == 0 {
+        return true;
+    }
+    let shift = width - prefix;
+    left >> shift == right >> shift
 }
 
 /// Parse a proxy URL from the environment into an endpoint. A bare
@@ -268,7 +319,7 @@ pub(crate) fn parse_proxy_url(raw: &str) -> Option<ProxyEndpoint> {
 
 /// Percent-decode a userinfo component. Credentials in a proxy URL are
 /// percent-encoded, and the proxy expects the decoded bytes.
-fn urlencoding_decode(value: &str) -> String {
+pub fn urlencoding_decode(value: &str) -> String {
     percent_decode(value).unwrap_or_else(|| value.to_string())
 }
 
@@ -297,11 +348,8 @@ fn system_proxy_for(url: &str) -> Option<ProxyEndpoint> {
         .ok()
         .is_some_and(|parsed| matches!(parsed.scheme(), "https" | "wss"));
 
-    if let Some(no_proxy) = env_var("NO_PROXY") {
-        let patterns: Vec<String> = no_proxy.split(',').map(|p| p.trim().to_string()).collect();
-        if patterns.iter().any(|p| p == "*") || ProxySettings::should_bypass(url, &patterns) {
-            return None;
-        }
+    if no_proxy_bypasses(env_var("NO_PROXY").as_deref(), url) {
+        return None;
     }
 
     let scheme_var = if is_secure {
@@ -311,6 +359,16 @@ fn system_proxy_for(url: &str) -> Option<ProxyEndpoint> {
     };
     let raw = env_var(scheme_var).or_else(|| env_var("ALL_PROXY"))?;
     parse_proxy_url(&raw)
+}
+
+/// Whether a `NO_PROXY` value exempts `url`. Both resolvers ask this in
+/// system-proxy mode: the HTTP client would otherwise apply its own narrower
+/// reading of the same variable and disagree with the WebSocket path.
+fn no_proxy_bypasses(no_proxy: Option<&str>, url: &str) -> bool {
+    no_proxy.is_some_and(|raw| {
+        let rules: Vec<String> = raw.split(',').map(str::to_string).collect();
+        ProxySettings::should_bypass(url, &rules)
+    })
 }
 
 /// Read an environment variable in either case, preferring the conventional
@@ -662,6 +720,79 @@ mod tests {
             state.get_proxy_config("https://evilinternal.test/x"),
             ProxyAction::Manual(_)
         ));
+    }
+
+    /// One rule, one URL, one answer: manual lists on both transports and the
+    /// `NO_PROXY` reading used in system mode all share it.
+    #[test]
+    fn every_resolver_reads_a_bypass_rule_the_same_way() {
+        let cases = [
+            ("example.com", "example.com", true),
+            ("example.com", "api.example.com", true),
+            ("example.com", "notexample.com", false),
+            (".example.com", "example.com", true),
+            (".example.com", "api.example.com", true),
+            ("*.example.com", "example.com", true),
+            ("*.example.com", "api.example.com", true),
+            ("*.example.com", "evilexample.com", false),
+            ("*", "anything.test", true),
+            ("10.0.0.0/8", "10.20.30.40", true),
+            ("10.0.0.0/8", "11.0.0.1", false),
+            ("192.168.1.7", "192.168.1.7", true),
+            ("168.1.7", "192.168.1.7", false),
+            ("::1", "[::1]", true),
+            ("[::1]", "[::1]", true),
+            ("fd00::/8", "[fd12::1]", true),
+            ("fd00::/8", "[fe80::1]", false),
+            ("10.0.0.0/8", "[::1]", false),
+            ("10.0.0.0/99", "10.0.0.1", false),
+            ("example.com:8080", "example.com", false),
+        ];
+
+        for (rule, host, bypassed) in cases {
+            let settings = ProxySettings {
+                bypass_list: vec![rule.to_string()],
+                ..enabled_manual()
+            };
+            let http = matches!(
+                settings.proxy_action(&format!("https://{host}/x")),
+                ProxyAction::Disable
+            );
+            let ws = settings.ws_proxy_action(&format!("wss://{host}/x")) == WsProxyAction::Direct;
+            let http_env = no_proxy_bypasses(Some(rule), &format!("https://{host}/x"));
+            let ws_env = no_proxy_bypasses(Some(rule), &format!("wss://{host}/x"));
+            assert_eq!(
+                (http, ws, http_env, ws_env),
+                (bypassed, bypassed, bypassed, bypassed),
+                "rule {rule:?} against {host:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_proxy_is_a_comma_separated_list_and_absent_means_no_bypass() {
+        assert!(no_proxy_bypasses(
+            Some("localhost, .corp.test ,10.0.0.0/8"),
+            "ws://build.corp.test/socket"
+        ));
+        assert!(!no_proxy_bypasses(
+            Some("localhost,,"),
+            "https://example.com"
+        ));
+        assert!(!no_proxy_bypasses(None, "https://example.com"));
+    }
+
+    #[test]
+    fn ws_connects_direct_when_the_manual_host_is_empty() {
+        let settings = ProxySettings {
+            host: "  ".to_string(),
+            proxy_type: "socks5".to_string(),
+            ..enabled_manual()
+        };
+        assert_eq!(
+            settings.ws_proxy_action("wss://example.com/socket"),
+            WsProxyAction::Direct
+        );
     }
 
     #[test]

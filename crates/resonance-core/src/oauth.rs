@@ -178,8 +178,8 @@ pub async fn oauth2_get_token(
             // Send client credentials in Authorization header (Basic auth)
             let credentials = format!(
                 "{}:{}",
-                config.client_id,
-                config.client_secret.as_deref().unwrap_or("")
+                form_encode(&config.client_id),
+                form_encode(config.client_secret.as_deref().unwrap_or(""))
             );
             let encoded = base64::Engine::encode(
                 &base64::engine::general_purpose::STANDARD,
@@ -233,7 +233,7 @@ pub async fn oauth2_get_token(
             success: true,
             access_token: text("access_token"),
             token_type: text("token_type"),
-            expires_in: token_response.get("expires_in").and_then(|v| v.as_i64()),
+            expires_in: token_response.get("expires_in").and_then(seconds),
             refresh_token: text("refresh_token"),
             scope: text("scope"),
             id_token: text("id_token"),
@@ -245,5 +245,50 @@ pub async fn oauth2_get_token(
             text("error").unwrap_or_else(|| format!("HTTP {}", status.as_u16())),
             text("error_description"),
         ))
+    }
+}
+
+/// RFC 6749 §2.3.1: client credentials are form-urlencoded before they are
+/// joined into the Basic header, so a `:` or `%` in a secret survives.
+fn form_encode(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// A lifetime in seconds as servers actually send it: a JSON integer, a float,
+/// or a numeric string.
+fn seconds(value: &serde_json::Value) -> Option<i64> {
+    match value {
+        serde_json::Value::Number(number) => number
+            .as_i64()
+            .or_else(|| number.as_f64().map(|float| float as i64)),
+        serde_json::Value::String(text) => {
+            let text = text.trim();
+            text.parse::<i64>()
+                .ok()
+                .or_else(|| text.parse::<f64>().ok().map(|float| float as i64))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn a_lifetime_is_read_from_integers_floats_and_numeric_strings() {
+        assert_eq!(seconds(&json!(3600)), Some(3600));
+        assert_eq!(seconds(&json!(3600.0)), Some(3600));
+        assert_eq!(seconds(&json!("3600")), Some(3600));
+        assert_eq!(seconds(&json!(" 3600.5 ")), Some(3600));
+        assert_eq!(seconds(&json!("soon")), None);
+        assert_eq!(seconds(&json!(null)), None);
+    }
+
+    #[test]
+    fn client_credentials_are_form_encoded() {
+        assert_eq!(form_encode("plain-id_1.2"), "plain-id_1.2");
+        assert_eq!(form_encode("p:a%s s"), "p%3Aa%25s+s");
     }
 }

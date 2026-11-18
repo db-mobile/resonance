@@ -139,6 +139,28 @@ describe('WebSocket connection lifecycle', () => {
         expect(getWebSocketState('tab-1')).toBe('open');
     });
 
+    test('connecting to a different URL starts a fresh transcript', async () => {
+        const other = 'wss://other.test/socket';
+        await connect();
+        await emit('open');
+        await emit('message', { message: 'from the first socket' });
+        await emit('close', { code: 1000 });
+        expect(await transcript()).toContain('from the first socket');
+
+        await connect({ url: other });
+        await emit('open', { url: other });
+        await emit('message', { url: other, message: 'from the second socket' });
+
+        const text = await transcript();
+        expect(text).toContain(`CONNECTED ${other}`);
+        expect(text).toContain('from the second socket');
+        expect(text).not.toContain('from the first socket');
+        await jest.advanceTimersByTimeAsync(500);
+        expect(app.workspaceTabController.service.updateTab).toHaveBeenLastCalledWith('tab-1', {
+            response: expect.objectContaining({ data: text })
+        });
+    });
+
     test('offered sub-protocols reach Connect and the server choice is shown in the transcript', async () => {
         await connect({ protocols: ['chat', '', 'superchat'] });
 

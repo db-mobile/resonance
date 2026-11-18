@@ -16,6 +16,8 @@ const ROOT_SECTIONS = [
     { label: 'Subscription', operationType: 'subscription', getter: 'getSubscriptionType' }
 ];
 
+const DEFAULT_OPERATION_NAMES = { query: 'MyQuery', mutation: 'MyMutation', subscription: 'MySubscription' };
+
 /**
  * @param {Array} definitions
  * @param {string} operationType
@@ -37,18 +39,51 @@ function findOperation(definitions, operationType, operationName) {
 
 /**
  * @param {string} operationType
- * @param {string|null} operationName
  * @returns {object}
  */
-function createOperation(operationType, operationName) {
+function createOperation(operationType) {
     return {
         kind: Kind.OPERATION_DEFINITION,
         operation: operationType,
-        name: operationName ? { kind: Kind.NAME, value: operationName } : undefined,
+        name: undefined,
         variableDefinitions: [],
         directives: [],
         selectionSet: { kind: Kind.SELECTION_SET, selections: [] }
     };
+}
+
+/**
+ * @param {Set<string>} used
+ * @param {string} base
+ * @returns {string}
+ */
+function uniqueName(used, base) {
+    let name = base;
+    let i = 2;
+    while (used.has(name)) {
+        name = base + i;
+        i += 1;
+    }
+    return name;
+}
+
+/**
+ * @param {object} doc
+ * @param {object} created
+ * @param {string|null} preferredName
+ */
+function nameOperations(doc, created, preferredName) {
+    const ops = doc.definitions.filter(def => def.kind === Kind.OPERATION_DEFINITION);
+    const used = new Set(ops.filter(op => op.name).map(op => op.name.value));
+    if (ops.length < 2 && !preferredName) {
+        return;
+    }
+    ops.filter(op => !op.name).forEach(op => {
+        const preferred = op === created && preferredName && !used.has(preferredName) ? preferredName : null;
+        const value = preferred || uniqueName(used, DEFAULT_OPERATION_NAMES[op.operation]);
+        used.add(value);
+        op.name = { kind: Kind.NAME, value };
+    });
 }
 
 /**
@@ -209,8 +244,9 @@ export function toggleFieldInQuery({
     const doc = parseOrEmpty(queryText);
     let op = findOperation(doc.definitions, operationType, operationName);
     if (!op) {
-        op = createOperation(operationType, operationName);
+        op = createOperation(operationType);
         doc.definitions = [...doc.definitions, op];
+        nameOperations(doc, op, operationName);
     }
     if (pathPresent(op.selectionSet, path)) {
         removePath(op.selectionSet, path);
@@ -251,12 +287,14 @@ function capitalize(value) {
 }
 
 /**
- * @param {object} op
+ * @param {object} doc
  * @returns {Set<string>}
  */
-function existingVarNames(op) {
+function existingVarNames(doc) {
     const set = new Set();
-    (op.variableDefinitions || []).forEach(def => set.add(def.variable.name.value));
+    doc.definitions.forEach(def => {
+        (def.variableDefinitions || []).forEach(variable => set.add(variable.variable.name.value));
+    });
     return set;
 }
 
@@ -267,14 +305,7 @@ function existingVarNames(op) {
  * @returns {string}
  */
 function allocVarName(used, fieldName, argName) {
-    const base = used.has(argName) ? fieldName + capitalize(argName) : argName;
-    let name = base;
-    let i = 2;
-    while (used.has(name)) {
-        name = base + i;
-        i += 1;
-    }
-    return name;
+    return uniqueName(used, used.has(argName) ? fieldName + capitalize(argName) : argName);
 }
 
 /**
@@ -417,7 +448,7 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
     }
 
     if (!varName) {
-        varName = allocVarName(existingVarNames(op), field.name.value, argName);
+        varName = allocVarName(existingVarNames(doc), field.name.value, argName);
         field.arguments = [...(field.arguments || []).filter(a => a.name.value !== argName), variableArgument(argName, varName)];
         op.variableDefinitions = [...(op.variableDefinitions || []), variableDefinition(varName, argType)];
     }
