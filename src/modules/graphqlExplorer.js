@@ -425,9 +425,10 @@ export function getArgumentValue({ queryText, variablesText, operationType = 'qu
  * @param {string} opts.argType
  * @param {boolean} [opts.required]
  * @param {*} opts.raw
+ * @param {import('graphql').GraphQLSchema|null} [opts.schema]
  * @returns {{query: string, variables: string}}
  */
-export function setArgumentValue({ queryText, variablesText, operationType = 'query', operationName = null, path, argName, argType, required = false, raw }) {
+export function setArgumentValue({ queryText, variablesText, operationType = 'query', operationName = null, path, argName, argType, required = false, raw, schema = null }) {
     const doc = parseOrEmpty(queryText);
     const op = findOperation(doc.definitions, operationType, operationName);
     const field = op ? findFieldAtPath(op.selectionSet, path) : null;
@@ -435,7 +436,7 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
         return { query: queryText, variables: variablesText };
     }
     const vars = parseVariables(variablesText);
-    const empty = typeof raw === 'boolean' ? raw === false : (typeof raw !== 'string' || raw.trim() === '');
+    const empty = typeof raw !== 'boolean' && (typeof raw !== 'string' || raw.trim() === '');
     let varName = boundVariableName(field, argName);
 
     if (empty && !required) {
@@ -455,7 +456,7 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
     if (empty) {
         delete vars[varName];
     } else {
-        vars[varName] = coerceInputValue(raw, argType);
+        vars[varName] = coerceInputValue(raw, argType, schema);
     }
     return { query: print(doc), variables: stringifyVariables(vars) };
 }
@@ -694,16 +695,10 @@ export class GraphQLExplorer {
      * @returns {HTMLElement}
      */
     _buildArgControl(kind, argType) {
-        if (kind === 'boolean') {
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.className = 'check graphql-explorer-arg-value';
-            cb.addEventListener('change', () => this._onArgChange(cb));
-            return cb;
-        }
-        if (kind === 'enum') {
+        if (kind === 'boolean' || kind === 'enum') {
+            const values = kind === 'boolean' ? ['true', 'false'] : enumValuesForType(argType, this.schema);
             const select = el('select', 'select-base compact graphql-explorer-arg-value');
-            ['', ...enumValuesForType(argType, this.schema)].forEach(opt => {
+            ['', ...values].forEach(opt => {
                 const o = document.createElement('option');
                 o.value = opt;
                 o.textContent = opt || '—';
@@ -729,7 +724,6 @@ export class GraphQLExplorer {
         if (!row) {
             return;
         }
-        const raw = control.type === 'checkbox' ? control.checked : control.value;
         let result;
         try {
             result = setArgumentValue({
@@ -741,7 +735,8 @@ export class GraphQLExplorer {
                 argName: row.dataset.arg,
                 argType: row.dataset.argtype,
                 required: row.dataset.required === 'true',
-                raw
+                raw: control.value,
+                schema: this.schema
             });
         } catch (_e) {
             return;
@@ -915,11 +910,7 @@ export class GraphQLExplorer {
                 path: argRow.dataset.path ? argRow.dataset.path.split(PATH_SEP) : [],
                 argName: argRow.dataset.arg
             });
-            if (control.type === 'checkbox') {
-                control.checked = value === 'true';
-            } else {
-                control.value = value;
-            }
+            control.value = value;
         });
     }
 

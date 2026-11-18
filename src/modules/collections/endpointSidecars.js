@@ -81,7 +81,12 @@ export async function writeNewEndpointSidecars(repository, collectionId, endpoin
         await repository.savePersistedHeaders(collectionId, endpointId, headers);
     }
 
-    if (typeof requestData.body === 'string') {
+    if (requestData.formBodyData) {
+        await repository.saveBodyState(collectionId, endpointId, {
+            modifiedBody: typeof requestData.body === 'string' ? requestData.body : null,
+            formBodyData: requestData.formBodyData
+        });
+    } else if (typeof requestData.body === 'string') {
         await repository.saveModifiedRequestBody(collectionId, endpointId, requestData.body);
     }
 

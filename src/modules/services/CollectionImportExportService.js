@@ -30,6 +30,9 @@ function curlResultToRequestData({ endpoint, auth }) {
     if (endpoint.requestBody) {
         requestData.body = endpoint.requestBody.example;
     }
+    if (endpoint.formBody) {
+        requestData.formBodyData = endpoint.formBody;
+    }
     if (auth) {
         requestData.authConfig = auth;
     }

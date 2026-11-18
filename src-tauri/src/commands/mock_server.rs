@@ -821,8 +821,9 @@ fn parse_prefer(headers: &HeaderMap) -> Prefer {
 
 fn json_content(response: &Value) -> Option<&Value> {
     response
-        .pointer("/content/application~1json")
-        .or_else(|| response.pointer("/content/application/json"))
+        .get("content")
+        .and_then(super::import_export::openapi::json_media)
+        .map(|(_, media)| media)
 }
 
 /// Body for one documented response: the named example when asked for one,

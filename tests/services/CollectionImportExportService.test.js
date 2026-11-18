@@ -266,6 +266,21 @@ describe('CollectionImportExportService', () => {
             expect(toast.success).toHaveBeenCalledWith('Imported cURL as "Create user"');
         });
 
+        test('a multipart cURL import passes its form rows on', async () => {
+            const formBody = { mode: 'formdata', fields: [{ key: 'name', value: 'Rex' }] };
+            deps.curlImportDialog.show.mockResolvedValue({
+                collectionId: 'c1',
+                endpoint: { name: 'Upload', method: 'POST', path: '/pets', headers: {}, parameters: { query: {} }, formBody }
+            });
+
+            await service.handleImportCurl(null);
+
+            expect(deps.collectionService.addRequestToCollection).toHaveBeenCalledWith('c1', {
+                name: 'Upload', method: 'POST', path: '/pets', protocol: 'http', headers: [], queryParams: [],
+                formBodyData: formBody
+            });
+        });
+
         test('creates a new collection when a name is given and skips empty sidecars', async () => {
             deps.curlImportDialog.show.mockResolvedValue({
                 newCollectionName: 'Fresh',

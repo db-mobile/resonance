@@ -273,18 +273,42 @@ fn effective_body(endpoint: &Endpoint) -> Option<LiveBody> {
         .map(|e| LiveBody::Raw(e.to_string()))
 }
 
-/// OpenAPI path keys are paths; a request that addresses an absolute URL
-/// contributes only its path component.
+/// OpenAPI path keys are templated paths: a leading `/`, `{name}` for path
+/// variables, and no host, query or fragment. A saved request URL is usually
+/// `{{baseUrl}}/users/{{id}}?x=1` and may also be absolute or use `:id`.
 fn openapi_path(endpoint: &Endpoint) -> String {
     let source = endpoint.url.as_deref().unwrap_or(&endpoint.path);
-    match source.split_once("://") {
-        Some((_, rest)) => rest
-            .find('/')
-            .and_then(|start| rest[start..].split('?').next())
-            .unwrap_or("/")
-            .to_string(),
-        None => source.to_string(),
+    let source = source.split(['?', '#']).next().unwrap_or_default();
+    let path = match source.split_once("://") {
+        Some((_, rest)) => rest.find('/').map_or("", |start| &rest[start..]),
+        None if source.starts_with("{{") => {
+            source.find("}}").map_or(source, |end| &source[end + 2..])
+        }
+        None => source,
+    };
+    let templated = path
+        .split('/')
+        .map(|segment| match segment.strip_prefix(':') {
+            Some(name) if !name.is_empty() => format!("{{{name}}}"),
+            _ => segment.replace("{{", "{").replace("}}", "}"),
+        })
+        .collect::<Vec<_>>()
+        .join("/");
+    if templated.starts_with('/') {
+        templated
+    } else {
+        format!("/{templated}")
     }
+}
+
+/// The `{name}` placeholders of a path key, in order.
+fn path_template_names(path: &str) -> Vec<&str> {
+    path.split('{')
+        .skip(1)
+        .filter_map(|rest| rest.split_once('}'))
+        .map(|(name, _)| name)
+        .filter(|name| !name.is_empty())
+        .collect()
 }
 
 pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<String>) {
@@ -319,11 +343,27 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
             operation["tags"] = serde_json::json!(endpoint.tags);
         }
 
-        if let Some(params) = &endpoint.parameters {
-            let params = parameters_to_openapi(params);
-            if !params.is_empty() {
-                operation["parameters"] = Value::Array(params);
+        let path = openapi_path(endpoint);
+        let mut params = endpoint
+            .parameters
+            .as_ref()
+            .map(parameters_to_openapi)
+            .unwrap_or_default();
+        for name in path_template_names(&path) {
+            if !params
+                .iter()
+                .any(|param| param["in"] == "path" && param["name"] == name)
+            {
+                params.push(serde_json::json!({
+                    "name": name,
+                    "in": "path",
+                    "required": true,
+                    "schema": { "type": "string" },
+                }));
             }
+        }
+        if !params.is_empty() {
+            operation["parameters"] = Value::Array(params);
         }
 
         if let Some(body) = request_body_to_openapi(endpoint) {
@@ -337,10 +377,7 @@ pub(crate) fn collection_to_openapi(collection: &Collection) -> (Value, Vec<Stri
             operation["responses"]["200"]["content"]["application/json"]["schema"] = schema.clone();
         }
 
-        paths
-            .entry(openapi_path(endpoint))
-            .or_default()
-            .insert(method, operation);
+        paths.entry(path).or_default().insert(method, operation);
     }
 
     let mut spec = serde_json::json!({
@@ -626,7 +663,7 @@ mod tests {
         let collection = single(create, Some("https://api.example.com"));
 
         let (spec, _) = collection_to_openapi(&collection);
-        let post = &spec["paths"]["/items/{{id}}"]["post"];
+        let post = &spec["paths"]["/items/{id}"]["post"];
         assert_eq!(
             post["parameters"],
             serde_json::json!([
@@ -766,5 +803,53 @@ mod tests {
         assert_eq!(get.parameters.unwrap()["query"]["q"]["example"], "spec");
         assert_eq!(get.live_body, None);
         assert_eq!(get.security, None);
+    }
+
+    #[test]
+    fn openapi_path_keys_are_templated_paths() {
+        let key = |url: &str| {
+            let mut request = endpoint("Request", "GET");
+            request.url = Some(url.to_string());
+            openapi_path(&request)
+        };
+
+        for (url, expected) in [
+            ("{{baseUrl}}/users/{{id}}?x=1", "/users/{id}"),
+            ("https://api.test/users/:id", "/users/{id}"),
+            ("https://api.test/a#frag", "/a"),
+            (
+                "https://{{host}}/v1/items/{{itemId}}/",
+                "/v1/items/{itemId}/",
+            ),
+            ("users", "/users"),
+            ("{{baseUrl}}", "/"),
+            ("https://api.test", "/"),
+            ("https://api.test?x=1", "/"),
+            ("/files/{name}.json", "/files/{name}.json"),
+            ("/time/12:30", "/time/12:30"),
+        ] {
+            assert_eq!(key(url), expected, "{url}");
+        }
+    }
+
+    #[test]
+    fn every_path_placeholder_is_declared_as_a_path_parameter() {
+        let mut request = endpoint("Item", "GET");
+        request.url = Some("{{baseUrl}}/shops/:shop/items/{{id}}".to_string());
+        request.parameters = Some(serde_json::json!({
+            "path": { "id": { "example": "7", "description": "Item id" } }
+        }));
+
+        let (spec, _) = collection_to_openapi(&single(request, None));
+        let params = spec["paths"]["/shops/{shop}/items/{id}"]["get"]["parameters"]
+            .as_array()
+            .unwrap();
+        let declared: Vec<(&str, &str)> = params
+            .iter()
+            .map(|p| (p["name"].as_str().unwrap(), p["in"].as_str().unwrap()))
+            .collect();
+        assert_eq!(declared, [("id", "path"), ("shop", "path")]);
+        assert_eq!(params[0]["description"], "Item id");
+        assert_eq!(params[1]["required"], true);
     }
 }

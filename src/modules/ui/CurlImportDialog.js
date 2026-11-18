@@ -197,8 +197,10 @@ export class CurlImportDialog extends BaseModal {
             }
 
             if (previewBody) {
-                if (this.parsedRequest.body) {
-                    let bodyPreview = this.parsedRequest.body;
+                const formFields = this.parsedRequest.formBody?.fields || [];
+                const bodyText = this.parsedRequest.body || formFields.map(field => field.key).join(', ');
+                if (bodyText) {
+                    let bodyPreview = bodyText;
                     if (bodyPreview.length > 100) {
                         bodyPreview = `${bodyPreview.substring(0, 100)}...`;
                     }

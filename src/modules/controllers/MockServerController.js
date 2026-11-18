@@ -7,6 +7,18 @@ import { SchemaProcessor } from '../schema/SchemaProcessor.js';
 import { findRequest } from '../collections/collectionTree.js';
 
 /**
+ * @param {Object|undefined} response
+ * @returns {Object|null}
+ */
+function jsonResponseSchema(response) {
+    const entries = Object.entries(response?.content || {});
+    const essence = name => name.split(';')[0].trim().toLowerCase();
+    const media = entries.find(([name]) => essence(name) === 'application/json')
+        || entries.find(([name]) => essence(name).endsWith('+json'));
+    return media?.[1]?.schema || null;
+}
+
+/**
  * @param {{method?: string, responses?: Object}} endpoint
  * @returns {Object|null}
  */
@@ -15,15 +27,12 @@ export function extractResponseSchema(endpoint) {
     const { responses } = endpoint;
     if (!responses) {return null;}
 
-    if (responses['200']?.content?.['application/json']?.schema) {
-        return responses['200'].content['application/json'].schema;
-    }
-    if (['POST', 'PUT'].includes(method) && responses['201']?.content?.['application/json']?.schema) {
-        return responses['201'].content['application/json'].schema;
-    }
-    for (const code of Object.keys(responses)) {
-        if (code.startsWith('2') && responses[code]?.content?.['application/json']?.schema) {
-            return responses[code].content['application/json'].schema;
+    const preferred = ['POST', 'PUT'].includes(method) ? ['200', '201'] : ['200'];
+    const successes = Object.keys(responses).filter(code => code.startsWith('2'));
+    for (const code of [...preferred, ...successes]) {
+        const schema = jsonResponseSchema(responses[code]);
+        if (schema) {
+            return schema;
         }
     }
     return null;

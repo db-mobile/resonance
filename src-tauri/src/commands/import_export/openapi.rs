@@ -117,6 +117,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
     if let Some(paths_obj) = paths.as_object() {
         for (path, methods) in paths_obj {
             if let Some(methods_obj) = methods.as_object() {
+                let shared_parameters = methods_obj.get("parameters");
                 for (method, operation) in methods_obj {
                     if !["get", "post", "put", "patch", "delete", "head", "options"]
                         .contains(&method.as_str())
@@ -143,7 +144,11 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
                             .and_then(Value::as_array)
                             .map(|tags| normalize(tags.iter().filter_map(Value::as_str)))
                             .unwrap_or_default(),
-                        parameters: parse_parameters(operation.get("parameters"), &spec),
+                        parameters: parse_parameters(
+                            merged_parameters(shared_parameters, operation.get("parameters"))
+                                .as_ref(),
+                            &spec,
+                        ),
                         request_body: extract_openapi_request_body(
                             operation.get("requestBody"),
                             &spec,
@@ -267,12 +272,79 @@ fn extract_base_path(path: &str) -> String {
         .to_string()
 }
 
+/// Path-item parameters apply to every operation under the path. They go
+/// first so an operation's own parameter with the same name and location,
+/// parsed later, replaces the shared one.
+fn merged_parameters(shared: Option<&Value>, own: Option<&Value>) -> Option<Value> {
+    let list = |value: Option<&Value>| value.and_then(Value::as_array).cloned();
+    match (list(shared), list(own)) {
+        (None, None) => None,
+        (shared, own) => Some(Value::Array(
+            shared
+                .into_iter()
+                .flatten()
+                .chain(own.into_iter().flatten())
+                .collect(),
+        )),
+    }
+}
+
+/// Follow a chain of local `$ref`s on a node that is not a schema: a request
+/// body, response, parameter or example. A cycle, a missing target or an
+/// external reference leaves the last node reached.
+fn resolve_ref<'a>(value: &'a Value, spec: &'a Value) -> &'a Value {
+    let mut current = value;
+    let mut seen: HashSet<&str> = HashSet::new();
+    while let Some(path) = current.get("$ref").and_then(Value::as_str) {
+        if !path.starts_with("#/") || seen.len() >= MAX_REF_DEPTH || !seen.insert(path) {
+            break;
+        }
+        match spec.pointer(&path[1..]) {
+            Some(target) => current = target,
+            None => break,
+        }
+    }
+    current
+}
+
+/// The JSON entry of a `content` map with its media type as written. Plain
+/// `application/json` wins; otherwise any `+json` type. Parameters such as
+/// `; charset=utf-8` and letter case are ignored when matching.
+pub(crate) fn json_media(content: &Value) -> Option<(&str, &Value)> {
+    let entries = content.as_object()?;
+    let essence = |name: &str| {
+        name.split(';')
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+    };
+    entries
+        .iter()
+        .find(|(name, _)| essence(name) == "application/json")
+        .or_else(|| {
+            entries
+                .iter()
+                .find(|(name, _)| essence(name).ends_with("+json"))
+        })
+        .map(|(name, media)| (name.as_str(), media))
+}
+
 /// Extract and process OpenAPI requestBody into format expected by frontend
 fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> Option<Value> {
-    let rb = request_body?;
+    let rb = resolve_ref(request_body?, spec);
 
-    let json_content = rb.get("content").and_then(|c| c.get("application/json"));
+    let media = rb.get("content").and_then(json_media);
+    let json_content = media.map(|(_, content)| content);
     let schema = json_content.and_then(|c| c.get("schema")).cloned();
+    let typed = |mut body: Value| {
+        if let Some((media_type, _)) = media
+            && media_type != "application/json"
+        {
+            body["contentType"] = Value::String(media_type.to_string());
+        }
+        body
+    };
 
     // Check for example at various levels: a direct media-type `example`, or
     // the first entry of the media-type `examples` map ({ name: { value } }).
@@ -284,7 +356,7 @@ fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> O
                 .and_then(|c| c.get("examples"))
                 .and_then(|ex| ex.as_object())
                 .and_then(|map| map.values().next())
-                .and_then(|first| first.get("value").cloned())
+                .and_then(|first| resolve_ref(first, spec).get("value").cloned())
         });
 
     if let Some(ex) = example {
@@ -294,7 +366,7 @@ fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> O
         } else {
             serde_json::to_string_pretty(&ex).unwrap_or_default()
         };
-        return Some(serde_json::json!({ "example": example_str }));
+        return Some(typed(serde_json::json!({ "example": example_str })));
     }
 
     if let Some(schema) = schema {
@@ -303,10 +375,10 @@ fn extract_openapi_request_body(request_body: Option<&Value>, spec: &Value) -> O
         let example_json = generate_example_from_schema(&resolved, spec);
         let example_str = serde_json::to_string_pretty(&example_json).unwrap_or_default();
 
-        return Some(serde_json::json!({
+        return Some(typed(serde_json::json!({
             "schema": resolved,
             "example": example_str
-        }));
+        })));
     }
 
     // Check if required flag is set
@@ -331,40 +403,21 @@ fn extract_openapi_responses(
     let mut result: HashMap<String, Value> = HashMap::new();
 
     for (status_code, response) in responses_obj {
+        let response = resolve_ref(response, spec);
         let mut resolved_response = response.clone();
 
-        // Resolve schema $ref in content/application/json/schema
-        if let Some(content) = response.get("content")
-            && let Some(json_content) = content.get("application/json")
-            && let Some(schema) = json_content.get("schema")
-        {
-            let resolved_schema = resolve_schema_ref(schema, spec);
-
-            // Build the resolved response structure
-            let mut new_response = serde_json::Map::new();
-
-            // Copy description if present
-            if let Some(desc) = response.get("description") {
-                new_response.insert("description".to_string(), desc.clone());
+        // Resolve the JSON media type's schema and example references in
+        // place, keeping the response's other media types and headers.
+        if let Some((media_type, json_content)) = response.get("content").and_then(json_media) {
+            let media = &mut resolved_response["content"][media_type];
+            if let Some(schema) = json_content.get("schema") {
+                media["schema"] = resolve_schema_ref(schema, spec);
             }
-
-            // Build content with resolved schema
-            let mut new_content = serde_json::Map::new();
-            let mut new_json_content = serde_json::Map::new();
-            new_json_content.insert("schema".to_string(), resolved_schema);
-
-            // Copy example if present
-            if let Some(example) = json_content.get("example") {
-                new_json_content.insert("example".to_string(), example.clone());
+            if let Some(examples) = json_content.get("examples").and_then(Value::as_object) {
+                for (name, example) in examples {
+                    media["examples"][name] = resolve_ref(example, spec).clone();
+                }
             }
-
-            new_content.insert(
-                "application/json".to_string(),
-                Value::Object(new_json_content),
-            );
-            new_response.insert("content".to_string(), Value::Object(new_content));
-
-            resolved_response = Value::Object(new_response);
         }
 
         // Also handle OpenAPI 2.x style schema directly on response
@@ -589,16 +642,10 @@ fn parse_parameters(params: Option<&Value>, spec: &Value) -> Option<Value> {
 
     for param in arr {
         // Resolve $ref if present (e.g., "$ref": "#/components/parameters/acceptLanguage")
-        let resolved_param = if let Some(ref_path) = param.get("$ref").and_then(|r| r.as_str()) {
-            if ref_path.starts_with("#/") {
-                let json_pointer = format!("/{}", ref_path.trim_start_matches("#/"));
-                spec.pointer(&json_pointer).unwrap_or(param)
-            } else {
-                param
-            }
-        } else {
-            param
-        };
+        let resolved_param = resolve_ref(param, spec);
+        let schema = resolved_param
+            .get("schema")
+            .map(|schema| resolve_schema_ref(schema, spec));
 
         let name = resolved_param
             .get("name")
@@ -617,13 +664,13 @@ fn parse_parameters(params: Option<&Value>, spec: &Value) -> Option<Value> {
         let mut param_obj = serde_json::Map::new();
 
         // Extract example from schema or use default
-        let example = resolved_param
-            .get("schema")
+        let example = schema
+            .as_ref()
             .and_then(schema_example)
             .or_else(|| resolved_param.get("example").cloned())
             .unwrap_or_else(|| {
                 // Generate default based on schema type
-                match resolved_param.get("schema").and_then(primary_type) {
+                match schema.as_ref().and_then(primary_type) {
                     Some("integer") | Some("number") => Value::String("0".to_string()),
                     Some("boolean") => Value::String("true".to_string()),
                     _ => Value::String(String::new()),
@@ -648,8 +695,8 @@ fn parse_parameters(params: Option<&Value>, spec: &Value) -> Option<Value> {
             param_obj.insert("required".to_string(), Value::Bool(required));
         }
 
-        if let Some(schema) = resolved_param.get("schema") {
-            param_obj.insert("schema".to_string(), schema.clone());
+        if let Some(schema) = schema {
+            param_obj.insert("schema".to_string(), schema);
         }
 
         match location {
@@ -1366,5 +1413,182 @@ mod tests {
                 format!("{{{{{}}}}}", USERNAME_VARIABLE)
             );
         }
+    }
+
+    fn only_endpoint(spec: Value) -> Endpoint {
+        let mut collection = parse_openapi_spec(spec).unwrap();
+        assert_eq!(collection.endpoints.len(), 1);
+        collection.endpoints.remove(0)
+    }
+
+    #[test]
+    fn json_family_media_types_are_read_as_json() {
+        for media_type in [
+            "application/vnd.api+json",
+            "application/json; charset=utf-8",
+            "Application/Problem+JSON",
+        ] {
+            let endpoint = only_endpoint(json!({
+                "openapi": "3.0.3",
+                "info": { "title": "T" },
+                "paths": { "/pets": { "post": {
+                    "requestBody": { "required": true, "content": { media_type: {
+                        "schema": { "type": "object", "properties": { "name": { "type": "string", "example": "Rex" } } }
+                    } } },
+                    "responses": { "200": { "description": "ok", "content": { media_type: {
+                        "schema": { "$ref": "#/components/schemas/Pet" }
+                    } } } }
+                } } },
+                "components": { "schemas": { "Pet": { "type": "object" } } }
+            }));
+
+            let body = endpoint.request_body.expect(media_type);
+            assert_eq!(body["contentType"], media_type);
+            assert!(body["example"].as_str().unwrap().contains("Rex"), "{body}");
+            let responses = endpoint.responses.unwrap();
+            assert_eq!(
+                responses["200"]["content"][media_type]["schema"],
+                json!({ "type": "object" }),
+                "{media_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn plain_json_wins_over_a_json_variant_and_carries_no_content_type() {
+        let content = json!({
+            "application/hal+json": { "example": { "hal": true } },
+            "application/json": { "example": { "plain": true } },
+            "text/plain": { "example": "x" }
+        });
+        assert_eq!(json_media(&content).unwrap().0, "application/json");
+        assert!(json_media(&json!({ "text/plain": {}, "application/xml": {} })).is_none());
+
+        let body =
+            extract_openapi_request_body(Some(&json!({ "content": content })), &json!({})).unwrap();
+        assert!(body.get("contentType").is_none());
+        assert!(body["example"].as_str().unwrap().contains("plain"));
+    }
+
+    #[test]
+    fn request_body_response_and_example_refs_are_followed() {
+        let endpoint = only_endpoint(json!({
+            "openapi": "3.0.3",
+            "info": { "title": "T" },
+            "paths": { "/pets": { "post": {
+                "requestBody": { "$ref": "#/components/requestBodies/PetAlias" },
+                "responses": { "200": { "$ref": "#/components/responses/Ok" } }
+            } } },
+            "components": {
+                "requestBodies": {
+                    "PetAlias": { "$ref": "#/components/requestBodies/Pet" },
+                    "Pet": { "content": { "application/json": {
+                        "examples": { "rex": { "$ref": "#/components/examples/Rex" } }
+                    } } }
+                },
+                "responses": { "Ok": { "description": "ok", "headers": { "X-Rate": {} },
+                    "content": { "application/json": {
+                        "schema": { "$ref": "#/components/schemas/Pet" },
+                        "examples": { "rex": { "$ref": "#/components/examples/Rex" } }
+                    } } } },
+                "examples": { "Rex": { "value": { "name": "Rex" } } },
+                "schemas": { "Pet": { "type": "object" } }
+            }
+        }));
+
+        let body = endpoint.request_body.unwrap();
+        assert!(body["example"].as_str().unwrap().contains("Rex"), "{body}");
+        let ok = &endpoint.responses.unwrap()["200"];
+        assert_eq!(ok["description"], "ok");
+        assert!(ok["headers"].get("X-Rate").is_some());
+        let media = &ok["content"]["application/json"];
+        assert_eq!(media["schema"], json!({ "type": "object" }));
+        assert_eq!(media["examples"]["rex"]["value"]["name"], "Rex");
+    }
+
+    #[test]
+    fn a_reference_cycle_or_missing_target_does_not_hang() {
+        let spec = json!({ "components": { "requestBodies": {
+            "A": { "$ref": "#/components/requestBodies/B" },
+            "B": { "$ref": "#/components/requestBodies/A" }
+        } } });
+        let cyclic = json!({ "$ref": "#/components/requestBodies/A" });
+        assert!(resolve_ref(&cyclic, &spec).get("$ref").is_some());
+        assert_eq!(extract_openapi_request_body(Some(&cyclic), &spec), None);
+
+        let missing = json!({ "$ref": "#/components/requestBodies/Nope" });
+        assert_eq!(resolve_ref(&missing, &spec), &missing);
+        let external = json!({ "$ref": "other.yaml#/Body" });
+        assert_eq!(resolve_ref(&external, &spec), &external);
+    }
+
+    #[test]
+    fn path_item_parameters_apply_to_each_operation_and_the_operation_wins() {
+        let collection = parse_openapi_spec(json!({
+            "openapi": "3.0.3",
+            "info": { "title": "T" },
+            "paths": { "/users/{id}": {
+                "parameters": [
+                    { "name": "id", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Id" } },
+                    { "$ref": "#/components/parameters/Trace" },
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "example": 1 } }
+                ],
+                "get": {
+                    "parameters": [
+                        { "name": "page", "in": "query", "schema": { "type": "integer", "example": 9 } }
+                    ],
+                    "responses": { "200": { "description": "ok" } }
+                },
+                "delete": { "responses": { "204": { "description": "gone" } } }
+            } },
+            "components": {
+                "parameters": { "Trace": { "name": "X-Trace", "in": "header", "example": "abc" } },
+                "schemas": { "Id": { "type": "integer", "example": 5 } }
+            }
+        }))
+        .unwrap();
+
+        let params = |method: &str| {
+            collection
+                .endpoints
+                .iter()
+                .find(|endpoint| endpoint.method == method)
+                .and_then(|endpoint| endpoint.parameters.clone())
+                .unwrap()
+        };
+        let get = params("GET");
+        assert_eq!(get["path"]["id"]["example"], "5");
+        assert_eq!(get["path"]["id"]["schema"]["type"], "integer");
+        assert_eq!(get["header"]["X-Trace"]["example"], "abc");
+        assert_eq!(get["query"]["page"]["example"], "9");
+        let delete = params("DELETE");
+        assert_eq!(delete["path"]["id"]["example"], "5");
+        assert_eq!(delete["query"]["page"]["example"], "1");
+    }
+
+    #[test]
+    fn a_swagger2_base_path_without_a_host_becomes_the_base_url() {
+        let collection = parse_openapi_spec(json!({
+            "swagger": "2.0",
+            "info": { "title": "P" },
+            "basePath": "/api/v2",
+            "paths": { "/pets": { "get": { "responses": {
+                "404": { "$ref": "#/responses/NotFound" }
+            } } } },
+            "responses": { "NotFound": { "description": "missing", "schema": { "type": "string" } } }
+        }))
+        .unwrap();
+
+        assert_eq!(collection.base_url.as_deref(), Some("/api/v2"));
+        let variables = collection.variables.unwrap();
+        assert_eq!(
+            (variables[0].key.as_str(), variables[0].value.as_str()),
+            ("baseUrl", "/api/v2")
+        );
+        let responses = collection.endpoints[0].responses.clone().unwrap();
+        assert_eq!(
+            responses["404"]["content"]["application/json"]["schema"]["type"],
+            "string"
+        );
     }
 }
