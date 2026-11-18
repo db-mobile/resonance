@@ -49,10 +49,20 @@ export class CookieManagerDialog extends BaseModal {
 
         app.i18n?.updateUI?.(content);
 
-        await this._populateEnvironments(content);
-        await this._loadToggleState(content);
-        await this._loadCookies();
         this._setupListeners(content);
+
+        try {
+            await this._populateEnvironments(content);
+            if (!this.dialog) { return; }
+            await this._loadToggleState(content);
+            if (!this.dialog) { return; }
+            await this._loadCookies();
+        } catch (error) {
+            if (!this.dialog) { return; }
+            toast.error(translate('cookies.load_failed', 'Failed to load cookies: {{message}}', {
+                message: typeof error === 'string' ? error : error.message
+            }));
+        }
     }
 
     async _populateEnvironments(content) {
@@ -160,7 +170,9 @@ export class CookieManagerDialog extends BaseModal {
     }
 
     async _loadCookies() {
-        this._allCookies = await this.service.getAll(this._environmentId);
+        const cookies = await this.service.getAll(this._environmentId);
+        if (!this.dialog) { return; }
+        this._allCookies = cookies;
         this._render(this._allCookies);
     }
 

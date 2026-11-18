@@ -5,6 +5,7 @@
 
 import { app } from './appContext.js';
 import { textToBase64 } from './utils/encoding.js';
+import { flashButtonFeedback } from './utils/buttonFeedback.js';
 
 /** @type {Map<string, {isBinary: boolean, base64: (string|null), suggestedName: string}>} */
 const responseMeta = new Map();
@@ -78,13 +79,10 @@ function showSaveFeedback(button, success) {
     if (!button) {
         return;
     }
-    const originalTitle = button.title;
-    button.title = success ? 'Saved!' : 'Save failed';
-    button.classList.add(success ? 'copied' : 'copy-error');
-    setTimeout(() => {
-        button.title = originalTitle;
-        button.classList.remove('copied', 'copy-error');
-    }, 2000);
+    flashButtonFeedback(button, {
+        title: success ? 'Saved!' : 'Save failed',
+        stateClass: success ? 'copied' : 'copy-error'
+    });
 }
 
 /**

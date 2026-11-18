@@ -4,7 +4,9 @@
 //! A tracked file is compared by size first and by blob id second, so a file
 //! of the same length is hashed the way Git would hash it. Every file is
 //! hashed on every scan; collections are small and the scan only runs on
-//! focus or after a save, so a stat shortcut is a later optimisation. Untracked
+//! focus or after a save, so a stat shortcut is a later optimisation. Entries
+//! Git itself does not compare are left alone: skip-worktree, assume-unchanged,
+//! and submodules, whose directories are not walked either. Untracked
 //! files count only when they are YAML, which keeps ignored build output and
 //! editor leftovers from being reported without a `.gitignore` parser.
 
@@ -196,17 +198,25 @@ fn join_components(path: &Path) -> Option<String> {
 fn compare(dir: &Path, prefix: &str, entries: &[IndexEntry]) -> DirStatus {
     let mut changes = BTreeMap::new();
     let mut tracked = HashSet::new();
+    let mut gitlinks = HashSet::new();
 
     for entry in entries.iter().filter(|e| e.path.starts_with(prefix)) {
         let rel = &entry.path[prefix.len()..];
         tracked.insert(rel.to_string());
+        if entry.is_gitlink() {
+            gitlinks.insert(dir.join(rel));
+            continue;
+        }
+        if entry.skip_worktree || entry.assume_valid {
+            continue;
+        }
         if let Some(kind) = tracked_change(&dir.join(rel), entry) {
             changes.insert(rel.to_string(), kind);
         }
     }
 
     let mut present = Vec::new();
-    collect_yaml(dir, dir, &mut present);
+    collect_yaml(dir, dir, &gitlinks, &mut present);
     for rel in present {
         if !tracked.contains(&rel) {
             changes.insert(rel, ChangeKind::Added);
@@ -216,7 +226,8 @@ fn compare(dir: &Path, prefix: &str, entries: &[IndexEntry]) -> DirStatus {
     DirStatus { changes }
 }
 
-/// Decides whether one tracked file differs from its index entry.
+/// Decides whether one tracked file differs from its index entry. A symbolic
+/// link is compared by its target path, never by what it points at.
 ///
 /// @param path - The file in the working tree
 /// @param entry - Its index entry
@@ -227,19 +238,52 @@ fn tracked_change(path: &Path, entry: &IndexEntry) -> Option<ChangeKind> {
         Err(error) if error.kind() == ErrorKind::NotFound => return Some(ChangeKind::Deleted),
         Err(_) => return None,
     };
-    if entry.stage > 0 || meta.len() != u64::from(entry.size) {
+    if entry.intent_to_add {
+        return Some(ChangeKind::Added);
+    }
+    if entry.stage > 0 {
+        return Some(ChangeKind::Modified);
+    }
+    if meta.is_symlink() {
+        if !entry.is_symlink() {
+            return Some(ChangeKind::Modified);
+        }
+        let target = link_target_bytes(path)?;
+        return (blob_oid(&target) != entry.oid).then_some(ChangeKind::Modified);
+    }
+    if meta.len() != u64::from(entry.size) {
         return Some(ChangeKind::Modified);
     }
     let bytes = fs::read(path).ok()?;
     (blob_oid(&bytes) != entry.oid).then_some(ChangeKind::Modified)
 }
 
+/// Reads the bytes Git stores as the blob of a symbolic link: its target path.
+///
+/// @param path - The link in the working tree
+/// @returns The target as raw bytes, or None when it cannot be read
+#[cfg(unix)]
+fn link_target_bytes(path: &Path) -> Option<Vec<u8>> {
+    use std::os::unix::ffi::OsStrExt;
+    Some(fs::read_link(path).ok()?.as_os_str().as_bytes().to_vec())
+}
+
+/// Off Unix the stored target bytes cannot be rebuilt reliably, so a link is not judged.
+///
+/// @param _path - The link in the working tree
+/// @returns Always None
+#[cfg(not(unix))]
+fn link_target_bytes(_path: &Path) -> Option<Vec<u8>> {
+    None
+}
+
 /// Collects the YAML files under a directory, as paths relative to `root`.
 ///
 /// @param root - The directory the paths are made relative to
 /// @param dir - The directory being walked
+/// @param gitlinks - Submodule directories, which are not entered
 /// @param out - Receives the relative paths
-fn collect_yaml(root: &Path, dir: &Path, out: &mut Vec<String>) {
+fn collect_yaml(root: &Path, dir: &Path, gitlinks: &HashSet<PathBuf>, out: &mut Vec<String>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -259,7 +303,9 @@ fn collect_yaml(root: &Path, dir: &Path, out: &mut Vec<String>) {
             continue;
         }
         if meta.is_dir() {
-            collect_yaml(root, &path, out);
+            if !gitlinks.contains(&path) {
+                collect_yaml(root, &path, gitlinks, out);
+            }
             continue;
         }
         if !is_yaml(&path) {
@@ -282,7 +328,7 @@ fn is_yaml(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::index::encode::{Spec, index, plain};
+    use super::super::index::encode::{self, Spec, index, plain, raw};
     use super::*;
     use crate::read::read_collection_dir;
     use tempfile::TempDir;
@@ -306,7 +352,16 @@ mod tests {
     }
 
     fn write_index(git_dir: &Path, specs: &[Spec<'_>]) {
-        write(&git_dir.join("index"), &index(2, specs));
+        let version = if specs.iter().any(|spec| spec.extended != 0) {
+            3
+        } else {
+            2
+        };
+        write(&git_dir.join("index"), &index(version, specs));
+    }
+
+    fn link_entry<'a>(path: &'a str, target: &str) -> Spec<'a> {
+        tracked(path, target.as_bytes()).with_mode(encode::MODE_SYMLINK)
     }
 
     fn changes(status: DirStatus) -> Vec<(String, ChangeKind)> {
@@ -446,6 +501,180 @@ mod tests {
         let mut spec = tracked("a.yaml", b"name: A\n");
         spec.flags |= 2 << 12;
         write_index(&git_dir, &[spec]);
+
+        assert_eq!(
+            changes(status_for_dir(&root).unwrap()),
+            vec![("a.yaml".to_string(), ChangeKind::Modified)]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tracked_symlink_with_its_recorded_target_is_clean() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("real.yaml"), b"name: A much longer body\n");
+        std::os::unix::fs::symlink("real.yaml", root.join("link.yaml")).unwrap();
+        std::os::unix::fs::symlink("missing.yaml", root.join("dangling.yaml")).unwrap();
+        write_index(
+            &git_dir,
+            &[
+                link_entry("dangling.yaml", "missing.yaml"),
+                link_entry("link.yaml", "real.yaml"),
+                tracked("real.yaml", b"name: A much longer body\n"),
+            ],
+        );
+
+        assert_eq!(changes(status_for_dir(&root).unwrap()), vec![]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tracked_symlink_pointing_elsewhere_is_modified() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("a.yaml"), b"name: A\n");
+        write(&root.join("b.yaml"), b"name: A\n");
+        std::os::unix::fs::symlink("b.yaml", root.join("link.yaml")).unwrap();
+        write_index(
+            &git_dir,
+            &[
+                tracked("a.yaml", b"name: A\n"),
+                tracked("b.yaml", b"name: A\n"),
+                link_entry("link.yaml", "a.yaml"),
+            ],
+        );
+
+        assert_eq!(
+            changes(status_for_dir(&root).unwrap()),
+            vec![("link.yaml".to_string(), ChangeKind::Modified)]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tracked_file_replaced_by_a_symlink_is_modified() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("real.yaml"), b"name: A\n");
+        std::os::unix::fs::symlink("real.yaml", root.join("a.yaml")).unwrap();
+        write_index(
+            &git_dir,
+            &[
+                tracked("a.yaml", b"name: A\n"),
+                tracked("real.yaml", b"name: A\n"),
+            ],
+        );
+
+        assert_eq!(
+            changes(status_for_dir(&root).unwrap()),
+            vec![("a.yaml".to_string(), ChangeKind::Modified)]
+        );
+    }
+
+    #[test]
+    fn a_symlink_entry_checked_out_as_a_plain_file_is_compared_by_content() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("same.yaml"), b"real.yaml");
+        write(&root.join("edited.yaml"), b"else.yaml");
+        write_index(
+            &git_dir,
+            &[
+                link_entry("edited.yaml", "real.yaml"),
+                link_entry("same.yaml", "real.yaml"),
+            ],
+        );
+
+        assert_eq!(
+            changes(status_for_dir(&root).unwrap()),
+            vec![("edited.yaml".to_string(), ChangeKind::Modified)]
+        );
+    }
+
+    #[test]
+    fn skip_worktree_entries_are_clean_whether_absent_or_different() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("local.yaml"), b"name: Local override\n");
+        write_index(
+            &git_dir,
+            &[
+                tracked("local.yaml", b"name: A\n").with_extended(encode::SKIP_WORKTREE),
+                tracked("sparse.yaml", b"name: S\n").with_extended(encode::SKIP_WORKTREE),
+            ],
+        );
+
+        assert_eq!(changes(status_for_dir(&root).unwrap()), vec![]);
+    }
+
+    #[test]
+    fn an_assume_valid_entry_is_clean_when_the_file_differs() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("a.yaml"), b"name: Changed\n");
+        let mut spec = tracked("a.yaml", b"name: A\n");
+        spec.flags |= encode::ASSUME_VALID;
+        write_index(&git_dir, &[spec]);
+
+        assert_eq!(changes(status_for_dir(&root).unwrap()), vec![]);
+    }
+
+    #[test]
+    fn an_intent_to_add_entry_is_added() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("new.yaml"), b"name: New\n");
+        write_index(
+            &git_dir,
+            &[tracked("new.yaml", b"").with_extended(encode::INTENT_TO_ADD)],
+        );
+
+        assert_eq!(
+            changes(status_for_dir(&root).unwrap()),
+            vec![("new.yaml".to_string(), ChangeKind::Added)]
+        );
+    }
+
+    #[test]
+    fn a_submodule_is_not_reported_and_its_files_are_not_added() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        let dir = root.join("api");
+        write(&dir.join("a.yaml"), b"name: A\n");
+        write(&dir.join("vendor").join("inner.yaml"), b"name: Inner\n");
+        write(
+            &dir.join("vendor").join("deep").join("x.yaml"),
+            b"name: X\n",
+        );
+        write(&dir.join("vendored").join("mine.yaml"), b"name: Mine\n");
+        write_index(
+            &git_dir,
+            &[
+                tracked("api/a.yaml", b"name: A\n"),
+                plain("api/absent", [7; 20], 0).with_mode(encode::MODE_GITLINK),
+                plain("api/vendor", [7; 20], 0).with_mode(encode::MODE_GITLINK),
+            ],
+        );
+
+        assert_eq!(
+            changes(status_for_dir(&dir).unwrap()),
+            vec![("vendored/mine.yaml".to_string(), ChangeKind::Added)]
+        );
+    }
+
+    #[test]
+    fn a_non_utf8_index_path_does_not_hide_other_changes() {
+        let temp = TempDir::new().unwrap();
+        let (root, git_dir) = repo(&temp);
+        write(&root.join("a.yaml"), b"name: B\n");
+        write_index(
+            &git_dir,
+            &[
+                tracked("a.yaml", b"name: A\n"),
+                raw(b"caf\xe9.yaml", [1; 20], 3),
+            ],
+        );
 
         assert_eq!(
             changes(status_for_dir(&root).unwrap()),
