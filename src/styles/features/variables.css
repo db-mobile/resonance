@@ -118,35 +118,6 @@
 .variable-autocomplete {
   position: fixed;
   z-index: var(--z-popover);
-  max-height: 320px;
-  overflow-y: auto;
-  display: none;
-  margin: 0;
-  padding: var(--space-2);
-  list-style: none;
-  background-color: var(--popover-bg-color);
-  color: var(--popover-fg-color);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-popover), 0 0 0 1px var(--popover-shade-color);
-}
-
-.variable-autocomplete.visible {
-  display: block;
-}
-
-.variable-autocomplete-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-small);
-  cursor: pointer;
-}
-
-.variable-autocomplete-item:hover,
-.variable-autocomplete-item.active {
-  background-color: var(--shade-color);
 }
 
 .variable-autocomplete-name {

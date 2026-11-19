@@ -4,8 +4,6 @@
  */
 
 .response-toolbar {
-  display: flex;
-  align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
   flex-shrink: 0;
@@ -281,8 +279,6 @@
   border-radius: 3px;
 }
 
-.response-toolbar { flex-wrap: wrap; }
-
 .inspection-panel {
   display: flex;
   flex-direction: column;
@@ -377,5 +373,4 @@
 .inspection-namespace-options { max-height: 200px; overflow: auto; font-size: var(--font-size-small); }
 .inspection-namespace-options summary { cursor: pointer; }
 .inspection-namespace-options p { margin: var(--space-3) 0; }
-.inspection-namespaces { width: 100%; box-sizing: border-box; font-family: var(--font-mono); }
 .inspection-bindings { white-space: pre-wrap; overflow-wrap: anywhere; }
