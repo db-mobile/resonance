@@ -11,9 +11,11 @@
 @import url("widgets/switch.css");
 @import url("widgets/select.css");
 @import url("widgets/boxed-list.css");
+@import url("widgets/compact-table.css");
 @import url("widgets/view-switcher.css");
 @import url("widgets/toolbar.css");
 @import url("widgets/popover.css");
+@import url("widgets/autocomplete.css");
 @import url("widgets/dialog.css");
 @import url("widgets/toast.css");
 @import url("widgets/badge.css");

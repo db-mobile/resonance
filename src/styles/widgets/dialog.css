@@ -121,11 +121,6 @@
   flex-shrink: 0;
 }
 
-.example-preview-headers.is-hidden,
-.example-preview-editor.is-hidden {
-  display: none;
-}
-
 .example-preview-binary {
   margin: 0;
   opacity: var(--dim-opacity);

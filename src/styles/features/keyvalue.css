@@ -69,10 +69,6 @@
   min-width: 0;
 }
 
-.form-body-row .file-cell[hidden] {
-  display: none;
-}
-
 .form-body-row .file-path-input {
   flex: 1;
 }

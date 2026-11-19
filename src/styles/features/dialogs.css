@@ -32,9 +32,6 @@
 }
 
 .shortcut-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
   min-height: 40px;
   padding: var(--space-1) var(--space-4);
@@ -63,7 +60,6 @@
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 320px;
 }
 
 .code-snippet-dialog .select-wrapper,
@@ -97,22 +93,6 @@
 
 .curl-input {
   min-height: 120px;
-  width: 100%;
-  padding: var(--space-3);
-  background-color: var(--view-bg-color);
-  color: var(--view-fg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-small);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-small);
-  line-height: 1.5;
-  resize: vertical;
-}
-
-.curl-input:focus {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: -2px;
-  border-color: transparent;
 }
 
 .curl-preview-section {
@@ -131,9 +111,6 @@
 }
 
 .curl-preview-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
   font-size: var(--font-size-small);
 }
 

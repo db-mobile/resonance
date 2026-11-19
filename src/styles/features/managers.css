@@ -4,7 +4,6 @@
  */
 
 .manager-header-actions {
-  display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
 }
@@ -74,11 +73,6 @@
   gap: var(--space-3);
   flex-shrink: 0;
   flex-wrap: wrap;
-}
-
-.manager-toolbar .manager-header-actions {
-  display: flex;
-  gap: var(--space-2);
 }
 
 .env-list-item {
@@ -407,7 +401,6 @@
 }
 
 .mock-server-controls {
-  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
@@ -489,46 +482,11 @@
 .mock-server-response-editor-textarea {
   flex: 1;
   min-height: 200px;
-  width: 100%;
-  padding: var(--space-3);
-  background-color: var(--view-bg-color);
-  color: var(--view-fg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-small);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-small);
-  line-height: 1.5;
   resize: none;
-}
-
-.mock-server-response-editor-textarea:focus {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: -2px;
-  border-color: transparent;
-}
-
-.mock-server-logs-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-caption);
-}
-
-.mock-server-logs-th {
-  text-align: left;
-  font-weight: 700;
-  opacity: var(--dim-opacity);
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--border-color);
 }
 
 .mock-server-logs-th--right {
   text-align: right;
-}
-
-.mock-server-logs-td {
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--card-shade-color);
-  font-family: var(--font-mono);
 }
 
 .mock-server-logs-td--muted {
