@@ -41,7 +41,11 @@ pub(crate) fn convert_to_openapi3(spec: Value) -> Result<Value, String> {
     if let Some(parameters) = obj.remove("parameters") {
         components.insert("parameters".to_string(), parameters);
     }
-    if let Some(responses) = obj.remove("responses") {
+    if let Some(mut responses) = obj.remove("responses") {
+        convert_responses(
+            &mut responses,
+            root_produces.as_deref().unwrap_or("application/json"),
+        );
         components.insert("responses".to_string(), responses);
     }
     if let Some(security_defs) = obj.remove("securityDefinitions") {
@@ -82,16 +86,19 @@ pub(crate) fn convert_to_openapi3(spec: Value) -> Result<Value, String> {
 }
 
 /// `schemes`+`host`+`basePath` → `servers: [{url}]`; https preferred when the
-/// spec offers it. A host-less (relative) spec yields no servers, matching the
-/// parser's behavior for 3.0 documents without a `servers` array.
+/// spec offers it. Without a `host` the API lives on whichever host served the
+/// document, so a `basePath` becomes a relative server URL and a spec with
+/// neither yields no servers.
 fn build_servers(obj: &Map<String, Value>) -> Option<Value> {
-    let host = obj.get("host").and_then(|h| h.as_str())?;
     let base_path = obj
         .get("basePath")
         .and_then(|b| b.as_str())
         .unwrap_or("")
         .trim_end_matches('/')
         .to_string();
+    let Some(host) = obj.get("host").and_then(|h| h.as_str()) else {
+        return (!base_path.is_empty()).then(|| serde_json::json!([{ "url": base_path }]));
+    };
     let scheme = obj
         .get("schemes")
         .and_then(|s| s.as_array())
@@ -668,6 +675,59 @@ mod tests {
             doc.pointer("/components/schemas/Node/properties/child/$ref")
                 .unwrap(),
             &json!("#/components/schemas/Node")
+        );
+    }
+
+    #[test]
+    fn a_base_path_without_a_host_becomes_a_relative_server() {
+        let doc = convert_to_openapi3(json!({
+            "swagger": "2.0",
+            "info": { "title": "P" },
+            "basePath": "/api/v2/",
+            "paths": {}
+        }))
+        .unwrap();
+        assert_eq!(doc["servers"], json!([{ "url": "/api/v2" }]));
+
+        for base_path in [json!("/"), json!(""), Value::Null] {
+            let doc = convert_to_openapi3(json!({
+                "swagger": "2.0",
+                "info": { "title": "P" },
+                "basePath": base_path,
+                "paths": {}
+            }))
+            .unwrap();
+            assert!(doc.get("servers").is_none(), "{base_path}");
+        }
+    }
+
+    #[test]
+    fn shared_responses_are_converted_to_the_openapi3_shape() {
+        let doc = convert_to_openapi3(json!({
+            "swagger": "2.0",
+            "info": { "title": "P" },
+            "produces": ["application/vnd.api+json"],
+            "paths": { "/pets": { "get": { "responses": {
+                "404": { "$ref": "#/responses/NotFound" }
+            } } } },
+            "responses": { "NotFound": {
+                "description": "missing",
+                "schema": { "$ref": "#/definitions/Error" }
+            } },
+            "definitions": { "Error": { "type": "object" } }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            doc.pointer("/paths/~1pets/get/responses/404/$ref").unwrap(),
+            &json!("#/components/responses/NotFound")
+        );
+        assert_eq!(
+            doc.pointer(
+                "/components/responses/NotFound/content/application~1vnd.api+json/schema/$ref"
+            )
+            .unwrap(),
+            &json!("#/components/schemas/Error")
         );
     }
 }

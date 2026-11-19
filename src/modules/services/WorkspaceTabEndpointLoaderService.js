@@ -3,6 +3,7 @@
  * @module services/WorkspaceTabEndpointLoaderService
  */
 
+import { invalidateInFlight } from '../state/inFlightRequests.js';
 import { app } from '../appContext.js';
 import { getProtocol } from '../protocols/protocolRegistry.js';
 import { normalizeKeyValueRows } from '../utils/keyValueRows.js';
@@ -59,6 +60,7 @@ export class WorkspaceTabEndpointLoaderService {
     async loadEndpoint(endpoint, targetTabId) {
         try {
             const tabUpdate = { ...this.createTabUpdate(endpoint), historyEntryId: null };
+            invalidateInFlight(targetTabId);
             const tab = await this.service.updateTab(targetTabId, tabUpdate);
 
             if (tab) {
@@ -78,6 +80,7 @@ export class WorkspaceTabEndpointLoaderService {
     async loadHistoryEntry(historyEntry, targetTabId) {
         try {
             const tabUpdate = this.createHistoryTabUpdate(historyEntry);
+            invalidateInFlight(targetTabId);
             const tab = await this.service.updateTab(targetTabId, tabUpdate);
 
             if (tab) {
@@ -105,6 +108,8 @@ export class WorkspaceTabEndpointLoaderService {
         return {
             ...update,
             type: 'request',
+            response: null,
+            responseInspection: null,
             endpoint: null,
             historyEntryId: historyEntry.id || null,
             isModified: false
@@ -291,6 +296,8 @@ export class WorkspaceTabEndpointLoaderService {
         return {
             name,
             type: 'request',
+            response: null,
+            responseInspection: null,
             endpoint: {
                 collectionId: endpoint.collectionId,
                 endpointId: endpoint.id,

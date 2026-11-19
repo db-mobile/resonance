@@ -117,6 +117,25 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.4" date="2026-11-19">
+      <description>
+        <p>Bug fixes</p>
+        <ul>
+          <li>Clear the previous response when opening another request, and release tabs that pointed at a deleted collection</li>
+          <li>Keep a renamed variable in its own environment when switching environments mid-edit</li>
+          <li>Keep file permissions of collections linked from a shared git checkout</li>
+          <li>Fix AWS Signature paths with special characters, Digest authentication with several challenges, and OAuth secrets containing reserved characters</li>
+          <li>Apply the same proxy bypass rules to HTTP and WebSocket connections</li>
+          <li>Stop events and transcripts of an earlier SSE or WebSocket connection appearing after a reconnect</li>
+          <li>Apply mock server collection changes while the server is running</li>
+          <li>Set Boolean arguments to false and keep custom scalars as typed in the GraphQL explorer</li>
+          <li>Generate correct gRPC message skeletons for oneof fields, maps and well-known types</li>
+          <li>Import OpenAPI bodies with JSON-family media types, shared request bodies and responses, and path-level parameters</li>
+          <li>Import cURL commands that use form fields, --json, -G, attached option values and $'…' quoting</li>
+          <li>Keep disabled form fields disabled when importing Postman collections</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.6.3" date="2026-11-14">
       <description>
         <p>Bug fixes</p>

@@ -92,7 +92,8 @@
     "import_invalid": "Pas un export de cookies Resonance (attendu { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })",
     "confirm_clear_session": "Supprimer tous les cookies de session de cet environnement ?",
     "confirm_clear_all": "Supprimer tous les cookies de cet environnement ?\n\nCette action est irréversible.",
-    "clear_failed": "Impossible de supprimer les cookies : {{message}}"
+    "clear_failed": "Impossible de supprimer les cookies : {{message}}",
+    "load_failed": "Impossible de charger les cookies : {{message}}"
   },
   "import_dialog": {
     "title": "Importer une collection",

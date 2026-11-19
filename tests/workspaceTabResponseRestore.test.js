@@ -46,6 +46,15 @@ function responseOf(data) {
 }
 
 describe('_restoreResponse', () => {
+    test('clearing a replaced response drops its binary download metadata', async () => {
+        const { manager } = await loadHarness();
+        const { setResponseMeta, getResponseMeta } = await import('../src/modules/responseSaver.js');
+        setResponseMeta('tab-1', { isBinary: true, base64: 'b2xk', suggestedName: 'old.bin' });
+        await manager._restoreResponseState({ id: 'tab-1', request: { protocol: 'http' }, response: null });
+        expect(getResponseMeta('tab-1').isBinary).toBe(false);
+        expect(getResponseMeta('tab-1').base64).toBeNull();
+    });
+
     test.each(['websocket', 'sse'])('%s response Clear remains available after restoring a disconnected tab', async protocol => {
         const { manager, container } = await loadHarness();
         container.clearBtn.classList.add('is-hidden');

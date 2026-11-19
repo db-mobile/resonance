@@ -153,4 +153,27 @@ describe('GraphQLExplorer view', () => {
     expect(rootRow(rail, 'countries').closest('.graphql-explorer-item').style.display).not.toBe('none');
     expect(rootRow(rail, 'country').closest('.graphql-explorer-item').style.display).toBe('none');
   });
+
+  test('a Boolean argument is a three-way select that can store false', () => {
+    const flagSchema = buildSchema(`
+      scalar DateTime
+      type Query { country(flag: Boolean!, at: DateTime): String }
+    `);
+    const rail = makeRail();
+    let variables = '';
+    const explorer = new GraphQLExplorer(rail);
+    explorer.render(flagSchema, '', '', null, { onVariablesChange: (t) => { variables = t; } });
+    rootRow(rail, 'country').querySelector('input.check').click();
+
+    const control = (name) => rail.querySelector(`.graphql-explorer-arg-row[data-arg="${name}"] .graphql-explorer-arg-value`);
+    const flag = control('flag');
+    expect(flag.tagName).toBe('SELECT');
+    expect([...flag.options].map(o => o.value)).toEqual(['', 'true', 'false']);
+
+    flag.value = 'false';
+    flag.dispatchEvent(new Event('change'));
+    expect(JSON.parse(variables)).toEqual({ flag: false });
+    explorer.refreshState(explorer.queryText, variables);
+    expect(control('flag').value).toBe('false');
+  });
 });

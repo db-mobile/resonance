@@ -5,6 +5,7 @@ import { debounce } from './utils/debounce.js';
 import { markTabModified } from './state/tabModified.js';
 import { notifyUrlUpdated } from './ui/mirroredUrlSection.js';
 import { decorateInputsIn } from './ui/inputDecorator.js';
+import { parseUrlQueryPairs } from './utils/queryString.js';
 
 const debouncedSavePathParams = debounce(autoSaver('savePathParams', pathParamsList), 500);
 const debouncedSaveQueryParams = debounce(autoSaver('saveQueryParams', queryParamsList), 500);
@@ -236,18 +237,6 @@ export function updateUrlFromQueryParams() {
     }
 }
 
-/**
- * @param {string} component
- * @returns {string}
- */
-function safeDecodeURIComponent(component) {
-    try {
-        return decodeURIComponent(component);
-    } catch {
-        return component;
-    }
-}
-
 /** @returns {Array<Object>} */
 function captureDisabledQueryParams() {
     const disabledRows = [];
@@ -275,33 +264,6 @@ function restoreDisabledQueryParams(disabledRows) {
         });
         queryParamsList.insertBefore(row, queryParamsList.children[index] || null);
     });
-}
-
-/**
- * @param {string} urlString
- * @returns {Array<{key: string, value: string}>}
- */
-function parseUrlQueryPairs(urlString) {
-    const questionMarkIndex = urlString.indexOf('?');
-    const queryString = questionMarkIndex >= 0 ? urlString.substring(questionMarkIndex + 1) : '';
-    const pairs = [];
-
-    for (const pair of queryString.split('&')) {
-        if (!pair.trim()) {
-            continue;
-        }
-
-        const equalIndex = pair.indexOf('=');
-        if (equalIndex >= 0) {
-            pairs.push({
-                key: safeDecodeURIComponent(pair.substring(0, equalIndex)),
-                value: safeDecodeURIComponent(pair.substring(equalIndex + 1))
-            });
-        } else {
-            pairs.push({ key: safeDecodeURIComponent(pair), value: '' });
-        }
-    }
-    return pairs;
 }
 
 /**

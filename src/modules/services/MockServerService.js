@@ -10,8 +10,10 @@ export class MockServerService {
      * @param {MockServerRepository} repository
      * @param {IStatusDisplay} statusDisplay
      */
-    constructor(repository, statusDisplay) {
+    constructor(repository, statusDisplay, getCollections = async () => []) {
         this.repository = repository;
+        this.getCollections = getCollections;
+        this._mutationChain = Promise.resolve();
         this.statusDisplay = statusDisplay;
         this._events = new ChangeEmitter();
     }
@@ -38,11 +40,19 @@ export class MockServerService {
         }
     }
 
-    /**
-     * @param {Array} collections
-     * @returns {Promise<Object>}
-     */
-    async startServer(collections) {
+    /** Serialize lifecycle and settings changes against the live server. */
+    _serialize(work) {
+        const mutation = this._mutationChain.catch(() => {}).then(work);
+        this._mutationChain = mutation;
+        return mutation;
+    }
+
+    /** @param {Array} collections */
+    startServer(collections) {
+        return this._serialize(() => this._startServer(collections));
+    }
+
+    async _startServer(collections) {
         try {
             const settings = await this.repository.getSettings();
 
@@ -74,7 +84,11 @@ export class MockServerService {
     }
 
     /** @returns {Promise<Object>} */
-    async stopServer() {
+    stopServer() {
+        return this._serialize(() => this._stopServer());
+    }
+
+    async _stopServer() {
         try {
             const result = await window.backendAPI.mockServer.stop();
 
@@ -112,16 +126,13 @@ export class MockServerService {
      */
     async shouldUseMockServer(collectionId) {
         try {
-            const [status, settings] = await Promise.all([
-                this.getStatus(),
-                this.getSettings()
-            ]);
+            const status = await this.getStatus();
 
             if (!status.running) {
                 return { shouldUseMock: false, mockBaseUrl: null };
             }
 
-            if (!settings.enabledCollections.includes(collectionId)) {
+            if (!status.loadedCollectionIds?.includes(collectionId)) {
                 return { shouldUseMock: false, mockBaseUrl: null };
             }
 
@@ -160,7 +171,11 @@ export class MockServerService {
      * @param {Object} updates
      * @returns {Promise<Object>}
      */
-    async updateSettings(updates) {
+    updateSettings(updates) {
+        return this._serialize(() => this._updateSettings(updates));
+    }
+
+    async _updateSettings(updates) {
         return this._reporting('Error updating mock server settings', async () => {
             const status = await this.getStatus();
             const requiresRestart = status.running && updates.port !== undefined;
@@ -183,7 +198,11 @@ export class MockServerService {
      * @param {number} delayMs
      * @returns {Promise<Object>}
      */
-    async setEndpointDelay(collectionId, endpointId, delayMs) {
+    setEndpointDelay(collectionId, endpointId, delayMs) {
+        return this._serialize(() => this._setEndpointDelay(collectionId, endpointId, delayMs));
+    }
+
+    async _setEndpointDelay(collectionId, endpointId, delayMs) {
         return this._reporting('Error setting endpoint delay', async () => {
             const errors = this.validateDelay(delayMs);
             if (errors.length > 0) {
@@ -204,7 +223,11 @@ export class MockServerService {
      * @param {Object|null} response
      * @returns {Promise<Object>}
      */
-    async setCustomResponse(collectionId, endpointId, response) {
+    setCustomResponse(collectionId, endpointId, response) {
+        return this._serialize(() => this._setCustomResponse(collectionId, endpointId, response));
+    }
+
+    async _setCustomResponse(collectionId, endpointId, response) {
         return this._reporting('Error setting custom response', async () => {
             const result = await this.repository.setCustomResponse(collectionId, endpointId, response);
 
@@ -233,7 +256,11 @@ export class MockServerService {
      * @param {number|null} statusCode
      * @returns {Promise<Object>}
      */
-    async setCustomStatusCode(collectionId, endpointId, statusCode) {
+    setCustomStatusCode(collectionId, endpointId, statusCode) {
+        return this._serialize(() => this._setCustomStatusCode(collectionId, endpointId, statusCode));
+    }
+
+    async _setCustomStatusCode(collectionId, endpointId, statusCode) {
         return this._reporting('Error setting custom status code', async () => {
             const result = await this.repository.setCustomStatusCode(collectionId, endpointId, statusCode);
 
@@ -260,11 +287,28 @@ export class MockServerService {
      * @param {string} collectionId
      * @returns {Promise<boolean>}
      */
-    async toggleCollectionEnabled(collectionId) {
-        return this._reporting('Error toggling collection', async () => {
+    toggleCollectionEnabled(collectionId) {
+        return this._serialize(() => this._reporting('Error toggling collection', async () => {
+            const previous = await this.repository.getSettings();
+            const status = await window.backendAPI.mockServer.status();
+            const collections = status.running ? await this.getCollections() : [];
             const settings = await this.repository.toggleCollectionEnabled(collectionId);
+            if (status.running) {
+                try {
+                    const enabled = collections.filter(collection => settings.enabledCollections.includes(collection.id));
+                    const availableIds = new Set(enabled.map(collection => collection.id));
+                    if (settings.enabledCollections.some(id => !availableIds.has(id))) {
+                        throw new Error('An enabled collection is no longer available');
+                    }
+                    const result = await window.backendAPI.mockServer.reloadSettings(settings, enabled);
+                    if (!result.success) { throw new Error(result.message || 'Could not reload mock routes'); }
+                } catch (error) {
+                    await this.repository.saveSettings(previous);
+                    throw error;
+                }
+            }
             return settings.enabledCollections.includes(collectionId);
-        });
+        }));
     }
 
     /**

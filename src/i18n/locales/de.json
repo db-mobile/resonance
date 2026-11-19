@@ -98,7 +98,8 @@
     "import_invalid": "Kein Resonance-Cookie-Export (erwartet { \"format\": \"resonance-cookie-jar\", \"cookies\": [...] })",
     "confirm_clear_session": "Alle Sitzungs-Cookies dieser Umgebung löschen?",
     "confirm_clear_all": "Alle Cookies dieser Umgebung löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
-    "clear_failed": "Cookies konnten nicht gelöscht werden: {{message}}"
+    "clear_failed": "Cookies konnten nicht gelöscht werden: {{message}}",
+    "load_failed": "Cookies konnten nicht geladen werden: {{message}}"
   },
   "import_dialog": {
     "title": "Sammlung importieren",

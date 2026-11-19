@@ -471,7 +471,7 @@ fn extract_postman_oauth2(params: Option<&Vec<Value>>) -> Value {
 
 /// Extract request body from Postman body format
 /// Raw bodies become { example: "..." }.
-/// Form bodies become { type: "formdata"|"urlencoded", fields: { key: value } }.
+/// Form bodies become { type: "formdata"|"urlencoded", fields: [{ key, value, enabled, ... }] }.
 /// GraphQL bodies become a `graphql_data` payload { mode, query, variables }.
 fn extract_postman_body(body: Option<&Value>) -> ParsedBody {
     let Some(body_obj) = body.and_then(|b| b.as_object()) else {
@@ -491,48 +491,20 @@ fn extract_postman_body(body: Option<&Value>) -> ParsedBody {
                 "example": raw_content
             }))
         }
-        "formdata" => {
-            if let Some(formdata) = body_obj.get("formdata").and_then(|f| f.as_array()) {
-                let mut fields = serde_json::Map::new();
-                for item in formdata {
-                    if item.get("type").and_then(|t| t.as_str()) == Some("file") {
-                        continue;
-                    }
-                    if let (Some(key), Some(value)) = (
-                        item.get("key").and_then(|k| k.as_str()),
-                        item.get("value").and_then(|v| v.as_str()),
-                    ) {
-                        fields.insert(key.to_string(), Value::String(value.to_string()));
-                    }
-                }
-                if !fields.is_empty() {
-                    return ParsedBody::RequestBody(serde_json::json!({
-                        "type": "formdata",
-                        "fields": Value::Object(fields)
-                    }));
-                }
-            }
-            ParsedBody::Empty
-        }
-        "urlencoded" => {
-            if let Some(urlencoded) = body_obj.get("urlencoded").and_then(|u| u.as_array()) {
-                let mut fields = serde_json::Map::new();
-                for item in urlencoded {
-                    if let (Some(key), Some(value)) = (
-                        item.get("key").and_then(|k| k.as_str()),
-                        item.get("value").and_then(|v| v.as_str()),
-                    ) {
-                        fields.insert(key.to_string(), Value::String(value.to_string()));
-                    }
-                }
-                if !fields.is_empty() {
-                    return ParsedBody::RequestBody(serde_json::json!({
-                        "type": "urlencoded",
-                        "fields": Value::Object(fields)
-                    }));
-                }
-            }
-            ParsedBody::Empty
+        "formdata" | "urlencoded" => {
+            let fields: Vec<Value> = body_obj.get(mode).and_then(Value::as_array)
+                .into_iter().flatten()
+                .filter(|item| item.get("type").and_then(Value::as_str) != Some("file"))
+                .filter_map(|item| {
+                    let key = item.get("key")?.as_str()?;
+                    let value = item.get("value").and_then(Value::as_str).unwrap_or("");
+                    Some(serde_json::json!({
+                        "key": key, "value": value, "type": "text", "filePath": "",
+                        "contentType": item.get("contentType").and_then(Value::as_str).unwrap_or(""),
+                        "enabled": item.get("disabled").and_then(Value::as_bool) != Some(true)
+                    }))
+                }).collect();
+            ParsedBody::RequestBody(serde_json::json!({"type": mode, "fields": fields}))
         }
         "graphql" => {
             let graphql = body_obj.get("graphql").and_then(|g| g.as_object());
@@ -1046,6 +1018,27 @@ mod tests {
                     "config": { "username": "ada", "password": "pw" }
                 })
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod disabled_form_regressions {
+    use super::*;
+    #[test]
+    fn imported_form_rows_preserve_disabled_duplicates_and_empty_values() {
+        for mode in ["formdata", "urlencoded"] {
+            let body = serde_json::json!({"mode":mode, mode: [
+                {"key":"a", "value":"", "disabled":true},
+                {"key":"a", "value":"second", "contentType":"text/plain"}
+            ]});
+            let ParsedBody::RequestBody(parsed) = extract_postman_body(Some(&body)) else {
+                panic!("form missing");
+            };
+            assert_eq!(parsed["fields"][0]["enabled"], false);
+            assert_eq!(parsed["fields"][0]["value"], "");
+            assert_eq!(parsed["fields"][1]["key"], "a");
+            assert_eq!(parsed["fields"][1]["enabled"], true);
         }
     }
 }

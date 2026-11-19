@@ -49,6 +49,10 @@ pub struct SseConnectRequest {
     pub headers: Option<HashMap<String, String>>,
     #[serde(default)]
     pub last_event_id: Option<String>,
+    /// Chosen by the frontend for this attempt and echoed on every event, so
+    /// it can tell this stream's events from those of the one it replaced.
+    #[serde(default)]
+    pub connection_id: Option<String>,
     /// Mirrors the HTTP request options: `Some(false)` turns certificate
     /// verification off, and the client certificate / custom CA are resolved
     /// per host by the frontend from the certificate store.
@@ -73,6 +77,8 @@ struct SseEventPayload {
     event_type: String,
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    connection_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     event: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<String>,
@@ -86,11 +92,12 @@ struct SseEventPayload {
     message: Option<String>,
 }
 
-fn payload(tab_id: &str, url: &str, event_type: &str) -> SseEventPayload {
+fn payload(target: &StreamTarget, event_type: &str) -> SseEventPayload {
     SseEventPayload {
-        tab_id: tab_id.to_string(),
+        tab_id: target.tab_id.clone(),
         event_type: event_type.to_string(),
-        url: url.to_string(),
+        url: target.url.clone(),
+        connection_id: target.connection_id.clone(),
         event: None,
         data: None,
         id: None,
@@ -106,12 +113,11 @@ fn emit<R: Runtime>(app: &AppHandle<R>, payload: SseEventPayload) {
 
 fn emit_error<R: Runtime>(
     app: &AppHandle<R>,
-    tab_id: &str,
-    url: &str,
+    target: &StreamTarget,
     status: Option<u16>,
     message: String,
 ) {
-    let mut event = payload(tab_id, url, "error");
+    let mut event = payload(target, "error");
     event.status = status;
     event.message = Some(message);
     emit(app, event);
@@ -251,7 +257,7 @@ fn build_header_map(
         header_map.insert(header_name, header_value);
     }
 
-    if let Some(id) = last_event_id
+    if let Some(id) = last_event_id.filter(|id| !id.is_empty())
         && let Ok(value) = HeaderValue::from_str(id)
     {
         header_map.insert(HeaderName::from_static("last-event-id"), value);
@@ -262,13 +268,12 @@ fn build_header_map(
 
 fn dispatch<R: Runtime>(
     app: &AppHandle<R>,
-    tab_id: &str,
-    url: &str,
+    target: &StreamTarget,
     partial: &mut PartialEvent,
     last_event_id: &mut Option<String>,
 ) {
     if let Some(parts) = partial.take_payload() {
-        let mut event = payload(tab_id, url, "message");
+        let mut event = payload(target, "message");
         event.event = parts.event;
         event.data = parts.data;
         event.id = parts.id;
@@ -289,6 +294,7 @@ struct StreamTarget {
     body: Option<String>,
     headers: HashMap<String, String>,
     last_event_id: Option<String>,
+    connection_id: Option<String>,
 }
 
 /// Apply the reconnect-delay floor to a server-supplied `retry:`.
@@ -307,12 +313,11 @@ fn give_up_message() -> String {
 /// when the caller asked to shut down while waiting.
 async fn wait_before_retry<R: Runtime>(
     app: &AppHandle<R>,
-    tab_id: &str,
-    url: &str,
+    target: &StreamTarget,
     retry_ms: u64,
     shutdown: &mut oneshot::Receiver<()>,
 ) -> bool {
-    let mut reconnecting = payload(tab_id, url, "reconnecting");
+    let mut reconnecting = payload(target, "reconnecting");
     reconnecting.retry = Some(retry_ms);
     emit(app, reconnecting);
 
@@ -332,14 +337,13 @@ async fn stream_loop<R: Runtime>(
     shutdown: &mut oneshot::Receiver<()>,
 ) {
     let StreamTarget {
-        tab_id,
         url,
         method,
         body,
         headers,
         last_event_id: initial_last_event_id,
+        ..
     } = target;
-    let (tab_id, url) = (tab_id.as_str(), url.as_str());
 
     let mut last_event_id = initial_last_event_id.clone();
     let mut retry_ms: u64 = DEFAULT_RETRY_MS;
@@ -350,7 +354,7 @@ async fn stream_loop<R: Runtime>(
         let header_map = match build_header_map(headers, last_event_id.as_deref()) {
             Ok(map) => map,
             Err(message) => {
-                emit_error(app, tab_id, url, None, message);
+                emit_error(app, target, None, message);
                 return;
             }
         };
@@ -370,7 +374,7 @@ async fn stream_loop<R: Runtime>(
         let mut response = match sent {
             Ok(response) => response,
             Err(e) => {
-                emit_error(app, tab_id, url, None, format!("Connection failed: {}", e));
+                emit_error(app, target, None, format!("Connection failed: {}", e));
                 // The first connect failing is the user's problem to see now —
                 // a wrong URL or a server that is down. Once a stream has been
                 // established, a failure is a blip worth retrying.
@@ -379,10 +383,10 @@ async fn stream_loop<R: Runtime>(
                 }
                 silent_reconnects += 1;
                 if silent_reconnects >= MAX_SILENT_RECONNECTS {
-                    emit_error(app, tab_id, url, None, give_up_message());
+                    emit_error(app, target, None, give_up_message());
                     return;
                 }
-                if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+                if !wait_before_retry(app, target, retry_ms, shutdown).await {
                     return;
                 }
                 continue;
@@ -393,8 +397,7 @@ async fn stream_loop<R: Runtime>(
         if !status.is_success() {
             emit_error(
                 app,
-                tab_id,
-                url,
+                target,
                 Some(status.as_u16()),
                 format!("HTTP {}", status.as_u16()),
             );
@@ -411,8 +414,7 @@ async fn stream_loop<R: Runtime>(
         if !content_type.contains("text/event-stream") {
             emit_error(
                 app,
-                tab_id,
-                url,
+                target,
                 Some(status.as_u16()),
                 format!(
                     "Unexpected Content-Type: {}",
@@ -426,7 +428,7 @@ async fn stream_loop<R: Runtime>(
             return;
         }
 
-        let mut open = payload(tab_id, url, if first_connect { "open" } else { "reopen" });
+        let mut open = payload(target, if first_connect { "open" } else { "reopen" });
         open.status = Some(status.as_u16());
         emit(app, open);
         first_connect = false;
@@ -453,7 +455,7 @@ async fn stream_loop<R: Runtime>(
                     buffer.extend_from_slice(&bytes);
                     for line in drain_lines(&mut buffer) {
                         if line.is_empty() {
-                            dispatch(app, tab_id, url, &mut partial, &mut last_event_id);
+                            dispatch(app, target, &mut partial, &mut last_event_id);
                         } else {
                             parse_line(&line, &mut partial);
                             if let Some(ms) = partial.retry.take() {
@@ -464,7 +466,7 @@ async fn stream_loop<R: Runtime>(
                 }
                 Ok(None) => break,
                 Err(e) => {
-                    emit_error(app, tab_id, url, None, format!("Stream error: {}", e));
+                    emit_error(app, target, None, format!("Stream error: {}", e));
                     break;
                 }
             }
@@ -487,11 +489,11 @@ async fn stream_loop<R: Runtime>(
         // and advance Last-Event-ID past an event the server never finished.
 
         if silent_reconnects >= MAX_SILENT_RECONNECTS {
-            emit_error(app, tab_id, url, None, give_up_message());
+            emit_error(app, target, None, give_up_message());
             return;
         }
 
-        if !wait_before_retry(app, tab_id, url, retry_ms, shutdown).await {
+        if !wait_before_retry(app, target, retry_ms, shutdown).await {
             return;
         }
     }
@@ -514,7 +516,7 @@ async fn run_stream(
         .await
         .is_some()
     {
-        emit(&app, payload(&target.tab_id, &target.url, "close"));
+        emit(&app, payload(&target, "close"));
     }
 }
 
@@ -595,6 +597,7 @@ pub async fn sse_connect(
             body: request.body.take(),
             headers: request.headers.take().unwrap_or_default(),
             last_event_id: request.last_event_id.take(),
+            connection_id: request.connection_id.take(),
         },
         shutdown_rx,
     ));

@@ -131,7 +131,7 @@ export class StreamSession {
      * @returns {void}
      */
     transition(tabId, current, patch) {
-        this.set(tabId, { ...current, ...patch, transcript: current.transcript || '' });
+        this.set(tabId, { ...current, ...patch, transcript: patch.transcript ?? current.transcript ?? '' });
     }
 
     set(tabId, entry) {

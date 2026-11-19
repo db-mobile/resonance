@@ -39,7 +39,7 @@ async function handleBackendEvent(event) {
     }
     const current = session.get(tabId);
 
-    if (!current) {
+    if (!current || current.connectionId !== payload.connectionId) {
         return;
     }
 
@@ -68,7 +68,7 @@ async function handleBackendEvent(event) {
     }
 
     if (payload.eventType === 'message') {
-        if (payload.id) {
+        if (payload.id !== undefined && payload.id !== null) {
             session.set(tabId, { ...(session.get(tabId) || {}), lastEventId: payload.id });
         }
         await session.updateStatus(tabId, 'SSE event received', 200);
@@ -124,11 +124,16 @@ export async function handleSseConnect(url, headers = {}, { method, body } = {})
     }
 
     const current = session.get(tabId);
-    const lastEventId = current?.lastEventId || null;
+    const sameStream = Boolean(current) && current.url === trimmed;
+    const lastEventId = (sameStream && current.lastEventId) || null;
+    const connectionId = crypto.randomUUID();
 
-    if (!current || current.url !== trimmed) {
+    if (sameStream) {
+        session.set(tabId, { ...current, connectionId });
+    } else {
         session.set(tabId, {
             url: trimmed,
+            connectionId,
             state: 'connecting',
             transcript: '',
             lastEventId: null
@@ -139,6 +144,7 @@ export async function handleSseConnect(url, headers = {}, { method, body } = {})
     try {
         await window.backendAPI.sse.connect({
             tabId,
+            connectionId,
             url: trimmed,
             method,
             body,

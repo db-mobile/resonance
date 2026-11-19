@@ -5,7 +5,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use rumqttc::{AsyncClient, Event, LastWill, MqttOptions, Outgoing, Packet, QoS, Transport};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use tokio::task::JoinHandle;
 
 /// Maximum MQTT packet size (incoming and outgoing). rumqttc defaults to only
@@ -60,6 +60,11 @@ impl MqttConnection {
 #[derive(Default)]
 pub struct MqttState {
     connections: TabSessions<MqttConnection>,
+    /// Serializes connect and close. Replacing a connection awaits the old
+    /// one's clean disconnect with the map unlocked, so without this a second
+    /// connect could slip in, register, and then be overwritten — left running
+    /// with nothing able to reach it.
+    lifecycle: tokio::sync::Mutex<()>,
 }
 
 /// TLS options for `mqtts://` connections. The client identity (mTLS) and
@@ -229,7 +234,7 @@ fn encode_payload(payload: &[u8]) -> (String, &'static str) {
     }
 }
 
-fn emit_event(app: &AppHandle, payload: MqttEventPayload) {
+fn emit_event<R: Runtime>(app: &AppHandle<R>, payload: MqttEventPayload) {
     let _ = app.emit("mqtt-event", payload);
 }
 
@@ -368,8 +373,8 @@ fn build_mqtt_options(
     Ok(mqtt_options)
 }
 
-async fn establish_connection(
-    app: AppHandle,
+async fn establish_connection<R: Runtime>(
+    app: AppHandle<R>,
     state: TabSessions<MqttConnection>,
     request: &MqttConnectRequest,
     host: String,
@@ -445,7 +450,7 @@ async fn establish_connection(
         }
     });
 
-    connections.insert(
+    let displaced = connections.insert(
         request.tab_id.clone(),
         Session {
             generation,
@@ -458,6 +463,9 @@ async fn establish_connection(
         },
     );
     drop(connections);
+    if let Some(displaced) = displaced {
+        displaced.value.poll_handle.abort();
+    }
 
     Ok(client)
 }
@@ -468,13 +476,21 @@ pub async fn mqtt_connect(
     state: State<'_, MqttState>,
     request: MqttConnectRequest,
 ) -> Result<CommandAck, String> {
+    connect(&app, &state, request).await
+}
+
+async fn connect<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &MqttState,
+    request: MqttConnectRequest,
+) -> Result<CommandAck, String> {
     require_tab_id(&request.tab_id)?;
 
     let (host, port, use_tls) = match parse_broker(&request.broker) {
         Ok(parsed) => parsed,
         Err(error) => {
             emit_event(
-                &app,
+                app,
                 MqttEventPayload::error(&request.tab_id, &request.broker, error.clone()),
             );
             return Err(error);
@@ -482,6 +498,8 @@ pub async fn mqtt_connect(
     };
 
     let config_key = build_config_key(&request, &host, port, use_tls);
+
+    let lifecycle = state.lifecycle.lock().await;
 
     // Reuse the existing connection when the broker/auth/subscription config is identical.
     let existing_client = {
@@ -517,13 +535,14 @@ pub async fn mqtt_connect(
             Ok(client) => client,
             Err(error) => {
                 emit_event(
-                    &app,
+                    app,
                     MqttEventPayload::error(&request.tab_id, &request.broker, error.clone()),
                 );
                 return Err(error);
             }
         }
     };
+    drop(lifecycle);
 
     if let Some(topic) = request
         .subscribe_topic
@@ -534,7 +553,7 @@ pub async fn mqtt_connect(
         if let Err(error) = client.subscribe(topic.trim(), qos).await {
             let message = format!("Failed to subscribe to '{}': {}", topic.trim(), error);
             emit_event(
-                &app,
+                app,
                 MqttEventPayload::error_on_topic(
                     &request.tab_id,
                     &request.broker,
@@ -595,14 +614,116 @@ pub async fn mqtt_publish(
 
 #[tauri::command]
 pub async fn mqtt_close(state: State<'_, MqttState>, tab_id: String) -> Result<CommandAck, String> {
+    close(&state, tab_id).await
+}
+
+async fn close(state: &MqttState, tab_id: String) -> Result<CommandAck, String> {
     require_tab_id(&tab_id)?;
 
+    let _lifecycle = state.lifecycle.lock().await;
     let connection = state.connections.lock().await.remove(&tab_id);
     if let Some(connection) = connection {
         connection.value.shutdown().await;
     }
 
     Ok(CommandAck::ok())
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    struct Broker {
+        url: String,
+        accepted: Arc<AtomicUsize>,
+        open: Arc<AtomicUsize>,
+    }
+
+    /// Accepts every client, acknowledges its CONNECT and counts how many
+    /// sockets are still open.
+    async fn broker() -> Broker {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("mqtt://{}", listener.local_addr().unwrap());
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let open = Arc::new(AtomicUsize::new(0));
+        let (seen, live) = (accepted.clone(), open.clone());
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                seen.fetch_add(1, Ordering::SeqCst);
+                live.fetch_add(1, Ordering::SeqCst);
+                let live = live.clone();
+                tokio::spawn(async move {
+                    let mut buffer = [0u8; 1024];
+                    if socket.read(&mut buffer).await.unwrap_or(0) > 0 {
+                        let _ = socket.write_all(&[0x20, 0x02, 0x00, 0x00]).await;
+                        while matches!(socket.read(&mut buffer).await, Ok(read) if read > 0) {}
+                    }
+                    live.fetch_sub(1, Ordering::SeqCst);
+                });
+            }
+        });
+        Broker {
+            url,
+            accepted,
+            open,
+        }
+    }
+
+    fn request(broker: &str, client_id: &str) -> MqttConnectRequest {
+        serde_json::from_value(serde_json::json!({
+            "tabId": "tab-1", "broker": broker, "clientId": client_id
+        }))
+        .unwrap()
+    }
+
+    async fn settle(broker: &Broker, accepted: usize, open: usize) {
+        let reached = tokio::time::timeout(Duration::from_secs(10), async {
+            while broker.accepted.load(Ordering::SeqCst) != accepted
+                || broker.open.load(Ordering::SeqCst) != open
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        assert!(
+            reached.is_ok(),
+            "expected {accepted} accepted / {open} open, saw {} / {}",
+            broker.accepted.load(Ordering::SeqCst),
+            broker.open.load(Ordering::SeqCst)
+        );
+    }
+
+    /// Two connects racing to replace a live connection used to both register;
+    /// the loser stayed connected with nothing left that could close it.
+    #[tokio::test]
+    async fn concurrent_connects_leave_exactly_one_reachable_connection() {
+        let broker = broker().await;
+        let app = tauri::test::mock_app();
+        let handle = app.handle().clone();
+        let state = MqttState::default();
+
+        connect(&handle, &state, request(&broker.url, "first"))
+            .await
+            .unwrap();
+        settle(&broker, 1, 1).await;
+
+        let (second, third) = tokio::join!(
+            connect(&handle, &state, request(&broker.url, "second")),
+            connect(&handle, &state, request(&broker.url, "third")),
+        );
+        second.unwrap();
+        third.unwrap();
+        settle(&broker, 3, 1).await;
+        assert_eq!(state.connections.lock().await.len(), 1);
+
+        close(&state, "tab-1".to_string()).await.unwrap();
+        settle(&broker, 3, 0).await;
+        assert!(state.connections.lock().await.is_empty());
+    }
 }
 
 #[cfg(test)]

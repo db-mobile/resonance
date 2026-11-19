@@ -91,6 +91,29 @@ describe('responseSaver metadata + save', () => {
         expect(window.backendAPI.saveResponseBody).toHaveBeenCalledWith('file.bin', 'QUJD');
     });
 
+    it('a second save during the feedback restores the original title', async () => {
+        jest.useFakeTimers();
+        try {
+            setResponseMeta(TAB, { isBinary: true, base64: 'QUJD', suggestedName: 'file.bin' });
+            const button = document.createElement('button');
+            button.title = 'Save Response Body to File';
+
+            await handleSaveResponse(button, TAB);
+            expect(button.title).toBe('Saved!');
+            jest.advanceTimersByTime(500);
+            await handleSaveResponse(button, TAB);
+
+            jest.advanceTimersByTime(2000);
+            expect(button.title).toBe('Save Response Body to File');
+            expect(button.classList.contains('copied')).toBe(false);
+
+            jest.advanceTimersByTime(5000);
+            expect(button.title).toBe('Save Response Body to File');
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
     it('does not call the backend when there is nothing to save', async () => {
         const button = document.createElement('button');
         await handleSaveResponse(button, 'tab-without-response');

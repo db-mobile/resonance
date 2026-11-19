@@ -1064,6 +1064,11 @@ export class CollectionController {
         try {
             await app.runnerBookkeeping?.forgetCollection(collection.id);
             await this.service.deleteCollection(collection.id);
+            await app.workspaceTabController?.service.detachCollection(collection.id);
+            if (getCurrentEndpoint()?.collectionId === collection.id) {
+                setCurrentEndpoint(null);
+                this.highlightEndpoint(null);
+            }
             await this.variableService.cleanupCollectionVariables(collection.id);
             await this.loadCollections();
             toast.success(`Collection "${collection.name}" deleted`);

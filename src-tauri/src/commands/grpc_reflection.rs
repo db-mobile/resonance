@@ -632,6 +632,9 @@ pub(crate) fn generate_message_skeleton(desc: &prost_reflect::MessageDescriptor)
 /// mutually recursive `google.protobuf.Struct`/`Value`) becomes `{}` instead of
 /// recursing until the stack overflows.
 fn message_skeleton(desc: &prost_reflect::MessageDescriptor, visiting: &mut Vec<String>) -> Value {
+    if let Some(well_known) = well_known_skeleton(desc.full_name()) {
+        return well_known;
+    }
     if visiting.iter().any(|name| name == desc.full_name()) {
         return Value::Object(serde_json::Map::new());
     }
@@ -640,12 +643,13 @@ fn message_skeleton(desc: &prost_reflect::MessageDescriptor, visiting: &mut Vec<
     let mut obj = serde_json::Map::new();
 
     for field in desc.fields() {
+        if is_later_oneof_member(&field) {
+            continue;
+        }
         let field_name = field.name().to_string();
 
         if field.is_map() {
-            let mut map_obj = serde_json::Map::new();
-            map_obj.insert("key".to_string(), Value::String("value".to_string()));
-            obj.insert(field_name, Value::Object(map_obj));
+            obj.insert(field_name, map_skeleton(&field, visiting));
         } else if field.is_list() {
             obj.insert(
                 field_name,
@@ -658,6 +662,64 @@ fn message_skeleton(desc: &prost_reflect::MessageDescriptor, visiting: &mut Vec<
 
     visiting.pop();
     Value::Object(obj)
+}
+
+/// Only one member of a `oneof` may be set, so the skeleton shows the first and
+/// leaves the rest out. A proto3 `optional` field is a one-member synthetic
+/// oneof and is always kept.
+fn is_later_oneof_member(field: &prost_reflect::FieldDescriptor) -> bool {
+    field.containing_oneof().is_some_and(|oneof| {
+        !oneof.is_synthetic()
+            && oneof
+                .fields()
+                .next()
+                .is_some_and(|first| first.number() != field.number())
+    })
+}
+
+/// One sample entry whose key and value both have the declared types.
+fn map_skeleton(field: &prost_reflect::FieldDescriptor, visiting: &mut Vec<String>) -> Value {
+    use prost_reflect::Kind;
+
+    let mut entry = serde_json::Map::new();
+    if let Kind::Message(entry_desc) = field.kind() {
+        let key = match entry_desc.map_entry_key_field().kind() {
+            Kind::String => "key",
+            Kind::Bool => "false",
+            _ => "0",
+        };
+        entry.insert(
+            key.to_string(),
+            field_skeleton(&entry_desc.map_entry_value_field(), visiting),
+        );
+    }
+    Value::Object(entry)
+}
+
+/// The canonical proto3 JSON form of a well-known type. These do not serialize
+/// field by field, and the request path rejects the field-by-field form.
+fn well_known_skeleton(full_name: &str) -> Option<Value> {
+    let zero = || Value::Number(0.into());
+    Some(match full_name {
+        "google.protobuf.Timestamp" => Value::String("1970-01-01T00:00:00Z".to_string()),
+        "google.protobuf.Duration" => Value::String("0s".to_string()),
+        "google.protobuf.FieldMask"
+        | "google.protobuf.StringValue"
+        | "google.protobuf.BytesValue" => Value::String(String::new()),
+        "google.protobuf.BoolValue" => Value::Bool(false),
+        "google.protobuf.DoubleValue" | "google.protobuf.FloatValue" => {
+            Value::Number(serde_json::Number::from_f64(0.0).unwrap())
+        }
+        "google.protobuf.Int32Value"
+        | "google.protobuf.UInt32Value"
+        | "google.protobuf.Int64Value"
+        | "google.protobuf.UInt64Value" => zero(),
+        "google.protobuf.Struct" | "google.protobuf.Empty" => Value::Object(serde_json::Map::new()),
+        "google.protobuf.Value" => Value::Null,
+        "google.protobuf.ListValue" => Value::Array(Vec::new()),
+        "google.protobuf.Any" => serde_json::json!({ "@type": "" }),
+        _ => return None,
+    })
 }
 
 fn field_skeleton(field: &prost_reflect::FieldDescriptor, visiting: &mut Vec<String>) -> Value {

@@ -4,6 +4,7 @@
 
 use super::{Collection, VariableEntry};
 use crate::commands::collections as storage_collections;
+use serde_json::Value;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -89,11 +90,14 @@ pub(crate) fn save_collection_to_files(
 
     let mut endpoint_data = std::collections::HashMap::new();
     for endpoint in &collection.endpoints {
-        if endpoint.scripts.is_none() && endpoint.graphql_data.is_none() {
+        let form_body_data = imported_form_body(endpoint.request_body.as_ref());
+        if endpoint.scripts.is_none() && endpoint.graphql_data.is_none() && form_body_data.is_none()
+        {
             continue;
         }
         endpoint_data.entry(endpoint.id.clone()).or_insert_with(|| {
             storage_collections::EndpointData {
+                form_body_data,
                 scripts: endpoint.scripts.clone(),
                 graphql_data: endpoint.graphql_data.clone(),
                 ..Default::default()
@@ -164,4 +168,43 @@ pub(crate) async fn pick_import_file_with_kind(
     let file_path = path.as_path().ok_or("Invalid file path")?;
     save_last_import_directory(app, file_path);
     Ok(Some(file_path.to_path_buf()))
+}
+
+/// Seed editable form state so the editor and runner see the same imported rows.
+fn imported_form_body(body: Option<&Value>) -> Option<Value> {
+    let body = body?;
+    let mode = body.get("type")?.as_str()?;
+    if !matches!(mode, "formdata" | "urlencoded") {
+        return None;
+    }
+    Some(
+        serde_json::json!({"mode": mode, "fields": body.get("fields").cloned().unwrap_or(serde_json::json!([]))}),
+    )
+}
+
+#[cfg(test)]
+mod form_seed_tests {
+    use super::*;
+    #[test]
+    fn form_seed_survives_the_collection_body_round_trip() {
+        let rows = serde_json::json!([
+            {"key":"a", "value":"", "enabled":false},
+            {"key":"a", "value":"second", "enabled":true}
+        ]);
+        for mode in ["formdata", "urlencoded"] {
+            let body = serde_json::json!({"type":mode, "fields":rows});
+            let data = storage_collections::EndpointData {
+                form_body_data: imported_form_body(Some(&body)),
+                ..Default::default()
+            };
+            let mut doc: resonance_collections::model::RequestDoc =
+                serde_json::from_value(serde_json::json!({"id":"r", "name":"Form"})).unwrap();
+            resonance_collections::ipc::apply_endpoint_data(&mut doc, &data);
+            let yaml = resonance_collections::write::to_yaml(&doc).unwrap();
+            let reread: resonance_collections::model::RequestDoc =
+                serde_yaml_ng::from_str(&yaml).unwrap();
+            let read = resonance_collections::ipc::request_to_endpoint_data(&reread);
+            assert_eq!(read.form_body_data.unwrap()["fields"], rows);
+        }
+    }
 }

@@ -142,9 +142,10 @@ export class EnvironmentManager extends BaseModal {
                 envs.find(e => e.id === environmentId)
             );
 
-            if (!environment) {return;}
+            if (!environment || this.currentEnvironmentId !== environmentId) {return;}
 
             const activeEnvId = await this.service.getActiveEnvironmentId();
+            if (this.currentEnvironmentId !== environmentId || !this.dialog) {return;}
             const isActive = environment.id === activeEnvId;
 
             const detailsContainer = this.dialog.querySelector('#env-details');
@@ -154,6 +155,7 @@ export class EnvironmentManager extends BaseModal {
                 TEMPLATE_PATH,
                 'tpl-environment-manager-details'
             );
+            if (this.currentEnvironmentId !== environmentId || !detailsContainer.isConnected) {return;}
             detailsContainer.appendChild(detailsFragment);
 
             const setActiveBtn = detailsContainer.querySelector('#env-set-active-btn');
@@ -377,7 +379,8 @@ export class EnvironmentManager extends BaseModal {
                 : value;
             return { name, value: resolvedValue, isSecret };
         }));
-        await Promise.all(rows.map(row => this.addVariableRow(row, container)));
+        if (this.currentEnvironmentId !== environment.id || !container.isConnected) {return;}
+        await Promise.all(rows.map(row => this.addVariableRow(row, container, environment.id)));
         this.updateVariablesEmptyState();
     }
 
@@ -389,7 +392,7 @@ export class EnvironmentManager extends BaseModal {
     }
 
     /** @returns {Promise<HTMLElement|null>} */
-    addVariableRow({ name = '', value = '', isSecret = false }, container = null) {
+    addVariableRow({ name = '', value = '', isSecret = false }, container = null, environmentId = this.currentEnvironmentId) {
         if (!container) {
             container = this.dialog.querySelector('#env-variables-container');
         }
@@ -407,7 +410,7 @@ export class EnvironmentManager extends BaseModal {
 
                 this.applySecretState(row, isSecret);
 
-                this.setupVariableRowListeners(row, name);
+                this.setupVariableRowListeners(row, name, environmentId);
                 this.updateVariablesEmptyState();
                 return row;
             })
@@ -423,7 +426,7 @@ export class EnvironmentManager extends BaseModal {
         secretBtn?.setAttribute('aria-pressed', String(isSecret));
     }
 
-    setupVariableRowListeners(row, originalName) {
+    setupVariableRowListeners(row, originalName, environmentId = this.currentEnvironmentId) {
         const nameInput = row.querySelector('.var-name-input');
         const valueInput = row.querySelector('.var-value-input');
         const deleteBtn = row.querySelector('.var-delete-btn');
@@ -433,24 +436,33 @@ export class EnvironmentManager extends BaseModal {
         const isSecret = () => row.dataset.secret === 'true';
         let currentName = originalName;
 
-        const saveVariable = async () => {
-            const name = nameInput.value.trim();
-            const value = valueInput.value.trim();
+        let pending = Promise.resolve();
+        const enqueue = work => {
+            pending = pending.then(work).catch(error => toast.error(error.message));
+            return pending;
+        };
+        const saveVariable = () => {
+            const nextName = nameInput.value.trim();
+            const nextValue = valueInput.value.trim();
+            const nextSecret = isSecret();
+            return enqueue(async () => {
+                const name = nextName;
+                const value = nextValue;
 
-            if (!name) {
-                if (currentName) {
-                    await this.deleteVariable(currentName);
-                    currentName = '';
+                if (!name) {
+                    if (currentName) {
+                        await this.service.deleteVariable(environmentId, currentName);
+                        currentName = '';
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (currentName && name !== currentName) {
-                await this.deleteVariable(currentName);
-            }
-
-            await this.setVariable(name, value, isSecret());
-            currentName = name;
+                await this.service.setVariable(environmentId, name, value, nextSecret);
+                if (currentName && name !== currentName) {
+                    await this.service.deleteVariable(environmentId, currentName);
+                }
+                currentName = name;
+            });
         };
 
         nameInput.addEventListener('blur', saveVariable);
@@ -465,12 +477,12 @@ export class EnvironmentManager extends BaseModal {
         });
 
         if (secretBtn) {
-            secretBtn.addEventListener('click', async () => {
+            secretBtn.addEventListener('click', () => {
                 const next = !isSecret();
                 this.applySecretState(row, next);
                 const name = nameInput.value.trim();
                 if (name) {
-                    await this.setVariable(name, valueInput.value.trim(), next);
+                    saveVariable();
                 }
             });
         }
@@ -479,13 +491,13 @@ export class EnvironmentManager extends BaseModal {
             revealBtn.addEventListener('click', () => toggleRevealed(valueInput, revealBtn));
         }
 
-        deleteBtn.addEventListener('click', async () => {
+        deleteBtn.addEventListener('click', () => enqueue(async () => {
             if (currentName) {
-                await this.deleteVariable(currentName);
+                await this.service.deleteVariable(environmentId, currentName);
             }
             row.remove();
             this.updateVariablesEmptyState();
-        });
+        }));
     }
 
     /**

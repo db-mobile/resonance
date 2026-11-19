@@ -252,6 +252,12 @@ describe('StreamSession.transition', () => {
         expect(session.get(TAB)).toEqual({ url: 'wss://a', state: 'open', transcript: 'log', extra: 1 });
     });
 
+    test('lets the patch replace the transcript, including clearing it', () => {
+        const session = new StreamSession();
+        session.transition(TAB, { url: 'wss://a', transcript: 'log' }, { url: 'wss://b', transcript: '' });
+        expect(session.get(TAB)).toEqual({ url: 'wss://b', transcript: '' });
+    });
+
     test('defaults a missing transcript to empty', () => {
         const session = new StreamSession();
         session.transition(TAB, {}, { url: 'wss://a', state: 'closed' });

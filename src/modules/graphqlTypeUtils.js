@@ -67,11 +67,27 @@ export function enumValuesForType(typeString, schema = null) {
 }
 
 /**
+ * @param {string} typeString
+ * @param {string} trimmed
+ * @param {import('graphql').GraphQLSchema|null} schema
+ * @returns {boolean}
+ */
+function keepsTypedText(typeString, trimmed, schema) {
+    if (isListType(typeString) || /^[[{]/.test(trimmed)) {
+        return false;
+    }
+    const base = baseTypeName(typeString);
+    const named = schema?.getType?.(base);
+    return Boolean(named) && isScalarType(named) && !/json/i.test(base);
+}
+
+/**
  * @param {*} raw
  * @param {string} typeString
+ * @param {import('graphql').GraphQLSchema|null} [schema]
  * @returns {*}
  */
-export function coerceInputValue(raw, typeString) {
+export function coerceInputValue(raw, typeString, schema = null) {
     const base = baseTypeName(typeString);
     if (!isListType(typeString) && base === 'Boolean') {
         return raw === true || raw === 'true';
@@ -92,6 +108,9 @@ export function coerceInputValue(raw, typeString) {
     }
     if (trimmed === '') {
         return '';
+    }
+    if (keepsTypedText(typeString, trimmed, schema)) {
+        return raw;
     }
     try {
         return JSON.parse(trimmed);

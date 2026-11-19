@@ -279,15 +279,7 @@ fn read_folder(dir: &Path, at_root: bool) -> Result<FolderNode, String> {
         }
     }
 
-    node.requests
-        .sort_by_key(|entry| sort_key(entry.doc.seq, &entry.doc.name, &entry.doc.id));
-    node.folders.sort_by_key(|folder| {
-        let meta = folder.meta.as_ref();
-        let seq = meta.map(|m| m.seq).unwrap_or(0);
-        let name = folder_display_name(folder);
-        let id = meta.map(|m| m.id.clone()).unwrap_or_default();
-        sort_key(seq, &name, &id)
-    });
+    sort_folder(&mut node);
 
     Ok(node)
 }
@@ -458,6 +450,22 @@ pub fn read_collection_dir(dir: &Path) -> Result<LoadedCollection, String> {
         runners: runners.entries,
         reassigned_runner_ids: runners.reassigned,
     })
+}
+
+/// Keep warm cache ordering identical to a fresh directory read.
+pub(crate) fn sort_folder(node: &mut FolderNode) {
+    node.requests
+        .sort_by_key(|entry| sort_key(entry.doc.seq, &entry.doc.name, &entry.doc.id));
+    node.folders.sort_by_key(|folder| {
+        let meta = folder.meta.as_ref();
+        let seq = meta.map(|m| m.seq).unwrap_or(0);
+        let name = folder_display_name(folder);
+        let id = meta.map(|m| m.id.clone()).unwrap_or_default();
+        sort_key(seq, &name, &id)
+    });
+    for folder in &mut node.folders {
+        sort_folder(folder);
+    }
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ import { CookieJarService } from '../../src/modules/services/CookieJarService.js
 import { CookieRepository } from '../../src/modules/storage/CookieRepository.js';
 import { templateLoader } from '../../src/modules/templateLoader.js';
 import { escapeHandlerCount } from '../../src/modules/ui/modalEscape.js';
+import { toast } from '../../src/modules/ui/Toast.js';
 
 const MANAGER_TEMPLATE = './src/templates/cookies/cookieManager.html';
 const CONFIRM_TEMPLATE = './src/templates/dialogs/confirmDialog.html';
@@ -220,6 +221,48 @@ describe('CookieManagerDialog add/edit', () => {
 
         pressEscape();
         expect(document.querySelector('.cookie-manager-dialog')).toBeNull();
+    });
+
+    test('a failed load shows an error and leaves the dialog closable', async () => {
+        const errorSpy = jest.spyOn(toast, 'error').mockImplementation(() => {});
+        const getAllSpy = jest.spyOn(service, 'getAll').mockRejectedValueOnce(new Error('store down'));
+
+        const shown = dialog.show('env-dev', 'Dev');
+        await flush();
+        await flush();
+
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('store down'));
+        expect(content()).not.toBeNull();
+
+        content().querySelector('#cookie-manager-close-btn').click();
+
+        expect(content()).toBeNull();
+        await expect(shown).resolves.toBe(true);
+
+        errorSpy.mockRestore();
+        getAllSpy.mockRestore();
+    });
+
+    test('Escape closes the dialog while the load is still pending', async () => {
+        let finishLoad;
+        const getAllSpy = jest.spyOn(service, 'getAll').mockReturnValueOnce(
+            new Promise((resolve) => { finishLoad = resolve; })
+        );
+
+        const shown = dialog.show('env-dev', 'Dev');
+        await flush();
+        await flush();
+
+        pressEscape();
+        expect(content()).toBeNull();
+
+        finishLoad([{ id: 'c1', name: 'a', value: '1', domain: 'example.com', path: '/', expires: null }]);
+        await flush();
+
+        await expect(shown).resolves.toBe(true);
+        expect(dialog._allCookies).toEqual([]);
+
+        getAllSpy.mockRestore();
     });
 
     test('the empty state shows with no cookies and hides once one exists', async () => {

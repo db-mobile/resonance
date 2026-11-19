@@ -236,7 +236,8 @@ pub fn capture_runner_entry(entry: &CaptureEntry<'_>, target: &CaptureTarget) ->
         .filter(|row| row_enabled(row) && row_key(row).is_some())
         .map(parameter)
         .collect();
-    if query_rows.is_empty()
+    if overrides.query_params.is_none()
+        && query_source.is_empty()
         && let Some(examples) = query_examples
     {
         query_rows = examples

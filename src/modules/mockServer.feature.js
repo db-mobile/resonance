@@ -13,7 +13,7 @@ export const mockServerFeature = {
     name: 'mockServer',
     create(ctx) {
         const repository = new MockServerRepository(ctx.backendAPI);
-        const service = new MockServerService(repository, ctx.statusDisplay);
+        const service = new MockServerService(repository, ctx.statusDisplay, () => ctx.get('collectionRepository').getAll());
         const controller = new MockServerController(service, ctx.get('collectionRepository'));
         const dialog = new MockServerDialog(controller);
         return { repository, service, controller, dialog };

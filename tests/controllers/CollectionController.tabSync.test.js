@@ -65,3 +65,20 @@ describe('CollectionController.handleRenameRequest', () => {
         expect(controller.service.renameRequest).toHaveBeenCalledWith('c1', 'e1', 'Named');
     });
 });
+
+ test.each([false, true])('collection deletion detaches tabs only after success (failure=%s)', async fails => {
+    const { setCurrentEndpoint, getCurrentEndpoint } = await import('../../src/modules/state/currentEndpoint.js');
+    const controller = makeController();
+    controller.confirmDialog = { show: jest.fn(async () => true) };
+    controller.service.deleteCollection = fails ? jest.fn(async () => { throw new Error('disk failure'); }) : jest.fn(async () => {});
+    controller.variableService = { cleanupCollectionVariables: jest.fn(async () => {}) };
+    controller.loadCollections = jest.fn(async () => {});
+    controller.highlightEndpoint = jest.fn();
+    const detachCollection = jest.fn(async () => {});
+    app.workspaceTabController = { service: { detachCollection } };
+    setCurrentEndpoint({ collectionId: 'c1', endpointId: 'e1' });
+    await controller.handleDelete(collection);
+    expect(detachCollection).toHaveBeenCalledTimes(fails ? 0 : 1);
+    expect(getCurrentEndpoint()).toEqual(fails ? { collectionId: 'c1', endpointId: 'e1' } : null);
+    setCurrentEndpoint(null);
+});

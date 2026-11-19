@@ -1,4 +1,5 @@
 import { app } from './appContext.js';
+import { flashButtonFeedback } from './utils/buttonFeedback.js';
 
 /**
  * @param {string} text
@@ -18,25 +19,15 @@ async function copyToClipboard(text) {
  * @param {boolean} success
  */
 function showCopyFeedback(button, success) {
-    const originalTitle = button.title;
-    const originalHTML = button.innerHTML;
-
     if (success) {
-        button.title = 'Copied!';
-        button.innerHTML = `
-            <span class="icon icon-16 icon-check"></span>
-        `;
-        button.classList.add('copied');
+        flashButtonFeedback(button, {
+            title: 'Copied!',
+            stateClass: 'copied',
+            icon: { from: 'icon-copy', to: 'icon-check' }
+        });
     } else {
-        button.title = 'Copy failed';
-        button.classList.add('copy-error');
+        flashButtonFeedback(button, { title: 'Copy failed', stateClass: 'copy-error' });
     }
-
-    setTimeout(() => {
-        button.title = originalTitle;
-        button.innerHTML = originalHTML;
-        button.classList.remove('copied', 'copy-error');
-    }, 2000);
 }
 
 /**

@@ -15,7 +15,7 @@ mod common;
 mod export;
 mod har;
 mod insomnia;
-mod openapi;
+pub(crate) mod openapi;
 mod postman;
 mod runner_report;
 mod storage;

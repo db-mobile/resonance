@@ -4,6 +4,16 @@ import {
   setArgumentValue,
   getArgumentValue
 } from '../../src/modules/graphqlExplorer.js';
+import { buildSchema, parse, validate } from 'graphql';
+
+const MIXED_SCHEMA = buildSchema(`
+  type User { id: ID! }
+  type Query { countries(id: ID): String, a: String }
+  type Mutation { createUser(id: ID): User, m: String }
+  type Subscription { onEvent: String }
+`);
+
+const operationNames = text => parse(text).definitions.map(def => def.name?.value);
 
 describe('toggleFieldInQuery', () => {
   test('adds a root field to an empty query', () => {
@@ -83,6 +93,63 @@ query Second {
     const out = toggleFieldInQuery({ queryText: '', operationType: 'mutation', path: ['createUser'], leafIsObject: true });
     expect(getSelectedPaths(out, 'mutation').has('createUser')).toBe(true);
     expect(out).toContain('mutation');
+  });
+});
+
+describe('mixing operation types', () => {
+  const addMutation = queryText => toggleFieldInQuery({
+    queryText, operationType: 'mutation', path: ['createUser'], leafIsObject: true, leafDefaultFields: ['id']
+  });
+
+  test('a single operation stays anonymous', () => {
+    expect(operationNames(toggleFieldInQuery({ queryText: '', path: ['countries'] }))).toEqual([undefined]);
+  });
+
+  test('adding a second operation type names both operations', () => {
+    const out = addMutation(toggleFieldInQuery({ queryText: '', path: ['countries'] }));
+    expect(operationNames(out)).toEqual(['MyQuery', 'MyMutation']);
+    expect(validate(MIXED_SCHEMA, parse(out))).toEqual([]);
+    expect(getSelectedPaths(out, 'query').has('countries')).toBe(true);
+    expect(getSelectedPaths(out, 'mutation').has('createUser.id')).toBe(true);
+  });
+
+  test('a third operation type gets its own name', () => {
+    const two = addMutation(toggleFieldInQuery({ queryText: '', path: ['countries'] }));
+    const out = toggleFieldInQuery({ queryText: two, operationType: 'subscription', path: ['onEvent'] });
+    expect(operationNames(out)).toEqual(['MyQuery', 'MyMutation', 'MySubscription']);
+    expect(validate(MIXED_SCHEMA, parse(out))).toEqual([]);
+  });
+
+  test('the selected operation name is not reused for a new operation type', () => {
+    const out = toggleFieldInQuery({
+      queryText: 'query Q { a }', operationType: 'mutation', operationName: 'Q', path: ['m']
+    });
+    expect(operationNames(out)).toEqual(['Q', 'MyMutation']);
+    expect(validate(MIXED_SCHEMA, parse(out))).toEqual([]);
+  });
+
+  test('a default name already taken gets a numeric suffix', () => {
+    const out = toggleFieldInQuery({
+      queryText: 'query MyMutation { a }', operationType: 'mutation', path: ['m']
+    });
+    expect(operationNames(out)).toEqual(['MyMutation', 'MyMutation2']);
+  });
+
+  test('the same argument on two operations gets two variables and keeps both values', () => {
+    const doc = addMutation(toggleFieldInQuery({ queryText: '', path: ['countries'] }));
+    const first = setArgumentValue({
+      queryText: doc, variablesText: '', path: ['countries'], argName: 'id', argType: 'ID', raw: '1'
+    });
+    const second = setArgumentValue({
+      queryText: first.query, variablesText: first.variables, operationType: 'mutation',
+      path: ['createUser'], argName: 'id', argType: 'ID', raw: '2'
+    });
+    expect(JSON.parse(second.variables)).toEqual({ id: '1', createUserId: '2' });
+    expect(second.query).toContain('createUser(id: $createUserId)');
+    expect(validate(MIXED_SCHEMA, parse(second.query))).toEqual([]);
+    expect(getArgumentValue({
+      queryText: second.query, variablesText: second.variables, path: ['countries'], argName: 'id'
+    })).toBe('1');
   });
 });
 
@@ -192,6 +259,69 @@ describe('setArgumentValue', () => {
     const res = setArgumentValue({ queryText: base, variablesText: '', path: ['continent'], argName: 'code', argType: 'ID!', raw: 'EU' });
     expect(res.query).toBe(base);
     expect(res.variables).toBe('');
+  });
+});
+
+describe('Boolean arguments', () => {
+  const base = '{\n  country {\n    name\n  }\n}';
+  const set = (raw, required, variablesText = '') => setArgumentValue({
+    queryText: base, variablesText, path: ['country'], argName: 'flag',
+    argType: required ? 'Boolean!' : 'Boolean', required, raw
+  });
+
+  test.each([[false], ['false']])('a required Boolean keeps %j as a value', (raw) => {
+    const out = set(raw, true);
+    expect(JSON.parse(out.variables)).toEqual({ flag: false });
+    expect(out.query).toContain('$flag: Boolean!');
+    expect(getArgumentValue({
+      queryText: out.query, variablesText: out.variables, path: ['country'], argName: 'flag'
+    })).toBe('false');
+  });
+
+  test('an optional Boolean can be false, and only an empty value unbinds it', () => {
+    const bound = set('false', false);
+    expect(JSON.parse(bound.variables)).toEqual({ flag: false });
+    const cleared = setArgumentValue({
+      queryText: bound.query, variablesText: bound.variables, path: ['country'],
+      argName: 'flag', argType: 'Boolean', raw: ''
+    });
+    expect(cleared.variables).toBe('');
+    expect(cleared.query).not.toContain('flag');
+  });
+});
+
+describe('custom scalar arguments', () => {
+  const schema = buildSchema(`
+    scalar DateTime
+    scalar BigInt
+    scalar JSON
+    enum Unit { M KM }
+    input Filter { a: Int }
+    type Query { country(at: DateTime, big: BigInt, blob: JSON, unit: Unit, filter: Filter, n: Int): String }
+  `);
+  const stored = (argType, raw, withSchema = true) => JSON.parse(setArgumentValue({
+    queryText: '{\n  country\n}', variablesText: '', path: ['country'], argName: 'v',
+    argType, raw, schema: withSchema ? schema : null
+  }).variables).v;
+
+  test.each([
+    ['DateTime', '2024', '2024'],
+    ['DateTime!', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'],
+    ['BigInt', '12345678901234567890', '12345678901234567890'],
+    ['BigInt', 'true', 'true'],
+    ['DateTime', '{"a":1}', { a: 1 }],
+    ['JSON', '123', 123],
+    ['JSON', '{"a":1}', { a: 1 }],
+    ['Unit', 'KM', 'KM'],
+    ['Filter', '{"a":1}', { a: 1 }],
+    ['[DateTime]', '["2024"]', ['2024']],
+    ['Int', '5', 5]
+  ])('%s input %j is stored as %j', (argType, raw, expected) => {
+    expect(stored(argType, raw)).toEqual(expected);
+  });
+
+  test('without a schema the type is unknown and input is still parsed', () => {
+    expect(stored('DateTime', '2024', false)).toBe(2024);
   });
 });
 

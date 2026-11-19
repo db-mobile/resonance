@@ -16,6 +16,8 @@ const ROOT_SECTIONS = [
     { label: 'Subscription', operationType: 'subscription', getter: 'getSubscriptionType' }
 ];
 
+const DEFAULT_OPERATION_NAMES = { query: 'MyQuery', mutation: 'MyMutation', subscription: 'MySubscription' };
+
 /**
  * @param {Array} definitions
  * @param {string} operationType
@@ -37,18 +39,51 @@ function findOperation(definitions, operationType, operationName) {
 
 /**
  * @param {string} operationType
- * @param {string|null} operationName
  * @returns {object}
  */
-function createOperation(operationType, operationName) {
+function createOperation(operationType) {
     return {
         kind: Kind.OPERATION_DEFINITION,
         operation: operationType,
-        name: operationName ? { kind: Kind.NAME, value: operationName } : undefined,
+        name: undefined,
         variableDefinitions: [],
         directives: [],
         selectionSet: { kind: Kind.SELECTION_SET, selections: [] }
     };
+}
+
+/**
+ * @param {Set<string>} used
+ * @param {string} base
+ * @returns {string}
+ */
+function uniqueName(used, base) {
+    let name = base;
+    let i = 2;
+    while (used.has(name)) {
+        name = base + i;
+        i += 1;
+    }
+    return name;
+}
+
+/**
+ * @param {object} doc
+ * @param {object} created
+ * @param {string|null} preferredName
+ */
+function nameOperations(doc, created, preferredName) {
+    const ops = doc.definitions.filter(def => def.kind === Kind.OPERATION_DEFINITION);
+    const used = new Set(ops.filter(op => op.name).map(op => op.name.value));
+    if (ops.length < 2 && !preferredName) {
+        return;
+    }
+    ops.filter(op => !op.name).forEach(op => {
+        const preferred = op === created && preferredName && !used.has(preferredName) ? preferredName : null;
+        const value = preferred || uniqueName(used, DEFAULT_OPERATION_NAMES[op.operation]);
+        used.add(value);
+        op.name = { kind: Kind.NAME, value };
+    });
 }
 
 /**
@@ -209,8 +244,9 @@ export function toggleFieldInQuery({
     const doc = parseOrEmpty(queryText);
     let op = findOperation(doc.definitions, operationType, operationName);
     if (!op) {
-        op = createOperation(operationType, operationName);
+        op = createOperation(operationType);
         doc.definitions = [...doc.definitions, op];
+        nameOperations(doc, op, operationName);
     }
     if (pathPresent(op.selectionSet, path)) {
         removePath(op.selectionSet, path);
@@ -251,12 +287,14 @@ function capitalize(value) {
 }
 
 /**
- * @param {object} op
+ * @param {object} doc
  * @returns {Set<string>}
  */
-function existingVarNames(op) {
+function existingVarNames(doc) {
     const set = new Set();
-    (op.variableDefinitions || []).forEach(def => set.add(def.variable.name.value));
+    doc.definitions.forEach(def => {
+        (def.variableDefinitions || []).forEach(variable => set.add(variable.variable.name.value));
+    });
     return set;
 }
 
@@ -267,14 +305,7 @@ function existingVarNames(op) {
  * @returns {string}
  */
 function allocVarName(used, fieldName, argName) {
-    const base = used.has(argName) ? fieldName + capitalize(argName) : argName;
-    let name = base;
-    let i = 2;
-    while (used.has(name)) {
-        name = base + i;
-        i += 1;
-    }
-    return name;
+    return uniqueName(used, used.has(argName) ? fieldName + capitalize(argName) : argName);
 }
 
 /**
@@ -394,9 +425,10 @@ export function getArgumentValue({ queryText, variablesText, operationType = 'qu
  * @param {string} opts.argType
  * @param {boolean} [opts.required]
  * @param {*} opts.raw
+ * @param {import('graphql').GraphQLSchema|null} [opts.schema]
  * @returns {{query: string, variables: string}}
  */
-export function setArgumentValue({ queryText, variablesText, operationType = 'query', operationName = null, path, argName, argType, required = false, raw }) {
+export function setArgumentValue({ queryText, variablesText, operationType = 'query', operationName = null, path, argName, argType, required = false, raw, schema = null }) {
     const doc = parseOrEmpty(queryText);
     const op = findOperation(doc.definitions, operationType, operationName);
     const field = op ? findFieldAtPath(op.selectionSet, path) : null;
@@ -404,7 +436,7 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
         return { query: queryText, variables: variablesText };
     }
     const vars = parseVariables(variablesText);
-    const empty = typeof raw === 'boolean' ? raw === false : (typeof raw !== 'string' || raw.trim() === '');
+    const empty = typeof raw !== 'boolean' && (typeof raw !== 'string' || raw.trim() === '');
     let varName = boundVariableName(field, argName);
 
     if (empty && !required) {
@@ -417,14 +449,14 @@ export function setArgumentValue({ queryText, variablesText, operationType = 'qu
     }
 
     if (!varName) {
-        varName = allocVarName(existingVarNames(op), field.name.value, argName);
+        varName = allocVarName(existingVarNames(doc), field.name.value, argName);
         field.arguments = [...(field.arguments || []).filter(a => a.name.value !== argName), variableArgument(argName, varName)];
         op.variableDefinitions = [...(op.variableDefinitions || []), variableDefinition(varName, argType)];
     }
     if (empty) {
         delete vars[varName];
     } else {
-        vars[varName] = coerceInputValue(raw, argType);
+        vars[varName] = coerceInputValue(raw, argType, schema);
     }
     return { query: print(doc), variables: stringifyVariables(vars) };
 }
@@ -663,16 +695,10 @@ export class GraphQLExplorer {
      * @returns {HTMLElement}
      */
     _buildArgControl(kind, argType) {
-        if (kind === 'boolean') {
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.className = 'check graphql-explorer-arg-value';
-            cb.addEventListener('change', () => this._onArgChange(cb));
-            return cb;
-        }
-        if (kind === 'enum') {
+        if (kind === 'boolean' || kind === 'enum') {
+            const values = kind === 'boolean' ? ['true', 'false'] : enumValuesForType(argType, this.schema);
             const select = el('select', 'select-base compact graphql-explorer-arg-value');
-            ['', ...enumValuesForType(argType, this.schema)].forEach(opt => {
+            ['', ...values].forEach(opt => {
                 const o = document.createElement('option');
                 o.value = opt;
                 o.textContent = opt || '—';
@@ -698,7 +724,6 @@ export class GraphQLExplorer {
         if (!row) {
             return;
         }
-        const raw = control.type === 'checkbox' ? control.checked : control.value;
         let result;
         try {
             result = setArgumentValue({
@@ -710,7 +735,8 @@ export class GraphQLExplorer {
                 argName: row.dataset.arg,
                 argType: row.dataset.argtype,
                 required: row.dataset.required === 'true',
-                raw
+                raw: control.value,
+                schema: this.schema
             });
         } catch (_e) {
             return;
@@ -884,11 +910,7 @@ export class GraphQLExplorer {
                 path: argRow.dataset.path ? argRow.dataset.path.split(PATH_SEP) : [],
                 argName: argRow.dataset.arg
             });
-            if (control.type === 'checkbox') {
-                control.checked = value === 'true';
-            } else {
-                control.value = value;
-            }
+            control.value = value;
         });
     }
 

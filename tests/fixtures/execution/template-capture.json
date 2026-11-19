@@ -365,9 +365,9 @@
     }
   },
   {
-    "name": "disabled queries fall back to examples",
+    "name": "disabled queries stay disabled",
     "entry": {
-      "name": "disabled queries fall back to examples"
+      "name": "disabled queries stay disabled"
     },
     "target": {
       "collection": {
@@ -454,7 +454,7 @@
     "expected": {
       "collectionId": "collection",
       "endpointId": "request",
-      "name": "disabled queries fall back to examples",
+      "name": "disabled queries stay disabled",
       "path": "/items/{id}",
       "method": "POST",
       "protocol": "http",
@@ -471,12 +471,7 @@
         "zero"
       ],
       "headers": {},
-      "queryRows": [
-        {
-          "key": "q",
-          "value": "example"
-        }
-      ],
+      "queryRows": [],
       "bearerFallback": true,
       "auth": {
         "type": "inherit",
@@ -1159,12 +1154,7 @@
         "zero"
       ],
       "headers": {},
-      "queryRows": [
-        {
-          "key": "q",
-          "value": "example"
-        }
-      ],
+      "queryRows": [],
       "bearerFallback": true,
       "auth": {
         "type": "inherit",
@@ -1705,12 +1695,7 @@
         "zero"
       ],
       "headers": {},
-      "queryRows": [
-        {
-          "key": "q",
-          "value": "example"
-        }
-      ],
+      "queryRows": [],
       "bearerFallback": true,
       "auth": {
         "type": "inherit",
@@ -2251,12 +2236,7 @@
         "zero"
       ],
       "headers": {},
-      "queryRows": [
-        {
-          "key": "q",
-          "value": "example"
-        }
-      ],
+      "queryRows": [],
       "bearerFallback": true,
       "auth": {
         "type": "inherit",
@@ -2797,12 +2777,7 @@
         "zero"
       ],
       "headers": {},
-      "queryRows": [
-        {
-          "key": "q",
-          "value": "example"
-        }
-      ],
+      "queryRows": [],
       "bearerFallback": true,
       "auth": {
         "type": "inherit",
@@ -3364,6 +3339,164 @@
         "code": "missingCollection",
         "details": null
       }
+    }
+  },
+  {
+    "name": "explicit empty query override suppresses examples",
+    "entry": {
+      "name": "explicit empty query override suppresses examples",
+      "overrides": {
+        "queryParams": []
+      }
+    },
+    "target": {
+      "collection": {
+        "id": "collection",
+        "baseUrl": "https://api.test",
+        "defaultHeaders": {
+          "Accept": "application/json"
+        }
+      },
+      "endpoint": {
+        "id": "request",
+        "path": "/items/{id}",
+        "method": "POST",
+        "parameters": {
+          "path": {
+            "id": {
+              "example": 7
+            },
+            "zero": {
+              "example": 0
+            }
+          },
+          "query": {
+            "q": {
+              "example": "example"
+            },
+            "empty": {
+              "example": ""
+            }
+          }
+        }
+      },
+      "persisted": {},
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "scripts": {
+        "preRequestScript": "console.log(\"pre\")",
+        "testScript": "console.log(\"test\")"
+      },
+      "mockBaseUrl": "http://localhost:3333/mock"
+    },
+    "expected": {
+      "collectionId": "collection",
+      "endpointId": "request",
+      "name": "explicit empty query override suppresses examples",
+      "path": "/items/{id}",
+      "method": "POST",
+      "protocol": "http",
+      "url": "",
+      "baseUrl": "https://api.test",
+      "defaultHeaders": {
+        "Accept": "application/json"
+      },
+      "pathParams": {
+        "id": "7"
+      },
+      "pathParameterNames": [
+        "id",
+        "zero"
+      ],
+      "headers": {},
+      "queryRows": [],
+      "bearerFallback": true,
+      "auth": {
+        "type": "inherit",
+        "config": {}
+      },
+      "inheritedAuth": [
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "inner"
+          },
+          "authConfig": {
+            "type": "inherit",
+            "config": {}
+          }
+        },
+        {
+          "source": {
+            "kind": "folder",
+            "folderId": "outer"
+          },
+          "authConfig": {
+            "type": "bearer",
+            "config": {
+              "token": "synthetic-token"
+            }
+          }
+        },
+        {
+          "source": {
+            "kind": "collection"
+          },
+          "authConfig": {
+            "type": "basic",
+            "config": {
+              "username": "synthetic",
+              "password": "synthetic"
+            }
+          }
+        }
+      ],
+      "body": {
+        "mode": "json",
+        "content": "",
+        "fields": [],
+        "filePath": "",
+        "contentType": null,
+        "graphql": null
+      },
+      "preRequestScript": "console.log(\"pre\")",
+      "testScript": "console.log(\"test\")",
+      "postResponseScript": "",
+      "mockBaseUrl": "http://localhost:3333/mock"
     }
   }
 ]

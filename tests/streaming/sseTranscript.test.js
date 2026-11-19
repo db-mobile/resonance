@@ -14,6 +14,10 @@ import { handleSseConnect, clearSseState, clearSseTranscript, isSseLive } from '
 describe('SSE transcript order', () => {
     const url = 'https://example.test/events';
     let onEvent;
+    const lastConnect = () => window.backendAPI.sse.connect.mock.calls.at(-1)[0];
+    const emit = (eventType, extra = {}) => onEvent({
+        payload: { tabId: 'tab-1', url, connectionId: lastConnect().connectionId, eventType, ...extra }
+    });
 
     beforeEach(() => {
         jest.useFakeTimers();
@@ -42,7 +46,6 @@ describe('SSE transcript order', () => {
 
     test('prepends complete messages and saves the same order while preserving reconnect IDs', async () => {
         await handleSseConnect(url);
-        const emit = (eventType, extra = {}) => onEvent({ payload: { tabId: 'tab-1', url, eventType, ...extra } });
         await emit('open');
         await emit('message', { event: 'update', id: '1', data: 'older\n\nmessage' });
         await emit('message', { event: 'update', id: '2', data: 'newer\nmessage' });
@@ -63,7 +66,6 @@ describe('SSE transcript order', () => {
 
     test('Clear empties live messages and persistence, preserves the stream and reconnect ID, and accepts new events', async () => {
         await handleSseConnect(url);
-        const emit = (eventType, extra = {}) => onEvent({ payload: { tabId: 'tab-1', url, eventType, ...extra } });
         await emit('open');
         await emit('message', { id: 'keep-id', data: 'old message' });
         await clearSseTranscript('tab-1');
@@ -81,6 +83,45 @@ describe('SSE transcript order', () => {
         expect(transcript).toContain('new message');
         expect(transcript).not.toContain('old message');
         expect(transcript).not.toContain('CONNECTED');
+    });
+
+    test('events from the stream a reconnect replaced are ignored', async () => {
+        await handleSseConnect(url);
+        const replaced = lastConnect().connectionId;
+        await emit('open');
+        await handleSseConnect(url);
+        expect(lastConnect().connectionId).not.toBe(replaced);
+
+        await emit('message', { connectionId: replaced, id: 'stale', data: 'from the old stream' });
+        await emit('message', { connectionId: undefined, data: 'unlabelled' });
+        await emit('message', { id: 'fresh', data: 'from the new stream' });
+        await jest.advanceTimersByTimeAsync(500);
+
+        const transcript = displayResponseWithLineNumbersForTab.mock.calls.at(-1)[0];
+        expect(transcript).toContain('from the new stream');
+        expect(transcript).not.toContain('from the old stream');
+        expect(transcript).not.toContain('unlabelled');
+        await handleSseConnect(url);
+        expect(lastConnect().lastEventId).toBe('fresh');
+    });
+
+    test('an empty event id resets the reconnect ID', async () => {
+        await handleSseConnect(url);
+        await emit('open');
+        await emit('message', { id: '7', data: 'one' });
+        await emit('message', { id: '', data: 'two' });
+        await handleSseConnect(url);
+        expect(lastConnect().lastEventId).toBeNull();
+    });
+
+    test('a different URL starts without the previous stream\'s reconnect ID', async () => {
+        await handleSseConnect(url);
+        await emit('open');
+        await emit('message', { id: '7', data: 'one' });
+        await handleSseConnect('https://example.test/other');
+        expect(lastConnect()).toEqual(expect.objectContaining({
+            url: 'https://example.test/other', lastEventId: null
+        }));
     });
 
     test('Clear removes a restored SSE response without creating or closing a connection', async () => {

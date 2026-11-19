@@ -12,6 +12,7 @@ function makeRepository() {
         savePersistedQueryParams: jest.fn().mockResolvedValue(undefined),
         savePersistedHeaders: jest.fn().mockResolvedValue(undefined),
         saveModifiedRequestBody: jest.fn().mockResolvedValue(undefined),
+        saveBodyState: jest.fn().mockResolvedValue(undefined),
         savePersistedAuthConfig: jest.fn().mockResolvedValue(undefined)
     };
 }
@@ -94,5 +95,15 @@ describe('writeNewEndpointSidecars', () => {
         expect(repository.saveModifiedRequestBody).toHaveBeenCalledWith('c1', 'e1', '{"a":1}');
         expect(repository.savePersistedAuthConfig).toHaveBeenCalledTimes(1);
         expect(repository.savePersistedAuthConfig).toHaveBeenCalledWith('c1', 'e1', { type: 'bearer', config: { token: 't' } });
+    });
+
+    test('a form body is written as body state instead of a raw body', async () => {
+        const repository = makeRepository();
+        const formBodyData = { mode: 'formdata', fields: [{ key: 'name', value: 'Rex' }] };
+
+        await writeNewEndpointSidecars(repository, 'c1', 'e1', getProtocol('http'), { path: '/r', formBodyData });
+
+        expect(calledMethods(repository)).toEqual(['saveBodyState']);
+        expect(repository.saveBodyState).toHaveBeenCalledWith('c1', 'e1', { modifiedBody: null, formBodyData });
     });
 });

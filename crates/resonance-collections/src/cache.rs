@@ -156,7 +156,9 @@ impl CollectionCache {
     /// than cold.
     pub fn refresh(&self, dir: &Path, collection: &LoadedCollection) {
         if let Ok(fingerprint) = fingerprint(dir) {
-            self.put(dir, fingerprint, collection.clone());
+            let mut collection = collection.clone();
+            crate::read::sort_folder(&mut collection.root);
+            self.put(dir, fingerprint, collection);
         }
     }
 

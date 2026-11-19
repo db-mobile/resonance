@@ -1,6 +1,6 @@
 //! Mapping command-line flags onto the execution core's settings.
 use resonance_core::model::{Certificate, DataFile, ExecutionSettings, RunOptions};
-use resonance_core::proxy::{ProxyAuth, ProxySettings};
+use resonance_core::proxy::{ProxyAuth, ProxySettings, urlencoding_decode};
 use serde_json::Value;
 use std::path::Path;
 
@@ -31,7 +31,7 @@ pub fn proxy_settings(args: &RunArgs) -> Result<ProxySettings, CliError> {
     let port = parsed
         .port_or_known_default()
         .ok_or_else(|| CliError::Usage(format!("--proxy {raw:?} has no port")))?;
-    let username = parsed.username().to_string();
+    let username = urlencoding_decode(parsed.username());
     Ok(ProxySettings {
         enabled: true,
         use_system_proxy: false,
@@ -41,7 +41,7 @@ pub fn proxy_settings(args: &RunArgs) -> Result<ProxySettings, CliError> {
         auth: ProxyAuth {
             enabled: !username.is_empty(),
             username,
-            password: parsed.password().unwrap_or_default().to_string(),
+            password: urlencoding_decode(parsed.password().unwrap_or_default()),
         },
         ..ProxySettings::default()
     })
@@ -157,6 +157,19 @@ mod tests {
         assert_eq!(plain.port, 80);
         assert!(!plain.auth.enabled);
         assert!(proxy_settings(&args(&["--proxy", "not a url"])).is_err());
+    }
+
+    #[test]
+    fn proxy_credentials_are_percent_decoded() {
+        let proxy = proxy_settings(&args(&[
+            "--proxy",
+            "http://us%40er:p%40ss%3Aw+rd@proxy.test:8080",
+        ]))
+        .unwrap();
+        assert_eq!(
+            (proxy.auth.username.as_str(), proxy.auth.password.as_str()),
+            ("us@er", "p@ss:w+rd")
+        );
     }
 
     #[test]

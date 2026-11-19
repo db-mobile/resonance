@@ -42,3 +42,8 @@ export function trackInFlight(tabId, requestId) {
 export function inFlightRequestFor(tabId) {
     return byTab.get(tabId ?? NO_TAB) ?? null;
 }
+
+/** Detach a replaced request so its late response cannot update the tab. */
+export function invalidateInFlight(tabId) {
+    byTab.delete(tabId ?? NO_TAB);
+}

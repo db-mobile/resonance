@@ -245,3 +245,77 @@ async fn a_renewed_token_that_expires_mid_run_is_renewed_again() {
     );
     server.abort();
 }
+
+#[tokio::test]
+async fn a_string_or_float_token_lifetime_still_expires_the_token() {
+    for lifetime in [json!("1"), json!(1.0)] {
+        let tokens = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = tokens.clone();
+        let sent = lifetime.clone();
+        let (url, server) = serve(Router::new().fallback(any(
+            move |request: axum::extract::Request| {
+                let counter = counter.clone();
+                let sent = sent.clone();
+                async move {
+                    if request.uri().path() == "/token" {
+                        let n = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                        json!({"access_token":format!("fresh-{n}"),"expires_in":sent}).to_string()
+                    } else {
+                        "ok".to_string()
+                    }
+                }
+            },
+        )))
+        .await;
+        let auth = json!({"type":"oauth2","config":{"token":"expired","expiresAt":1,"grantType":"client_credentials","clientId":"id","tokenUrl":format!("{url}/token")}});
+        let request =
+            json!({"collectionId":"c","endpointId":"e","url":format!("{url}/api"),"auth":auth});
+        let input: RunInput = serde_json::from_value(json!({"executionId":"oauth-string-expiry","runnerName":"oauth","context":{},"requests":[request,request]})).unwrap();
+        let result = execute_run(input, Cancellation::default(), |_| {}).await;
+        let result = serde_json::to_value(result).unwrap();
+        assert_eq!(result["passed"], 2, "{lifetime}: {result}");
+        assert_eq!(
+            tokens.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "{lifetime}"
+        );
+        server.abort();
+    }
+}
+
+#[tokio::test]
+async fn basic_client_credentials_are_form_encoded_before_base64() {
+    let seen = Arc::new(std::sync::Mutex::new(String::new()));
+    let record = seen.clone();
+    let (url, server) = serve(Router::new().fallback(any(
+        move |request: axum::extract::Request| {
+            let record = record.clone();
+            async move {
+                *record.lock().unwrap() = request.headers()["authorization"]
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                json!({"access_token":"fresh","expires_in":3600}).to_string()
+            }
+        },
+    )))
+    .await;
+    let config: resonance_core::oauth::OAuth2Config = serde_json::from_value(json!({
+        "grantType":"client_credentials",
+        "tokenUrl":format!("{url}/token"),
+        "clientId":"my client",
+        "clientSecret":"p:a%s",
+        "clientAuthMethod":"header"
+    }))
+    .unwrap();
+    let result = resonance_core::oauth::oauth2_get_token(&ProxySettings::default(), config)
+        .await
+        .unwrap();
+    assert!(result.success);
+    let expected = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        "my+client:p%3Aa%25s",
+    );
+    assert_eq!(*seen.lock().unwrap(), format!("Basic {expected}"));
+    server.abort();
+}

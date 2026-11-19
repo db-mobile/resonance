@@ -22,46 +22,130 @@ struct DigestChallenge {
     opaque: Option<String>,
 }
 
-impl DigestChallenge {
-    /// Parse WWW-Authenticate header to extract digest challenge parameters
-    fn parse(www_authenticate: &str) -> Option<Self> {
-        if !www_authenticate.contains("Digest") {
-            return None;
+/// Split challenges/parameters at commas outside quoted strings.
+fn auth_segments(header: &str) -> Option<Vec<&str>> {
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut start = 0;
+    let mut parts = Vec::new();
+    for (index, ch) in header.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
         }
+        if quoted && ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            quoted = !quoted;
+        }
+        if ch == ',' && !quoted {
+            parts.push(header[start..index].trim());
+            start = index + 1;
+        }
+    }
+    if quoted || escaped {
+        return None;
+    }
+    parts.push(header[start..].trim());
+    Some(parts)
+}
 
-        let mut realm = String::new();
-        let mut nonce = String::new();
-        let mut qop = None;
-        let mut algorithm = "MD5".to_string();
-        let mut opaque = None;
+fn auth_value(value: &str) -> Option<String> {
+    let value = value.trim();
+    if !value.starts_with('"') {
+        return Some(value.to_string());
+    }
+    let inner = value.strip_prefix('"')?.strip_suffix('"')?;
+    let mut result = String::new();
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        result.push(if ch == '\\' { chars.next()? } else { ch });
+    }
+    Some(result)
+}
 
-        // Parse key=value pairs from the header
-        let re = regex::Regex::new(r#"(\w+)=["']?([^"',]+)["']?"#).ok()?;
-        for cap in re.captures_iter(www_authenticate) {
-            let key = cap.get(1)?.as_str();
-            let value = cap.get(2)?.as_str();
-            match key {
-                "realm" => realm = value.to_string(),
-                "nonce" => nonce = value.to_string(),
-                "qop" => qop = Some(value.to_string()),
-                "algorithm" => algorithm = value.to_uppercase(),
-                "opaque" => opaque = Some(value.to_string()),
+impl DigestChallenge {
+    fn parse_all(header: &str) -> Vec<Self> {
+        let Some(parts) = auth_segments(header) else {
+            return Vec::new();
+        };
+        let mut challenges = Vec::new();
+        let mut current: Option<Self> = None;
+        for part in parts {
+            let token_end = part
+                .find(|ch: char| ch.is_whitespace() || ch == '=')
+                .unwrap_or(part.len());
+            let token = &part[..token_end];
+            let rest = part[token_end..].trim_start();
+            let parameter = if !rest.starts_with('=') {
+                if let Some(challenge) = current.take().filter(|c| !c.nonce.is_empty()) {
+                    challenges.push(challenge);
+                }
+                if token.eq_ignore_ascii_case("digest") {
+                    current = Some(Self {
+                        realm: String::new(),
+                        nonce: String::new(),
+                        qop: None,
+                        algorithm: "MD5".into(),
+                        opaque: None,
+                    });
+                }
+                rest
+            } else {
+                part
+            };
+            let Some(challenge) = current.as_mut() else {
+                continue;
+            };
+            let Some((key, value)) = parameter.split_once('=') else {
+                continue;
+            };
+            let Some(value) = auth_value(value) else {
+                current = None;
+                continue;
+            };
+            match key.trim().to_ascii_lowercase().as_str() {
+                "realm" => challenge.realm = value,
+                "nonce" => challenge.nonce = value,
+                "qop" => challenge.qop = Some(value),
+                "algorithm" => challenge.algorithm = value.to_ascii_uppercase(),
+                "opaque" => challenge.opaque = Some(value),
                 _ => {}
             }
         }
-
-        if nonce.is_empty() {
-            return None;
+        if let Some(challenge) = current.filter(|c| !c.nonce.is_empty()) {
+            challenges.push(challenge);
         }
-
-        Some(DigestChallenge {
-            realm,
-            nonce,
-            qop,
-            algorithm,
-            opaque,
-        })
+        challenges
     }
+
+    #[cfg(test)]
+    fn parse(header: &str) -> Option<Self> {
+        Self::parse_all(header).into_iter().next()
+    }
+
+    fn supported(&self) -> bool {
+        matches!(self.algorithm.as_str(), "MD5" | "MD5-SESS")
+            && self
+                .qop
+                .as_ref()
+                .is_none_or(|qop| qop.split(',').any(|value| value.trim() == "auth"))
+    }
+}
+
+fn extract_digest_challenge(headers: &reqwest::header::HeaderMap) -> Option<DigestChallenge> {
+    headers
+        .get_all("www-authenticate")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(DigestChallenge::parse_all)
+        .find(DigestChallenge::supported)
+}
+
+fn quote_auth(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Compute MD5 hash of a string
@@ -130,13 +214,17 @@ fn build_digest_auth_header(
     // Build the header
     let mut header = format!(
         r#"Digest username="{}", realm="{}", nonce="{}", uri="{}", response="{}""#,
-        username, challenge.realm, challenge.nonce, uri, response
+        quote_auth(username),
+        quote_auth(&challenge.realm),
+        quote_auth(&challenge.nonce),
+        quote_auth(uri),
+        response
     );
 
     header.push_str(&format!(", algorithm={}", challenge.algorithm));
 
     if let Some(opaque) = &challenge.opaque {
-        header.push_str(&format!(r#", opaque="{}""#, opaque));
+        header.push_str(&format!(r#", opaque="{}""#, quote_auth(opaque)));
     }
 
     if challenge.qop.is_some() {
@@ -305,6 +393,33 @@ fn aws_uri_encode(input: &str, encode_slash: bool) -> String {
     encoded
 }
 
+/// The URL path is already serialized. Preserve valid escapes for S3;
+/// other services encode them again in the canonical request.
+fn aws_canonical_uri(path: &str, service: &str) -> String {
+    let path = if path.is_empty() { "/" } else { path };
+    if service != "s3" {
+        return aws_uri_encode(path, false);
+    }
+    let mut result = String::new();
+    let mut remaining = path;
+    while !remaining.is_empty() {
+        let bytes = remaining.as_bytes();
+        if bytes.len() >= 3
+            && bytes[0] == b'%'
+            && bytes[1].is_ascii_hexdigit()
+            && bytes[2].is_ascii_hexdigit()
+        {
+            result.push_str(&remaining[..3].to_ascii_uppercase());
+            remaining = &remaining[3..];
+        } else {
+            let ch = remaining.chars().next().unwrap();
+            result.push_str(&aws_uri_encode(&ch.to_string(), false));
+            remaining = &remaining[ch.len_utf8()..];
+        }
+    }
+    result
+}
+
 /// Derive the AWS Signature V4 signing key.
 fn aws_derive_signing_key(secret: &str, date: &str, region: &str, service: &str) -> Vec<u8> {
     let k_date = hmac_sha256(format!("AWS4{}", secret).as_bytes(), date.as_bytes());
@@ -325,10 +440,27 @@ fn build_aws_v4_headers(
     existing_headers: &HashMap<String, String>,
     body_bytes: &[u8],
 ) -> Result<HashMap<String, String>, String> {
+    build_aws_v4_headers_at(
+        aws,
+        method,
+        url_str,
+        existing_headers,
+        body_bytes,
+        chrono::Utc::now(),
+    )
+}
+
+fn build_aws_v4_headers_at(
+    aws: &AwsAuthConfig,
+    method: &str,
+    url_str: &str,
+    existing_headers: &HashMap<String, String>,
+    body_bytes: &[u8],
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<HashMap<String, String>, String> {
     let parsed =
         url::Url::parse(url_str).map_err(|e| format!("Invalid URL for AWS signing: {}", e))?;
 
-    let now = chrono::Utc::now();
     let date_stamp = now.format("%Y%m%d").to_string();
     let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
 
@@ -367,11 +499,7 @@ fn build_aws_v4_headers(
     }
 
     // -- Step 1: Canonical Request --------------------------------------------
-    let canonical_uri = if parsed.path().is_empty() {
-        "/".to_string()
-    } else {
-        parsed.path().to_string()
-    };
+    let canonical_uri = aws_canonical_uri(parsed.path(), &aws.service);
 
     // Canonical query string: sorted by key then value
     let mut query_pairs: Vec<(String, String)> = parsed
@@ -1143,9 +1271,7 @@ pub async fn send_api_request(
                     }
 
                     if let Some(auth_config) = &request_options.auth
-                        && let Some(www_auth) = response.headers().get("www-authenticate")
-                        && let Ok(www_auth_str) = www_auth.to_str()
-                        && let Some(challenge) = DigestChallenge::parse(www_auth_str)
+                        && let Some(challenge) = extract_digest_challenge(response.headers())
                     {
                         let uri = extract_uri(&request_options.url);
 
@@ -1896,5 +2022,151 @@ mod tests {
 
         assert!(wire_body_bytes("formdata", Some(&rows), None).is_err());
         assert!(wire_body_bytes("json", None, None).unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod correctness_auth_regressions {
+    use super::*;
+
+    #[test]
+    fn digest_preserves_quoted_commas_and_escaped_characters() {
+        let challenge = DigestChallenge::parse(
+            r#"Digest realm="team, \"blue\"\\ops", nonce="abc", qop="auth,auth-int", opaque="x,y""#,
+        )
+        .unwrap();
+        assert_eq!(challenge.realm, "team, \"blue\"\\ops");
+        assert_eq!(challenge.qop.as_deref(), Some("auth,auth-int"));
+        assert_eq!(challenge.opaque.as_deref(), Some("x,y"));
+    }
+
+    #[test]
+    fn digest_parameters_are_case_insensitive_and_do_not_cross_challenges() {
+        let challenge = DigestChallenge::parse(
+            r#"Basic realm="wrong", dIgEsT REALM = "right", NONCE = "abc", ALGORITHM = MD5, Basic realm="also wrong""#,
+        ).unwrap();
+        assert_eq!(challenge.realm, "right");
+        assert_eq!(challenge.nonce, "abc");
+        assert_eq!(challenge.algorithm, "MD5");
+    }
+
+    #[test]
+    fn digest_rejects_an_unterminated_quoted_parameter() {
+        assert!(DigestChallenge::parse(r#"Digest realm="ok", nonce="unterminated"#).is_none());
+    }
+
+    #[test]
+    fn digest_authorization_escapes_quoted_values() {
+        let challenge = DigestChallenge {
+            realm: "team\"blue\\ops".into(),
+            nonce: "nonce\"value".into(),
+            qop: None,
+            algorithm: "MD5".into(),
+            opaque: Some("opaque\\value".into()),
+        };
+        let header =
+            build_digest_auth_header("user\"name", "pass", "GET", "/", &challenge).unwrap();
+        assert!(header.contains(r#"username="user\"name""#), "{header}");
+        assert!(header.contains(r#"realm="team\"blue\\ops""#), "{header}");
+        assert!(header.contains(r#"nonce="nonce\"value""#), "{header}");
+        assert!(header.contains(r#"opaque="opaque\\value""#), "{header}");
+    }
+
+    #[tokio::test]
+    async fn digest_handshake_finds_a_later_header_and_hashes_the_entire_realm() {
+        use axum::{
+            Router,
+            http::{HeaderMap, StatusCode},
+            routing::get,
+        };
+        async fn handler(headers: HeaderMap) -> (StatusCode, HeaderMap, &'static str) {
+            let expected = md5_hash(&format!(
+                "{}:abc:{}",
+                md5_hash("user:team,blue:pass"),
+                md5_hash("GET:/api")
+            ));
+            if headers
+                .get("authorization")
+                .and_then(|h| h.to_str().ok())
+                .is_some_and(|h| {
+                    h.starts_with("Digest ") && h.contains(&format!("response=\"{expected}\""))
+                })
+            {
+                return (StatusCode::OK, HeaderMap::new(), "authenticated");
+            }
+            let mut headers = HeaderMap::new();
+            headers.append("www-authenticate", "Basic realm=\"basic\"".parse().unwrap());
+            headers.append(
+                "www-authenticate",
+                "Digest realm=\"team,blue\", nonce=\"abc\", algorithm=MD5"
+                    .parse()
+                    .unwrap(),
+            );
+            (StatusCode::UNAUTHORIZED, headers, "challenge")
+        }
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, Router::new().route("/api", get(handler)))
+                .await
+                .unwrap();
+        });
+        let options: RequestOptions = serde_json::from_value(serde_json::json!({
+            "method": "GET", "url": format!("http://{addr}/api"),
+            "auth": {"username": "user", "password": "pass"}, "timeout": 3000
+        }))
+        .unwrap();
+        let result =
+            send_api_request(&RequestState::default(), &ProxySettings::default(), options).await;
+        server.abort();
+        assert_eq!(result.unwrap().status, Some(200));
+    }
+
+    #[test]
+    fn aws_canonical_path_is_encoded_for_the_service() {
+        // Independently assemble the canonical request using expected URI literals;
+        // the timestamp comes from the generated header to avoid clock flakiness.
+        for (service, path, expected_path) in [
+            ("execute-api", "/a+b", "/a%2Bb"),
+            ("execute-api", "/a%20b", "/a%2520b"),
+            ("execute-api", "/a%2Fb", "/a%252Fb"),
+            ("execute-api", "/%C3%A9", "/%25C3%25A9"),
+            ("s3", "/a+b", "/a%2Bb"),
+            ("s3", "/a%20b", "/a%20b"),
+            ("s3", "/a%2Fb", "/a%2Fb"),
+            ("s3", "/a//b", "/a//b"),
+        ] {
+            let config = AwsAuthConfig {
+                access_key_id: "AKIDEXAMPLE".into(),
+                secret_access_key: "test-secret".into(),
+                region: "us-east-1".into(),
+                service: service.into(),
+                session_token: None,
+            };
+            let headers = build_aws_v4_headers(
+                &config,
+                "GET",
+                &format!("https://example.com{path}"),
+                &HashMap::new(),
+                b"",
+            )
+            .unwrap();
+            let date = &headers["x-amz-date"];
+            let payload_hash = sha256_hex(b"");
+            let canonical = format!(
+                "GET\n{expected_path}\n\nhost:example.com\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{date}\n\nhost;x-amz-content-sha256;x-amz-date\n{payload_hash}"
+            );
+            let scope = format!("{}/us-east-1/{service}/aws4_request", &date[..8]);
+            let to_sign = format!(
+                "AWS4-HMAC-SHA256\n{date}\n{scope}\n{}",
+                sha256_hex(canonical.as_bytes())
+            );
+            let key = aws_derive_signing_key("test-secret", &date[..8], "us-east-1", service);
+            let signature = hex::encode(hmac_sha256(&key, to_sign.as_bytes()));
+            assert!(
+                headers["Authorization"].ends_with(&signature),
+                "wrong canonical URI for {service}: {path}"
+            );
+        }
     }
 }
