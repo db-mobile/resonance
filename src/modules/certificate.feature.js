@@ -5,7 +5,6 @@
 
 import { CertificateRepository } from './storage/CertificateRepository.js';
 import { CertificateService } from './services/CertificateService.js';
-import { CertificateController } from './controllers/CertificateController.js';
 
 /** @type {import('./registry/FeatureRegistry.js').FeatureDescriptor} */
 export const certificateFeature = {
@@ -13,12 +12,13 @@ export const certificateFeature = {
     create(ctx) {
         const repository = new CertificateRepository(ctx.backendAPI);
         const service = new CertificateService(repository);
-        const controller = new CertificateController(service);
-        return { repository, service, controller };
+        return { repository, service };
     },
-    globals: { certificateController: 'controller' },
-    provides: { certificateController: 'controller' },
-    async init({ controller }) {
-        await controller.initialize();
+    globals: { certificateController: 'service' },
+    provides: { certificateController: 'service' },
+    async init({ service }) {
+        try {
+            await service.getItems();
+        } catch {}
     },
 };

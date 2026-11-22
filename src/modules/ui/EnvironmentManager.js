@@ -500,29 +500,6 @@ export class EnvironmentManager extends BaseModal {
         }));
     }
 
-    /**
-     * @param {string} name
-     * @param {string} value
-     * @param {boolean} [isSecret=false]
-     */
-    async setVariable(name, value, isSecret = false) {
-        try {
-            if (!this.currentEnvironmentId) {return;}
-            await this.service.setVariable(this.currentEnvironmentId, name, value, isSecret);
-        } catch (error) {
-            toast.error(error.message);
-        }
-    }
-
-    async deleteVariable(name) {
-        try {
-            if (!this.currentEnvironmentId) {return;}
-            await this.service.deleteVariable(this.currentEnvironmentId, name);
-        } catch (error) {
-            toast.error(error.message);
-        }
-    }
-
     async handleCreateEnvironment() {
         const name = await new RenameDialog().show(translate('environment_manager.create_default_name', 'New Environment'), {
             title: translate('environment_manager.create_title', 'Create Environment'),
