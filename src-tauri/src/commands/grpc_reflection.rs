@@ -19,10 +19,6 @@ use tonic::{Request, Status};
 
 pub mod reflection {
     #![allow(dead_code)]
-    // tonic-generated streaming clients return `Result<_, tonic::Status>`, and
-    // `Status` is large enough to trip `clippy::result_large_err`; the shape is
-    // fixed by the generated code, so the lint is silenced for this module.
-    #![allow(clippy::result_large_err)]
     tonic::include_proto!("grpc.reflection.v1");
 }
 
