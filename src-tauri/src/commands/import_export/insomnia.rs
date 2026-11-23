@@ -366,17 +366,12 @@ fn convert_request(request: &Value) -> Endpoint {
             .and_then(|d| d.as_str())
             .filter(|d| !d.is_empty())
             .map(|s| s.to_string()),
-        tags: Vec::new(),
         parameters: convert_parameters(request),
         request_body,
-        responses: None,
         security: convert_auth(request.get("authentication")),
         scripts: convert_scripts(request),
         graphql_data,
-        url: None,
-        live_body: None,
-        response_schema: None,
-        examples: Vec::new(),
+        ..Default::default()
     }
 }
 

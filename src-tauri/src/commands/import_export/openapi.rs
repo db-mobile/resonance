@@ -155,12 +155,7 @@ pub(crate) fn parse_openapi_spec(spec: Value) -> Result<Collection, String> {
                         ),
                         responses: extract_openapi_responses(operation.get("responses"), &spec),
                         security: extract_openapi_security(operation.get("security"), &spec),
-                        scripts: None,
-                        graphql_data: None,
-                        url: None,
-                        live_body: None,
-                        response_schema: None,
-                        examples: Vec::new(),
+                        ..Default::default()
                     };
 
                     // Extract base path (first segment) for folder grouping

@@ -69,7 +69,7 @@ pub struct Folder {
     pub auth_config: Option<Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Endpoint {
     pub id: String,

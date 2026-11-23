@@ -10,10 +10,7 @@
 
 use serde_json::{Map, Value};
 use std::fs;
-use std::io::Write;
 use std::path::Path;
-
-use super::fs_secure::restrict_file;
 
 /// Everything not claimed by one of the files below.
 pub const MAIN_STORE: &str = "resonance-store.json";
@@ -79,37 +76,36 @@ pub(crate) fn write_store(path: &Path, map: &Map<String, Value>) -> Result<(), S
     let contents = serde_json::to_string(map)
         .map_err(|e| format!("Failed to serialize {}: {}", path.display(), e))?;
 
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
-    let temp = parent.join(format!(
-        ".{}.tmp",
-        path.file_name().and_then(|n| n.to_str()).unwrap_or("store")
-    ));
-
-    let result = (|| -> Result<(), String> {
-        let mut file = fs::File::create(&temp)
-            .map_err(|e| format!("Failed to create {}: {}", temp.display(), e))?;
-        file.write_all(contents.as_bytes())
-            .map_err(|e| format!("Failed to write {}: {}", temp.display(), e))?;
-        file.sync_all()
-            .map_err(|e| format!("Failed to flush {}: {}", temp.display(), e))?;
-        drop(file);
-
-        restrict_file(&temp);
-
-        fs::rename(&temp, path).map_err(|e| format!("Failed to place {}: {}", path.display(), e))
-    })();
-
-    if result.is_err() {
-        let _ = fs::remove_file(&temp);
-    }
-    result
+    resonance_collections::write::write_atomic(path, &contents)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn store_writes_create_and_replace_compact_private_json_without_leftovers() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(MAIN_STORE);
+
+        for contents in [r#"{"theme":"dark","tabs":[1,2]}"#, r#"{"theme":"light"}"#] {
+            let map: Map<String, Value> = serde_json::from_str(contents).unwrap();
+            write_store(&path, &map).unwrap();
+
+            assert_eq!(fs::read_to_string(&path).unwrap(), contents);
+            assert_eq!(read_store(&path), map);
+            let files: Vec<_> = fs::read_dir(dir.path())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(files, vec![path.clone()]);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o077, 0);
+            }
+        }
+    }
 
     #[test]
     fn relocated_keys_route_to_their_own_files() {

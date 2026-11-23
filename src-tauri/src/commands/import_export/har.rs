@@ -199,18 +199,10 @@ fn build_endpoint(
         name,
         method: method.to_string(),
         path: raw_url.to_string(),
-        description: None,
-        tags: Vec::new(),
         parameters: extract_parameters(request),
         request_body: extract_body(request.get("postData")),
-        responses: None,
-        security: None,
-        scripts: None,
-        graphql_data: None,
-        url: None,
-        live_body: None,
-        response_schema: None,
         examples: extract_har_example(response),
+        ..Default::default()
     }
 }
 

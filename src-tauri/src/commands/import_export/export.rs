@@ -523,18 +523,7 @@ mod tests {
             name: name.to_string(),
             method: method.to_string(),
             path: format!("/{}", name.to_lowercase().replace(' ', "-")),
-            description: None,
-            tags: Vec::new(),
-            parameters: None,
-            request_body: None,
-            responses: None,
-            security: None,
-            scripts: None,
-            graphql_data: None,
-            url: None,
-            live_body: None,
-            response_schema: None,
-            examples: Vec::new(),
+            ..Default::default()
         }
     }
 
