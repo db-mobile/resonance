@@ -117,6 +117,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="3.6.5" date="2026-11-27">
+      <description>
+        <p>Maintenance release</p>
+        <ul>
+          <li>Give the URL and variable suggestion lists, and the tables in the mock server log and runner results, one consistent look</li>
+          <li>Align the preview rows of the cURL import dialog</li>
+          <li>Update dependencies and drop unused ones</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.6.4" date="2026-11-19">
       <description>
         <p>Bug fixes</p>

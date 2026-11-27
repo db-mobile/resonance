@@ -19,33 +19,6 @@
   left: 0;
   right: 0;
   z-index: var(--z-dropdown);
-  max-height: 320px;
-  overflow-y: auto;
-  display: none;
-  padding: var(--space-2);
-  background-color: var(--popover-bg-color);
-  color: var(--popover-fg-color);
-  border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-popover), 0 0 0 1px var(--popover-shade-color);
-}
-
-.url-autocomplete-dropdown.visible {
-  display: block;
-}
-
-.url-autocomplete-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-small);
-  cursor: pointer;
-}
-
-.url-autocomplete-item:hover,
-.url-autocomplete-item.active {
-  background-color: var(--shade-color);
 }
 
 .url-autocomplete-method {

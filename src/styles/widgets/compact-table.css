@@ -1,0 +1,25 @@
+.mock-server-logs-table,
+.runner-results-headers-table,
+.runner-results-cookies-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+}
+
+.mock-server-logs-th,
+.runner-results-headers-table th,
+.runner-results-cookies-table th {
+  text-align: left;
+  font-weight: 700;
+  opacity: var(--dim-opacity);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mock-server-logs-td,
+.runner-results-headers-table td,
+.runner-results-cookies-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--card-shade-color);
+  font-family: var(--font-mono);
+}

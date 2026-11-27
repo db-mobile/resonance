@@ -30,12 +30,6 @@
   background-color: var(--shade-color);
 }
 
-.history-item-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .history-item-method {
   font-family: var(--font-mono);
   font-size: 10px;

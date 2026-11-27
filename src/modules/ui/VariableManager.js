@@ -6,7 +6,6 @@
 import { templateLoader } from '../templateLoader.js';
 import { toast } from './Toast.js';
 import { DynamicVariablesReferenceDialog } from './DynamicVariablesReferenceDialog.js';
-import { pushEscapeHandler } from './modalEscape.js';
 import { BaseModal } from './BaseModal.js';
 import { applySecretState, toggleRevealed } from './secretToggle.js';
 
@@ -21,7 +20,6 @@ export class VariableManager extends BaseModal {
         super();
         this.onSave = null;
         this.onCancel = null;
-        this.releaseEscape = null;
     }
 
     /**
@@ -55,9 +53,7 @@ export class VariableManager extends BaseModal {
             overlayClass: 'variable-dialog-overlay',
             dialogClass: 'variable-dialog modal-dialog modal-dialog--variable-manager modal-dialog--scroll-y',
             templatePath: './src/templates/variables/variableManager.html',
-            templateId: 'tpl-variable-manager-dialog',
-            closeOnEscape: false,
-            closeOnOverlayClick: false
+            templateId: 'tpl-variable-manager-dialog'
         });
 
         const titleEl = dialogContent.querySelector('[data-role="title"]');
@@ -162,18 +158,6 @@ export class VariableManager extends BaseModal {
         if (referenceBtn) {
             referenceBtn.addEventListener('click', () => new DynamicVariablesReferenceDialog().show());
         }
-
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
-
-        this.releaseEscape = pushEscapeHandler(() => {
-            if (this.dialog) {
-                this.close();
-            }
-        });
     }
 
     save() {
@@ -227,12 +211,11 @@ export class VariableManager extends BaseModal {
         this.cleanup();
     }
 
-    cleanup() {
-        if (this.releaseEscape) {
-            this.releaseEscape();
-            this.releaseEscape = null;
-        }
+    onDismiss() {
+        this.close();
+    }
 
+    cleanup() {
         this.destroy();
 
         this.onSave = null;

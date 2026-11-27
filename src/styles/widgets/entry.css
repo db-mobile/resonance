@@ -27,10 +27,25 @@ textarea.form-input {
   resize: vertical;
 }
 
+.textarea-base {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-3);
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .entry:focus,
 .entry:focus-within,
 .input-base:focus,
 .form-input:focus,
+.textarea-base:focus,
 .inspection-expression:focus,
 .inspection-namespaces:focus,
 .binary-file-path:focus,

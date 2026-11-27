@@ -117,7 +117,6 @@
 }
 
 .proxy-row {
-  display: flex;
   align-items: flex-end;
   gap: var(--space-3);
   flex-wrap: wrap;
@@ -155,9 +154,6 @@
 }
 
 .cert-entry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
   flex-wrap: wrap;
 }
@@ -175,7 +171,6 @@
 .cert-file-row {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr) auto auto;
-  align-items: center;
   gap: var(--space-2);
 }
 

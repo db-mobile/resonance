@@ -10,7 +10,6 @@ rust-version.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
-tonic-prost-build = "0.14"
 prost-build = "0.14"
 protoc-bin-vendored = "3"
 
@@ -39,13 +38,12 @@ futures-util.workspace = true
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls-no-provider"] }
 
 # gRPC client (rustls-only TLS via tls-ring; keep the tree OpenSSL-free)
-tonic = { version = "0.14", default-features = false, features = ["codegen", "channel", "tls-ring", "tls-native-roots"] }
+tonic = { version = "0.14", default-features = false, features = ["channel", "tls-ring", "tls-native-roots"] }
 prost = "0.14"
 prost-types = "0.14"
 tonic-prost = "0.14"
 tokio-stream = "0.1"
 prost-reflect = { version = "0.16", features = ["serde"] }
-bytes.workspace = true
 http.workspace = true
 base64.workspace = true
 hyper-util.workspace = true
@@ -113,6 +111,7 @@ keyring = { version = "3", default-features = false, features = ["apple-native"]
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
 
 [dev-dependencies]
+bytes.workspace = true
 # Temp dirs that clean themselves up even when a test panics, which the
 # hand-rolled temp_dir().join(Uuid) pattern in fs_secure.rs does not.
 tempfile.workspace = true

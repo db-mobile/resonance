@@ -12,14 +12,12 @@ rust-version.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
-bytes.workspace = true
 http.workspace = true
 base64.workspace = true
 rustls-pemfile.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tower.workspace = true
-tokio-rustls.workspace = true
 rustls.workspace = true
 webpki-roots.workspace = true
 uuid.workspace = true
@@ -38,3 +36,4 @@ boa_engine = "0.20"
 
 [dev-dependencies]
 axum.workspace = true
+tokio-rustls.workspace = true
